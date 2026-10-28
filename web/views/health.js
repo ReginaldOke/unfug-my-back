@@ -3,6 +3,7 @@ import { h, iconButton, toast, copyText } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { readHealthExport, parseShortcut } from '../lib/health.js';
 import { dayLabel } from '../lib/dates.js';
+import { isNative, connectHealth } from '../lib/native.js';
 
 export function HealthView(ctx) {
   // Opened by the Shortcut with today's numbers: save them and go back to Today
@@ -18,13 +19,30 @@ export function HealthView(ctx) {
   const render = () => root.replaceChildren(
     h('header', { class: 'top-bar' }, iconButton('‹', 'Back', () => history.back()), h('h1', {}, 'Apple Health'), h('span')),
     status(),
-    importCard(render),
-    shortcutCard(),
+    // The app reads Health directly; the browser has to make do with an export or a Shortcut
+    ...(isNative ? [nativeCard(render)] : [importCard(render), shortcutCard()]),
     h('section', { class: 'card glass stack' },
       h('h2', {}, 'Screen time'),
       h('p', { class: 'hint' }, 'Screen time isn’t in Apple Health, and iPhone doesn’t share it with apps like this one. Log it on the Screen time stressor instead: Settings › Screen Time shows each day’s total.')));
   render();
   return root;
+}
+
+function nativeCard(render) {
+  const on = R.settings().healthSync;
+  return h('section', { class: 'card glass stack' },
+    h('h2', {}, on ? 'Connected' : 'Connect Apple Health'),
+    h('p', { class: 'hint' }, 'Reads your daily steps and sleep so you can see how they line up with your pain. Nothing leaves your phone.'),
+    h('button', {
+      type: 'button', class: 'btn primary', onclick: async e => {
+        e.currentTarget.disabled = true;
+        try {
+          const n = await connectHealth();
+          toast(n ? `Apple Health: ${n} day${n === 1 ? '' : 's'} updated` : 'Nothing new from Apple Health. Check Settings › Health › Data Access.');
+        } catch { toast('Couldn’t reach Apple Health'); }
+        render();
+      },
+    }, on ? 'Sync now' : 'Connect'));
 }
 
 function status() {

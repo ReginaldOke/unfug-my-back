@@ -194,6 +194,13 @@ export async function shareOrDownload(filename, text, mime) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export const vibrate = ms => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } };
+// iPhone ignores navigator.vibrate; the app uses the Taptic Engine instead (light for ticks, medium for lifts)
+const haptics = globalThis.Capacitor?.isNativePlatform?.() ? globalThis.Capacitor.registerPlugin('Haptics') : null;
+export const vibrate = ms => {
+  try {
+    if (haptics) haptics.impact({ style: ms >= 10 ? 'MEDIUM' : 'LIGHT' });
+    else navigator.vibrate?.(ms);
+  } catch { /* not supported */ }
+};
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));

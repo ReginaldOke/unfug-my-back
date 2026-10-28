@@ -1,0 +1,118 @@
+// The iOS app: the same web code runs inside a Capacitor shell, which adds real notifications (they
+// fire with the app closed, with action buttons) and Apple Health. In a browser all of this is a no-op.
+import * as R from './repos.js';
+import { localDate } from './dates.js';
+import { parseHM } from './reminders-core.js';
+
+const Cap = globalThis.Capacitor;
+export const isNative = !!Cap?.isNativePlatform?.();
+const plugin = name => (isNative ? Cap.registerPlugin(name) : null);
+const Notes = plugin('LocalNotifications');
+const Health = plugin('Health');
+
+const DAYS_AHEAD = 7; // iOS keeps at most 64 pending notifications
+const MOVE_ID = 1;
+
+/** Ask for notification permission and listen for taps. respond(eventId, outcome) handles the move buttons. */
+export async function startNative({ respond }) {
+  if (!isNative) return;
+  await Notes.registerActionTypes({
+    types: [
+      { id: 'MOVE', actions: [{ id: 'moved', title: 'Moving now' }, { id: 'already_moved', title: 'Already moved' }, { id: 'snoozed', title: 'Snooze 10 min' }] },
+      { id: 'ROUTINE', actions: [{ id: 'start', title: 'Start', foreground: true }] },
+    ],
+  });
+  Notes.addListener('localNotificationActionPerformed', ({ actionId, notification: n }) => {
+    const x = n.extra ?? {};
+    if (x.eventId && ['moved', 'already_moved', 'snoozed'].includes(actionId)) return respond(x.eventId, actionId);
+    if (x.hash) location.hash = x.hash;
+  });
+  const { display } = await Notes.checkPermissions();
+  if (display === 'prompt' || display === 'prompt-with-rationale') await Notes.requestPermissions();
+  syncNotifications();
+  if (R.settings().healthSync) syncHealth().catch(() => {});
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && R.settings().healthSync) syncHealth().catch(() => {}); });
+}
+
+export async function notificationPermission() {
+  if (!isNative) return null;
+  return (await Notes.checkPermissions()).display;
+}
+
+let timer = 0, lastPlan = '';
+/** Re-plans every pending system notification from what's stored. Cheap; called after any change. */
+export function syncNotifications() {
+  if (!isNative) return;
+  clearTimeout(timer);
+  timer = setTimeout(plan, 300);
+}
+
+async function plan() {
+  const s = R.settings();
+  const now = new Date();
+  const list = [];
+  const at = (date, hm) => { const d = new Date(`${date}T00:00:00`); const m = parseHM(hm); d.setHours(Math.floor(m / 60), m % 60); return d; };
+
+  // The movement reminder ahead, if there is one
+  const move = R.reminders.pending();
+  if (move && new Date(move.scheduledFor) > now) {
+    list.push({ id: MOVE_ID, title: 'Time to move', body: `You've been still for a while. A short walk or stretch will do.`, actionTypeId: 'MOVE', schedule: { at: new Date(move.scheduledFor) }, extra: { eventId: move.id } });
+  }
+  // Check-ins and routines for the next week, skipping today's if they're already done
+  let id = 100;
+  for (let k = 0; k < DAYS_AHEAD; k++) {
+    const date = localDate(new Date(now.getTime() + k * 86_400_000));
+    if (s.checkinTime && !R.checkins.entryFor(date)) {
+      const when = at(date, s.checkinTime);
+      if (when > now) list.push({ id: id++, title: 'Time to check in', body: 'Takes about a minute.', schedule: { at: when }, extra: { hash: '#/checkin' } });
+    }
+    for (const r of R.routines.all()) {
+      r.schedule.forEach((t, i) => {
+        const when = at(date, t);
+        if (when <= now || R.routines.completionsOn(date, r.id).length > i) return;
+        list.push({ id: id++, title: r.name, body: `${r.items.length} moves. Tap to start.`, actionTypeId: 'ROUTINE', schedule: { at: when }, extra: { hash: `#/routine/${r.id}` } });
+      });
+    }
+  }
+  // Ticks run every 20 seconds; only touch iOS when the plan changes
+  const sig = JSON.stringify(list.map(n => [n.title, +n.schedule.at]));
+  if (sig === lastPlan) return;
+  lastPlan = sig;
+  const { notifications: pending } = await Notes.getPending();
+  if (pending.length) await Notes.cancel({ notifications: pending.map(n => ({ id: n.id })) });
+  if (list.length) await Notes.schedule({ notifications: list.slice(0, 60) });
+}
+
+/** Asks for read access to steps and sleep (iOS shows its own sheet the first time). */
+export async function connectHealth() {
+  if (!isNative) return false;
+  const { available } = await Health.isAvailable();
+  if (!available) return false;
+  await Health.requestAuthorization({ read: ['steps', 'sleep'] });
+  R.setSettings({ healthSync: true });
+  return syncHealth();
+}
+
+/** Pulls the last 60 days of daily steps and nightly sleep into the diary. Returns how many days changed. */
+export async function syncHealth(days = 60) {
+  if (!isNative) return 0;
+  const end = new Date(), start = new Date(end.getTime() - days * 86_400_000);
+  const range = { startDate: start.toISOString(), endDate: end.toISOString() };
+  const rows = new Map();
+  const row = date => rows.get(date) ?? rows.set(date, { date }).get(date);
+
+  const { samples: steps = [] } = await Health.queryAggregated({ dataType: 'steps', ...range, bucket: 'day', aggregation: 'sum' }).catch(() => ({}));
+  for (const x of steps) if (x.value > 0) row(localDate(new Date(x.startDate))).steps = Math.round(x.value);
+
+  // Sleep counts toward the morning you woke up; time in bed and awake don't count
+  const { samples: sleep = [] } = await Health.readSamples({ dataType: 'sleep', ...range, limit: 5000 }).catch(() => ({}));
+  const asleep = new Map();
+  for (const x of sleep) {
+    if (['inBed', 'awake'].includes(x.sleepState)) continue;
+    const woke = localDate(new Date(x.endDate));
+    asleep.set(woke, (asleep.get(woke) ?? 0) + (new Date(x.endDate) - new Date(x.startDate)) / 60_000);
+  }
+  for (const [date, min] of asleep) if (min >= 60) row(date).sleepHours = Math.round(min / 6) / 10;
+
+  return R.health.merge([...rows.values()], 'healthkit');
+}

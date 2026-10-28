@@ -18,7 +18,8 @@ export function notify({ key, title, body, actions = [] }) {
   if (key) banners = banners.filter(b => b.key !== key);
   banners = [...banners, { id: ++seq, key, title, body, actions }];
   emit();
-  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+  // The iOS app schedules real notifications ahead of time (native.js); this is the browser's stand-in
+  if (!globalThis.Capacitor?.isNativePlatform?.() && document.hidden && 'Notification' in window && Notification.permission === 'granted') {
     try {
       const n = new Notification(title, { body, tag: key });
       n.onclick = () => { window.focus(); n.close(); };

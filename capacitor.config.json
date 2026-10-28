@@ -1,0 +1,14 @@
+{
+  "appId": "com.reginaldoke.unfugmyback",
+  "appName": "Unfug My Back",
+  "webDir": "dist",
+  "backgroundColor": "#141416",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": true,
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "LocalNotifications": { "iconColor": "#e5534b" }
+  }
+}

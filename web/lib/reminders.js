@@ -4,6 +4,7 @@ import * as core from './reminders-core.js';
 import { motion } from './motion.js';
 import { notify, dismissKey } from './notify.js';
 import { localDate, minutesSince } from './dates.js';
+import { startNative, syncNotifications } from './native.js';
 
 const TICK_MS = 20_000;
 
@@ -14,12 +15,18 @@ export function start() {
   wake('open');
   document.addEventListener('visibilitychange', () => { if (!document.hidden) wake('foreground'); });
   setInterval(() => wake('tick'), TICK_MS);
+  startNative({ respond });
 }
 
 export const status = () => ({ pending: R.reminders.pending(), awaiting: R.reminders.awaiting()[0] ?? null });
 
 /** Runs on every wake: app open, foreground, timer tick, simulated motion, notification action. */
 export function wake() {
+  runWake();
+  syncNotifications(); // the app hands what's ahead to iOS, so it fires with the app closed
+}
+
+function runWake() {
   const now = new Date();
   const s = R.settings();
   const cfg = s.reminder;
@@ -110,6 +117,7 @@ export function reschedule(from = new Date()) {
 
 function schedule(at) {
   cancelPending();
+  syncNotifications();
   if (!at) return null;
   return R.reminders.create({ scheduledFor: at.toISOString(), firedAt: null, outcome: null, stationaryMinutesBefore: null });
 }

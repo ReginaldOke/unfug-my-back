@@ -7,3 +7,9 @@ reference UI/
 /Free_Pack_-_Male_Base_Mesh.*
 # three.js is copied in by the deploy workflow
 web/vendor/
+
+# iOS build output
+/dist/
+ios/App/App/public/
+ios/App/Pods/
+ios/DerivedData/

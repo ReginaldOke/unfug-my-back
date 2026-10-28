@@ -75,7 +75,8 @@ render();
 reminders.start();
 
 // Installable app: offline support and updates on each open (see sw.js)
-if ('serviceWorker' in navigator) {
+// The iOS app ships its files inside the app, so it needs no offline cache
+if ('serviceWorker' in navigator && !globalThis.Capacitor?.isNativePlatform?.()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline support unavailable', e));
   });

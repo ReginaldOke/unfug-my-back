@@ -5,9 +5,11 @@
 //     fragment, which never leaves the phone.
 // Parsing is pure and tested in test/health.test.js.
 
-// Off for now: the export and Shortcut routes are too fiddly. Kept for a native app, where HealthKit
-// can read steps and sleep directly; turning this on brings back the strips, the screen and the lines.
-export const HEALTH_IMPORT = false;
+import { isNative } from './native.js';
+
+// On in the iOS app, which reads HealthKit directly. Off in the browser: the export and Shortcut routes
+// were too fiddly. Turning this on brings back the strips, the screen and the lines.
+export const HEALTH_IMPORT = isNative;
 
 const STEP_TYPE = 'HKQuantityTypeIdentifierStepCount';
 const SLEEP_TYPE = 'HKCategoryTypeIdentifierSleepAnalysis';

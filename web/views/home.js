@@ -45,7 +45,7 @@ export function HomeView(ctx) {
     onLift: () => { dragging = true; },
     // Redraw once the card has glided into its slot (the save during the drag was skipped)
     onDrop: () => { dragging = false; setTimeout(() => render(), 360); },
-    onReorder: rows => R.setSettings({ homeOrder: rows.map(r => r.dataset.section), homeReordered: true }),
+    onReorder: rows => R.setSettings({ homeOrder: rows.map(r => r.dataset.section) }),
   });
   seedNotes();
   const render = () => {
@@ -53,8 +53,7 @@ export function HomeView(ctx) {
     if (dragging || sections.querySelector('.pad-input')) return;
     const { top, parts } = build();
     sections.replaceChildren(...sectionOrder().map(k => parts[k]));
-    const tip = R.settings().homeReordered ? null : h('p', { class: 'hint center home-tip' }, 'Tip: hold any section to move it.');
-    root.replaceChildren(...[...top, sections, tip].filter(Boolean));
+    root.replaceChildren(...[...top, sections].filter(Boolean));
   };
   rerender = render;
   render();

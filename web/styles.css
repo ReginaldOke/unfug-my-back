@@ -1060,7 +1060,6 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .home-section { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; border-radius: var(--r-card); transition: opacity .25s var(--ease-out); }
 .home-sections.dragging .home-section:not(.lifted) { opacity: 0.6; }
 .home-section.lifted { position: relative; z-index: 5; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.75); transition: box-shadow .2s; }
-.home-tip { color: var(--ink-3); font-size: 12px; margin-top: -4px; }
 
 /* ---------- Notes ---------- */
 .pad { gap: 6px; }
@@ -1074,7 +1073,8 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .pad-add { color: var(--ink-3); font-style: normal; font-size: 14px; cursor: pointer; }
 .pad-input { resize: none; overflow: hidden; outline: none; caret-color: var(--red-2); -webkit-user-select: text; user-select: text; }
 .pad-input::placeholder { color: var(--ink-3); }
-.pad-edit { display: flex; align-items: flex-start; gap: 8px; }
+.pad-edit { display: flex; align-items: flex-start; gap: 8px; flex: 1; min-width: 0; }
+.pad-edit .pad-input { flex: 1; min-width: 0; }
 .pad-del { flex: none; width: 30px; height: 30px; margin-top: 8px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.1); color: var(--ink-2); font-size: 13px; }
 .sleep-step { display: flex; flex-direction: column; gap: 22px; }
 .sleep-step .steps-strip { margin-bottom: 0; }
