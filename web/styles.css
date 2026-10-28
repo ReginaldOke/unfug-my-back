@@ -1133,3 +1133,77 @@ a.routine-card { text-decoration: none; color: inherit; display: flex; }
 /* Routine cards open on tap: a gentle press instead of a chevron */
 a.routine-card { transition: transform .25s var(--spring), background .2s; -webkit-tap-highlight-color: transparent; }
 a.routine-card:active { transform: scale(0.98); background: rgba(255, 255, 255, 0.1); }
+
+/* ---------- One routine page: edit and log in one place ---------- */
+.routine-page .top-bar .eyebrow { flex: 1; text-align: center; }
+.routine-title { font-size: 30px; border-bottom-color: transparent; margin: 4px 0 8px; transition: border-color .2s; }
+.routine-title:hover { border-bottom-color: var(--line); }
+.play-btn { width: 38px; height: 38px; display: grid; place-items: center; color: var(--ink); }
+.play-btn svg { transform: translateX(1px); }
+
+.routine-page .log-row { position: relative; display: block; padding: 0; overflow: hidden; border-radius: 0; transition: height .24s var(--ease-out), opacity .2s; }
+.routine-page .log-row.lifted { border-radius: 16px; overflow: visible; }
+.routine-page .log-row.removing { opacity: 0; }
+.log-inner {
+  position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 8px 2px; min-height: 58px;
+  transition: transform .3s var(--spring); touch-action: pan-y;
+}
+/* Only opaque while sliding, so the grain shows through at rest */
+.log-inner { border-radius: 14px; }
+.log-row.swiping .log-inner, .log-row.open .log-inner { background: #26262a; box-shadow: 6px 0 18px -8px rgba(0, 0, 0, 0.6); }
+.log-row.swiping .log-inner { transition: none; }
+.log-row.lifted .log-inner { background: rgba(40, 40, 44, 0.96); border-radius: 16px; padding-inline: 10px; }
+.log-del {
+  position: absolute; inset: 6px 0 6px auto; width: 76px; border: 0; border-radius: 14px; background: #e5534b; color: #fff; font: inherit; font-size: 14px;
+  opacity: 0; transition: opacity .2s; cursor: pointer;
+}
+.log-row.open .log-del, .log-row.swiping .log-del { opacity: 1; }
+
+/* A quiet checkbox: a hairline ring that fills softly when ticked */
+.routine-page .log-check {
+  width: 18px; height: 18px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.03);
+  padding: 0; cursor: pointer; position: relative;
+}
+.routine-page .log-check::before { content: ''; position: absolute; inset: -12px; } /* a bigger target than it looks */
+.routine-page .log-row.done .log-check { background: rgba(116, 212, 192, 0.85); border-color: transparent; transform: none; }
+.routine-page .log-row.done .log-check::after { width: 7px; height: 4px; border-width: 1.6px; border-color: #0f2620; }
+
+input.log-name {
+  flex: 1; min-width: 0; background: none; border: 0; padding: 6px 0; color: var(--ink); font: inherit; font-size: 16px;
+  cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: color .2s;
+}
+input.log-name:focus { outline: none; cursor: text; -webkit-user-select: text; user-select: text; }
+input.log-name::placeholder { color: var(--ink-3); }
+.routine-page .log-row.done input.log-name:not(:focus) { color: var(--ink-2); }
+.log-list:not(:empty) + .log-add-input { margin-top: 4px; }
+.log-add-input { width: 100%; background: none; border: 0; border-top: 1px solid var(--line); padding: 16px 2px; color: var(--ink); font: inherit; }
+.log-add-input::placeholder { color: var(--ink-3); }
+.log-add-input:focus { outline: none; }
+
+/* How hard did you go: a three-stop slider, green to yellow to red */
+.effort-field { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.effort-word { font-size: 14px; color: var(--ink-2); transition: color .2s; }
+.effort-field:has(.effort-range[data-level="1"]) .effort-word { color: #7fd98f; }
+.effort-field:has(.effort-range[data-level="2"]) .effort-word { color: #f2cf5b; }
+.effort-field:has(.effort-range[data-level="3"]) .effort-word { color: #ff7a6b; }
+.effort-range { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: none; margin: 0; cursor: pointer; }
+.effort-range::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, transparent var(--pct, 50%), rgba(24, 24, 26, 0.72) var(--pct, 50%)),
+    linear-gradient(90deg, #7fd98f, #f2cf5b 50%, #ff7a6b);
+}
+.effort-range::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, #7fd98f, #f2cf5b 50%, #ff7a6b); opacity: .5; }
+.effort-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: #f4f4f6;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); transition: transform .25s var(--spring);
+}
+.effort-range:active::-webkit-slider-thumb { transform: scale(1.15); }
+.effort-range::-moz-range-thumb { width: 24px; height: 24px; border: 0; border-radius: 50%; background: #f4f4f6; }
+.routine-page .field { margin-top: 18px; }
+
+.link-danger { display: block; margin: 28px auto 8px; background: none; border: 0; color: #ff8a7d; font: inherit; font-size: 14px; opacity: .8; cursor: pointer; }
+
+/* Player: − and + around what you did */
+.stepper { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 6px 0 4px; }
+.stepper .icon-btn { width: 46px; height: 46px; font-size: 22px; }
+.stepper .dose-big { min-width: 120px; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }

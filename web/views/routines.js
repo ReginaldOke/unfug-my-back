@@ -1,5 +1,6 @@
-// Routines: your list, a day's log (sets and reps), the editor, and a one-move-at-a-time player.
-import { h, toast, iconButton, confirmSheet, segmented, vibrate } from '../lib/ui.js';
+// Routines: your list, one page per routine (edit it and log a day's session in the same place),
+// and a one-move-at-a-time player that shares the session in progress.
+import { h, toast, iconButton, confirmSheet, vibrate } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate, dayLabel } from '../lib/dates.js';
 import { bumpLastNumber } from '../lib/labels.js';
@@ -32,89 +33,252 @@ export function RoutinesView() {
 
 const lastDone = id => R.routines.lastDoneDate(id);
 
+// Sessions in progress, by routine and day, shared by the routine page and the player, so reps
+// adjusted in one show up in the other. Cleared when the session is saved.
+const sessions = new Map();
+const EFFORT = ['', 'Easy', 'Moderate', 'Hard'];
+
+function sessionFor(r, date, fromCheckin) {
+  const key = `${r?.id ?? 'new'}|${date}`;
+  if (sessions.has(key)) return sessions.get(key);
+  const logged = r ? R.routines.sessionOn(r.id, date) : null;
+  const before = r ? R.routines.lastDid(r.id, date) : new Map();
+  const didNow = new Map((logged?.log ?? []).map(x => [x.name, x.did]));
+  const draft = fromCheckin && r ? checkinDraft(date) : null;
+  // Each box starts with what you did today if logged, else last time, else the target
+  const s = {
+    key, id: r?.id ?? null, date, name: r?.name ?? '', schedule: [...(r?.schedule ?? [])],
+    items: (r?.items ?? []).map(it => {
+      const now = didNow.get(it.name);
+      return { name: it.name, dose: it.dose, did: now || before.get(it.name) || it.dose || '', done: !!now };
+    }),
+    intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
+  };
+  sessions.set(key, s);
+  return s;
+}
+
 /**
- * A routine's log for one day: every move with what you did (last time's numbers shown faintly),
- * drag to reorder, add a move, save. Opened from the Routines tab, Today, or a check-in's Edit.
+ * Saves the routine (name, moves, reminders) and, if any move is ticked, that day's session.
+ * Returns the routine, or null if it can't be saved yet.
  */
-export function RoutineLogView(ctx) {
-  const r = R.routines.get(ctx.args[0]);
-  if (!r) return h('div', { class: 'view' }, h('p', {}, 'Routine not found.'), h('a', { href: '#/routines' }, 'Routines'));
+function saveSession(s, { fromCheckin }) {
+  const name = s.name.trim();
+  const items = s.items.filter(it => it.name.trim());
+  if (!name) { toast('Give the routine a name'); return null; }
+  if (!items.length) { toast('Add at least one move'); return null; }
+  const moves = items.map(it => ({ name: it.name.trim(), dose: it.dose || it.did.trim() }));
+  const existing = s.id ? R.routines.get(s.id) : null;
+  const changed = !existing || existing.name !== name || JSON.stringify(existing.items) !== JSON.stringify(moves)
+    || existing.schedule.join() !== [...new Set(s.schedule)].sort().join();
+  const r = changed ? R.routines.save(s.id, { name, items: moves, schedule: [...new Set(s.schedule)].sort() }) : existing;
+  const done = items.filter(it => it.done);
+  if (done.length) {
+    const log = items.map(it => ({ name: it.name.trim(), did: it.done ? it.did.trim() || '✓' : '' }));
+    // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
+    const live = checkinDraft(s.date);
+    R.routines.logSession(r.id, s.date, { log, intensity: s.intensity }, { writeLog: !live });
+    if (live) { live.selections.set(r.linkedFactorId, 1); live.intensity.set(r.linkedFactorId, s.intensity); }
+  }
+  sessions.delete(s.key);
+  toast(done.length ? `${name} logged` : 'Routine saved');
+  if (fromCheckin) location.hash = `#/checkin?date=${s.date}`;
+  else if (done.length && s.date === localDate()) { justFinished.id = r.id; location.hash = '#/'; }
+  else location.hash = '#/routines';
+  return r;
+}
+
+const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>';
+
+/**
+ * One page per routine: tap the title to rename it, tick moves (the circle or the name), adjust what
+ * you did by typing or swiping the box, hold a row to drag it, swipe a row left to delete it, set how
+ * hard you went and the reminders, then Done. ▶ plays it one move at a time.
+ */
+export function RoutineView(ctx) {
+  const r = ctx.args[0] && ctx.args[0] !== 'new' ? R.routines.get(ctx.args[0]) : null;
+  if (ctx.args[0] && ctx.args[0] !== 'new' && !r) return h('div', { class: 'view' }, h('p', {}, 'Routine not found.'), h('a', { href: '#/routines' }, 'Routines'));
   const date = ctx.params.get('date') || localDate();
   const fromCheckin = ctx.params.get('from') === 'checkin';
-  const session = R.routines.sessionOn(r.id, date);
-  const before = R.routines.lastDid(r.id, date);
-  const didNow = new Map((session?.log ?? []).map(x => [x.name, x.did]));
-  // Each box starts with what you did today if logged, else last time's numbers, else the target;
-  // you adjust it rather than type from scratch. Ticked (done) is separate: tap the name, or change the value
-  const items = structuredClone(r.items).map(it => {
-    const logged = didNow.get(it.name);
-    return { ...it, did: logged || before.get(it.name) || it.dose || '', done: !!logged };
+  const s = sessionFor(r, date, fromCheckin);
+  if (!r && !s.items.length) s.items.push({ name: '', dose: '', did: '', done: false });
+
+  const title = h('input', {
+    type: 'text', class: 'title-input routine-title', value: s.name, placeholder: 'Routine name', 'aria-label': 'Routine name', maxlength: 60,
+    oninput: e => { s.name = e.target.value; },
+    onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
   });
-  const draft = fromCheckin ? checkinDraft(date) : null;
-  const factorId = r.linkedFactorId;
-  let intensity = draft?.intensity.get(factorId) ?? session?.intensity ?? null;
 
   const list = h('div', { class: 'log-list' });
   const rowItem = new Map();
-  const paint = () => list.replaceChildren(
-    ...items.map(it => {
-      const tick = on => { it.done = on; row.classList.toggle('done', on); name.setAttribute('aria-pressed', String(on)); };
-      const did = h('input', {
-        type: 'text', class: 'did-input', value: it.did, inputmode: 'text', enterkeyhint: 'next',
-        placeholder: 'Done', 'aria-label': `What you did: ${it.name}`,
-        oninput: e => { it.did = e.target.value; tick(true); },
-        onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); const next = row.nextElementSibling?.querySelector('.did-input'); next ? next.focus() : e.target.blur(); } },
-      });
-      scrubNumber(did, () => it.dose || '0');
-      // Tapping the name ticks the move off (or back on)
-      const name = h('button', { type: 'button', class: 'grow log-tick', 'aria-pressed': String(it.done), onclick: () => tick(!it.done) },
-        h('span', { class: 'log-check', 'aria-hidden': 'true' }), h('span', { class: 'log-name' }, it.name));
-      const row = h('div', { class: `log-row drag-row${it.done ? ' done' : ''}` },
-        h('span', { class: 'grip', role: 'button', 'aria-label': `Drag to reorder ${it.name}`, title: 'Drag to reorder' }, h('i'), h('i'), h('i')),
-        name,
-        did);
-      rowItem.set(row, it);
-      return row;
-    }),
-    addRow());
-  dragHandles(list, { onReorder: rows => { items.splice(0, items.length, ...rows.map(x => rowItem.get(x))); } });
+  let openRow = null; // the row swiped open to show Delete
+  const closeOpen = () => { if (openRow) { openRow.slide(0); openRow = null; } };
 
-  function addRow() {
-    const input = h('input', {
-      type: 'text', class: 'glass-input', placeholder: '+ Add a move', 'aria-label': 'Add a move', enterkeyhint: 'done',
-      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } },
-      onblur: () => { const name = input.value.trim(); if (name) { items.push({ name, dose: '', did: '', done: false }); paint(); } },
+  function moveRow(it) {
+    const check = h('button', { type: 'button', class: 'log-check', 'aria-label': `Done: ${it.name || 'move'}` });
+    const tick = on => { it.done = on; row.classList.toggle('done', on); check.setAttribute('aria-pressed', String(on)); };
+    const name = h('input', {
+      type: 'text', class: 'log-name', value: it.name, placeholder: 'Move', 'aria-label': 'Move name', enterkeyhint: 'next',
+      oninput: e => { it.name = e.target.value; },
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
     });
-    return h('div', { class: 'log-add' }, input);
+    // Tapping the name ticks it; it's only for typing once you're already in it, or while it's empty
+    name.addEventListener('pointerdown', e => {
+      if (document.activeElement === name || !it.name) return;
+      e.preventDefault();
+    });
+    name.addEventListener('click', () => { if (document.activeElement !== name && it.name) tick(!it.done); });
+    name.addEventListener('dblclick', () => { name.focus(); });
+    const did = h('input', {
+      type: 'text', class: 'did-input', value: it.did, inputmode: 'text', enterkeyhint: 'next', placeholder: 'Done',
+      'aria-label': `What you did: ${it.name}`,
+      oninput: e => { it.did = e.target.value; tick(true); },
+      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); const next = row.nextElementSibling?.querySelector('.did-input'); next ? next.focus() : e.target.blur(); } },
+    });
+    scrubNumber(did, () => it.dose || '0');
+    check.addEventListener('click', () => tick(!it.done));
+
+    const inner = h('div', { class: 'log-inner' }, check, name, did);
+    const del = h('button', { type: 'button', class: 'log-del', 'aria-label': `Delete ${it.name || 'move'}`, onclick: () => remove() }, 'Delete');
+    const row = h('div', { class: `log-row drag-row${it.done ? ' done' : ''}` }, del, inner);
+    check.setAttribute('aria-pressed', String(it.done));
+    rowItem.set(row, it);
+
+    function remove() {
+      row.style.height = `${row.offsetHeight}px`;
+      row.classList.add('removing');
+      requestAnimationFrame(() => { row.style.height = '0px'; });
+      setTimeout(() => { s.items.splice(s.items.indexOf(it), 1); row.remove(); openRow = null; }, 240);
+      vibrate(8);
+    }
+
+    // Swipe left to reveal Delete; a short swipe springs back
+    let sw = null;
+    row.slide = x => { inner.style.transform = x ? `translateX(${x}px)` : ''; row.classList.toggle('open', x < 0); };
+    let swallowUntil = 0;
+    inner.addEventListener('pointerdown', e => {
+      if (e.target.closest('.did-input') || e.button > 0) return;
+      sw = { x: e.clientX, y: e.clientY, base: openRow === row ? -84 : 0, on: false };
+    });
+    inner.addEventListener('pointermove', e => {
+      if (!sw || list.classList.contains('dragging')) return;
+      if (!e.buttons) { sw = null; return; }
+      const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+      if (!sw.on) {
+        if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        sw.on = true;
+        if (openRow && openRow !== row) closeOpen();
+        row.classList.add('swiping');
+      }
+      row.slide(Math.max(-110, Math.min(0, sw.base + dx)));
+    });
+    const endSwipe = e => {
+      if (!sw) return;
+      const wasSwipe = sw.on;
+      const x = sw.base + (e.clientX - sw.x);
+      sw = null;
+      row.classList.remove('swiping');
+      if (!wasSwipe) return;
+      if (x < -42) { row.slide(-84); openRow = row; } else { row.slide(0); if (openRow === row) openRow = null; }
+      swallowUntil = performance.now() + 350; // a swipe isn't a tap on the name
+    };
+    inner.addEventListener('click', e => { if (performance.now() < swallowUntil) { e.stopPropagation(); e.preventDefault(); } }, true);
+    inner.addEventListener('pointerup', endSwipe);
+    inner.addEventListener('pointercancel', endSwipe);
+    return row;
   }
+
+  const paint = () => list.replaceChildren(...s.items.map(moveRow));
   paint();
+  // Hold a row (its name or the space around it, not the box) to lift it, then drag
+  dragHandles(list, {
+    hold: true, skip: '.did-input, .log-name:focus, .log-del', onLift: closeOpen,
+    onReorder: rows => { s.items.splice(0, s.items.length, ...rows.map(x => rowItem.get(x))); },
+  });
+  const closeOnTapAway = e => { if (openRow && !openRow.contains(e.target)) closeOpen(); };
+  document.addEventListener('pointerdown', closeOnTapAway, { capture: true });
+  ctx.onCleanup(() => document.removeEventListener('pointerdown', closeOnTapAway, { capture: true }));
 
-  const effort = segmented([[1, 'Easy'], [2, 'Moderate'], [3, 'Hard']], intensity, v => { intensity = v; }, 'How hard');
-
-  function save() {
-    const moves = items.map(({ name, dose }) => ({ name, dose }));
-    if (moves.map(m => m.name + m.dose).join() !== r.items.map(m => m.name + m.dose).join()) R.routines.save(r.id, { items: moves });
-    // Only ticked moves count as done; a tick with nothing typed is saved as ✓
-    const log = items.map(({ name, did, done }) => ({ name, did: done ? did.trim() || '✓' : '' }));
-    // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
-    const liveDraft = checkinDraft(date);
-    R.routines.logSession(r.id, date, { log, intensity }, { writeLog: !liveDraft });
-    if (liveDraft) { liveDraft.selections.set(factorId, 1); liveDraft.intensity.set(factorId, intensity ?? liveDraft.intensity.get(factorId) ?? 2); }
-    toast(`${r.name} logged`);
-    if (fromCheckin) location.hash = `#/checkin?date=${date}`;
-    else { justFinished.id = date === localDate() ? r.id : null; location.hash = '#/'; }
+  const add = h('input', {
+    type: 'text', class: 'log-add-input', placeholder: '+ Add a move', 'aria-label': 'Add a move', enterkeyhint: 'done',
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); commitAdd(); } },
+    onblur: () => commitAdd(),
+  });
+  function commitAdd() {
+    const name = add.value.trim();
+    if (!name) return;
+    const it = { name, dose: '', did: '', done: false };
+    s.items.push(it);
+    list.append(moveRow(it));
+    add.value = '';
   }
 
-  return h('div', { class: 'view routine-log' },
+  // How hard you went: a three-stop slider, green to red
+  const word = h('span', { class: 'effort-word' });
+  const effort = h('input', {
+    type: 'range', class: 'effort-range', min: 1, max: 3, step: 1, value: s.intensity, 'aria-label': 'How hard did you go?',
+    oninput: e => { s.intensity = Number(e.target.value); paintEffort(); vibrate(4); },
+  });
+  const paintEffort = () => {
+    word.textContent = EFFORT[s.intensity];
+    effort.dataset.level = s.intensity;
+    effort.style.setProperty('--pct', `${(s.intensity - 1) * 50}%`);
+  };
+  paintEffort();
+
+  // Reminders, as chips; + adds one
+  const times = h('div', { class: 'chips wrap' });
+  const paintTimes = () => times.replaceChildren(
+    ...s.schedule.map((t, i) => h('span', { class: 'chip time' },
+      h('input', { type: 'time', value: t, 'aria-label': `Reminder ${i + 1}`, onchange: e => { s.schedule[i] = e.target.value; } }),
+      h('button', { type: 'button', class: 'x', 'aria-label': `Remove reminder ${i + 1}`, onclick: () => { s.schedule.splice(i, 1); paintTimes(); } }, '✕'))),
+    h('button', { type: 'button', class: 'chip add', onclick: () => { s.schedule.push('18:00'); paintTimes(); } }, '+ Reminder'));
+  paintTimes();
+
+  const play = h('button', {
+    type: 'button', class: 'icon-btn glass play-btn', 'aria-label': 'Follow along, one move at a time', title: 'Follow along',
+    onclick: () => {
+      if (!s.items.some(it => it.name.trim())) return toast('Add a move first');
+      if (!s.id) { const saved = saveDraftRoutine(); if (!saved) return; }
+      location.hash = `#/routine/${s.id}/run?date=${date}${fromCheckin ? '&from=checkin' : ''}`;
+    },
+  });
+  play.innerHTML = PLAY;
+
+  // A new routine has to exist before the player can open it
+  function saveDraftRoutine() {
+    if (!s.name.trim()) { toast('Give the routine a name'); title.focus(); return null; }
+    const r2 = R.routines.save(null, { name: s.name.trim(), items: s.items.filter(it => it.name.trim()).map(it => ({ name: it.name.trim(), dose: it.did.trim() })), schedule: s.schedule });
+    sessions.delete(s.key);
+    s.id = r2.id;
+    s.key = `${r2.id}|${date}`;
+    sessions.set(s.key, s);
+    return r2;
+  }
+
+  if (!r) setTimeout(() => title.focus(), 50);
+  return h('div', { class: 'view routine-page' },
     h('header', { class: 'top-bar' },
       iconButton('‹', 'Back', () => history.back()),
       h('span', { class: 'eyebrow' }, dayLabel(date)),
-      h('a', { class: 'chip glass', href: `#/routine/${r.id}/edit${fromCheckin ? `?from=checkin&date=${date}` : ''}` }, 'Edit')),
-    h('h1', {}, r.name),
+      h('div', { class: 'row tight' }, play,
+        h('button', { type: 'button', class: 'btn primary small', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
+    title,
     list,
-    h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'How hard was it?'), effort),
-    h('button', { type: 'button', class: 'btn primary wide', onclick: save }, session ? 'Save' : 'Done'),
-    r.items.some(it => MoveFigure(it.name)) ? h('a', { class: 'btn ghost wide', href: `#/routine/${r.id}/run` }, '▶ Follow along') : null);
+    add,
+    h('div', { class: 'effort-field' },
+      h('div', { class: 'row between' }, h('span', { class: 'field-label' }, 'How hard did you go?'), word),
+      effort),
+    h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
+    r ? h('button', {
+      type: 'button', class: 'link-danger', onclick: async () => {
+        if (await confirmSheet(`Delete ${r.name}?`, 'Past sessions stay in your history.', 'Delete', { danger: true })) {
+          sessions.delete(s.key);
+          R.routines.archive(r.id);
+          location.hash = '#/routines';
+        }
+      },
+    }, 'Delete routine') : null);
 }
 
 const SCRUB_STEP = 14; // px of finger travel per step
@@ -155,100 +319,42 @@ function scrubNumber(input, seed) {
   input.addEventListener('pointercancel', end);
 }
 
-export function RoutineEditView(ctx) {
-  const r = ctx.args[0] ? R.routines.get(ctx.args[0]) : null;
-  const fromCheckin = ctx.params.get('from') === 'checkin';
-  const date = ctx.params.get('date');
-  const model = {
-    name: r?.name ?? '',
-    items: structuredClone(r?.items ?? [{ name: '', dose: '' }, { name: '', dose: '' }, { name: '', dose: '' }]),
-    schedule: [...(r?.schedule ?? [])],
-  };
-  const itemsBox = h('div', { class: 'stack tight' });
-  const timesBox = h('div', { class: 'chips wrap' });
-
-  // Press the grip and drag to reorder; rows keep their item, so only the numbers need redrawing
-  const rowItem = new Map();
-  const renumber = () => itemsBox.querySelectorAll('.drag-row .idx').forEach((n, i) => { n.textContent = String(i + 1); });
-  const renderItems = () => itemsBox.replaceChildren(
-    ...model.items.map((it, i) => {
-      const row = h('div', { class: 'item-row drag-row' },
-        h('span', { class: 'grip', role: 'button', 'aria-label': `Drag to reorder ${it.name || 'move'}`, title: 'Drag to reorder' }, h('i'), h('i'), h('i')),
-        h('span', { class: 'idx' }, String(i + 1)),
-        h('input', { type: 'text', class: 'glass-input grow', value: it.name, placeholder: ['Push-ups', 'Squats', 'Plank'][i] ?? 'Move', 'aria-label': `Move ${i + 1}`, oninput: e => { it.name = e.target.value; } }),
-        h('input', { type: 'text', class: 'glass-input dose-input', value: it.dose, placeholder: ['3 × 10', '3 × 12', '45 s'][i] ?? '× 6', 'aria-label': `Target for move ${i + 1}`, oninput: e => { it.dose = e.target.value; } }),
-        h('button', { type: 'button', class: 'icon-btn small', 'aria-label': `Remove move ${i + 1}`, onclick: () => { model.items.splice(model.items.indexOf(it), 1); renderItems(); } }, '✕'));
-      rowItem.set(row, it);
-      return row;
-    }),
-    h('button', { type: 'button', class: 'btn ghost small', onclick: () => { model.items.push({ name: '', dose: '' }); renderItems(); itemsBox.querySelector('.item-row:last-of-type input')?.focus(); } }, '+ Add a move'));
-  dragHandles(itemsBox, { onReorder: rows => { model.items = rows.map(r => rowItem.get(r)); renumber(); } });
-
-  const renderTimes = () => timesBox.replaceChildren(
-    ...model.schedule.map((t, i) => h('span', { class: 'chip time' },
-      h('input', { type: 'time', value: t, 'aria-label': `Reminder ${i + 1}`, onchange: e => { model.schedule[i] = e.target.value; } }),
-      h('button', { type: 'button', class: 'x', 'aria-label': `Remove reminder ${i + 1}`, onclick: () => { model.schedule.splice(i, 1); renderTimes(); } }, '✕'))),
-    h('button', { type: 'button', class: 'chip add', onclick: () => { model.schedule.push('18:00'); renderTimes(); } }, '+ Reminder'));
-
-  renderItems();
-  renderTimes();
-
-  const save = () => {
-    const items = model.items.filter(it => it.name.trim()).map(it => ({ name: it.name.trim(), dose: it.dose.trim() }));
-    if (!model.name.trim()) return toast('Give the routine a name');
-    if (!items.length) return toast('Add at least one move');
-    const saved = R.routines.save(r?.id, { name: model.name.trim(), items, schedule: [...new Set(model.schedule)].sort() });
-    toast('Routine saved');
-    // Back to where it was opened: the check-in it was added from, or the routine's log
-    if (fromCheckin && !r) location.hash = `#/checkin?date=${date ?? localDate()}`;
-    else if (r) history.back();
-    else location.hash = `#/routine/${saved.id}`;
-  };
-
-  return h('div', { class: 'view' },
-    h('header', { class: 'top-bar' }, iconButton('‹', 'Back', () => history.back()), h('h1', {}, r ? 'Edit routine' : 'New routine'), h('span')),
-    h('input', { type: 'text', class: 'title-input', value: model.name, placeholder: 'e.g. Calisthenics', 'aria-label': 'Routine name', oninput: e => { model.name = e.target.value; } }),
-    h('section', { class: 'card glass' }, h('div', { class: 'row between' }, h('h2', {}, 'Moves'), h('span', { class: 'hint' }, 'Target')), itemsBox),
-    h('section', { class: 'card glass stack' }, h('h2', {}, 'Reminders'), timesBox),
-    h('button', { type: 'button', class: 'btn primary wide', onclick: save }, 'Save routine'),
-    r ? h('button', {
-      type: 'button', class: 'btn ghost wide', onclick: async () => {
-        if (await confirmSheet('Remove this routine?', 'Past sessions stay in your history.', 'Remove', { danger: true })) {
-          R.routines.archive(r.id);
-          location.hash = '#/routines';
-        }
-      },
-    }, 'Remove routine') : null);
-}
-
+/** One move at a time, with its animation. − and + adjust what you did, shared with the routine page. */
 export function RoutineRunView(ctx) {
   const r = R.routines.get(ctx.args[0]);
   if (!r) return h('div', { class: 'view' }, h('p', {}, 'Routine not found.'));
-  let i = 0;
+  const date = ctx.params.get('date') || localDate();
+  const fromCheckin = ctx.params.get('from') === 'checkin';
+  const s = sessionFor(r, date, fromCheckin);
+  const moves = s.items.filter(it => it.name.trim());
+  let i = Math.max(0, moves.findIndex(it => !it.done));
   const root = h('div', { class: 'flow' });
-
-  const finish = completed => {
-    R.routines.complete(r.id, completed);
-    // Today celebrates the finish on the routine tile (see home.js); a partial session just gets a note
-    if (completed) justFinished.id = r.id;
-    else toast('Logged as partly done');
-    location.hash = '#/';
-  };
+  const back = () => { location.hash = `#/routine/${r.id}?date=${date}${fromCheckin ? '&from=checkin' : ''}`; };
 
   function render() {
-    const it = r.items[i];
-    const last = i === r.items.length - 1;
+    const it = moves[i];
+    const last = i === moves.length - 1;
+    const amount = h('span', { class: 'dose-big' }, it.did || it.dose || '—');
+    const bump = by => { it.did = bumpLastNumber(it.did || it.dose || '0', by); amount.textContent = it.did; vibrate(4); };
     root.replaceChildren(
-      h('header', { class: 'flow-head' }, iconButton('✕', 'Stop', () => (i > 0 ? finish(false) : history.back())), h('span', { class: 'eyebrow' }, r.name), h('span', { class: 'timer' }, `${i + 1}/${r.items.length}`)),
-      h('div', { class: 'progress' }, r.items.map((_, k) => h('i', { class: k < i ? 'done' : k === i ? 'now' : '' }))),
+      h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, r.name), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),
+      h('div', { class: 'progress' }, moves.map((m, k) => h('i', { class: m.done ? 'done' : k === i ? 'now' : '' }))),
       h('div', { class: 'flow-body move-stage' },
         MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)),
         h('h1', { tabindex: -1 }, it.name),
-        h('p', { class: 'dose-big' }, it.dose),
-        r.items[i + 1] ? h('p', { class: 'hint' }, `Next: ${r.items[i + 1].name}`) : null),
+        h('div', { class: 'stepper' },
+          h('button', { type: 'button', class: 'icon-btn glass', 'aria-label': 'One less', onclick: () => bump(-1) }, '−'),
+          amount,
+          h('button', { type: 'button', class: 'icon-btn glass', 'aria-label': 'One more', onclick: () => bump(1) }, '+')),
+        moves[i + 1] ? h('p', { class: 'hint' }, `Next: ${moves[i + 1].name}`) : null),
       h('div', { class: 'flow-footer' },
-        i > 0 ? iconButton('‹', 'Back', () => { i--; render(); }) : h('span'),
-        h('button', { type: 'button', class: 'btn primary wide', onclick: () => (last ? finish(true) : (i++, render())) }, last ? 'Done' : 'Next')));
+        i > 0 ? iconButton('‹', 'Previous move', () => { i--; render(); }) : h('span'),
+        h('button', {
+          type: 'button', class: 'btn primary wide', onclick: () => {
+            it.done = true;
+            if (last) saveSession(s, { fromCheckin }); else { i++; render(); }
+          },
+        }, last ? 'Finish' : 'Next')));
     root.querySelector('h1').focus({ preventScroll: true });
   }
   render();

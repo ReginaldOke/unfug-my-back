@@ -135,9 +135,9 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
  * Vertical drag-to-reorder list; the other rows glide out of the way. Rows are children with .drag-row.
  * By default a row is dragged by its .grip (routine moves). hold: press anywhere on a row and hold to
  * lift it instead (Today's sections), so ordinary taps and scrolling still work. Near the top or bottom
- * of the screen the page scrolls along. onReorder(rows in their new order) runs on drop if anything moved.
+ * of the screen the page scrolls along. skip: what a hold can't start on. onReorder(rows in their new order) runs on drop if anything moved.
  */
-export function dragHandles(list, { onReorder = () => {}, hold = false, onLift = () => {}, onDrop = () => {} }) {
+export function dragHandles(list, { onReorder = () => {}, hold = false, skip = 'input, textarea, .vslider, .grip', onLift = () => {}, onDrop = () => {} }) {
   let drag = null, press = null, swallowUntil = 0, raf = 0;
   const rows = () => [...list.children].filter(el => el.classList.contains('drag-row'));
 
@@ -193,7 +193,7 @@ export function dragHandles(list, { onReorder = () => {}, hold = false, onLift =
       return;
     }
     const el = e.target.closest('.drag-row');
-    if (!el || e.target.closest('input, textarea, .vslider, .grip')) return;
+    if (!el || e.target.closest(skip)) return;
     press = { el, x: e.clientX, y: e.clientY, target: e.target };
     press.timer = setTimeout(() => { if (press) { lift(press.el, press.last ?? e, list); press = null; } }, HOLD_MS);
   });
