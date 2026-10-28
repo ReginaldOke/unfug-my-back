@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050505">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Unfug My Back</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div id="banners" aria-live="polite"></div>
+  <main id="app"></main>
+  <nav id="tabs" class="glass" aria-label="Main">
+    <a href="#/" data-path="/"><span aria-hidden="true">◉</span><small>Today</small></a>
+    <a href="#/checkin" data-path="/checkin" class="tab-cta"><span aria-hidden="true">+</span><small>Check in</small></a>
+    <a href="#/routines" data-path="/routine"><span aria-hidden="true">↻</span><small>Routines</small></a>
+    <a href="#/settings" data-path="/settings"><span aria-hidden="true">⚙︎</span><small>Settings</small></a>
+  </nav>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
