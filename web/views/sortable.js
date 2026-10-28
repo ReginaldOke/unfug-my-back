@@ -130,3 +130,100 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
 
   return { setEditing, get editing() { return editing; } };
 }
+
+/**
+ * Vertical drag-to-reorder list; the other rows glide out of the way. Rows are children with .drag-row.
+ * By default a row is dragged by its .grip (routine moves). hold: press anywhere on a row and hold to
+ * lift it instead (Today's sections), so ordinary taps and scrolling still work. Near the top or bottom
+ * of the screen the page scrolls along. onReorder(rows in their new order) runs on drop if anything moved.
+ */
+export function dragHandles(list, { onReorder = () => {}, hold = false, onLift = () => {}, onDrop = () => {} }) {
+  let drag = null, press = null, swallowUntil = 0, raf = 0;
+  const rows = () => [...list.children].filter(el => el.classList.contains('drag-row'));
+
+  function glideTo(el, ref) {
+    const others = rows().filter(x => x !== el);
+    const before = new Map(others.map(x => [x, x.getBoundingClientRect().top]));
+    list.insertBefore(el, ref);
+    for (const x of others) {
+      const dy = before.get(x) - x.getBoundingClientRect().top;
+      if (dy) x.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], GLIDE);
+    }
+    vibrate(4);
+  }
+
+  function follow() {
+    const { el, offY, y } = drag;
+    el.style.transform = 'none';
+    const slot = el.getBoundingClientRect().top;
+    el.style.transform = `translateY(${y - offY - slot}px) scale(${hold ? 0.97 : 1.02})`;
+    // Swap once the finger passes the middle of a neighbour
+    const list_ = rows(), i = list_.indexOf(el);
+    const prev = list_[i - 1], next = list_[i + 1];
+    if (next && y > next.getBoundingClientRect().top + next.offsetHeight / 2) glideTo(el, next.nextElementSibling);
+    else if (prev && y < prev.getBoundingClientRect().top + prev.offsetHeight / 2) glideTo(el, prev);
+  }
+
+  // Scroll the page while the finger rests near an edge
+  function edgeScroll() {
+    if (!drag) return;
+    const edge = 90, { y } = drag;
+    const speed = y < edge ? -(edge - y) / 6 : y > innerHeight - edge ? (y - (innerHeight - edge)) / 6 : 0;
+    if (speed) { scrollBy(0, speed); follow(); }
+    raf = requestAnimationFrame(edgeScroll);
+  }
+
+  function lift(el, e, target) {
+    try { target.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+    drag = { el, offY: e.clientY - el.getBoundingClientRect().top, y: e.clientY, start: rows() };
+    el.classList.add('lifted');
+    list.classList.add('dragging');
+    vibrate(hold ? 12 : 8);
+    onLift();
+    if (hold) raf = requestAnimationFrame(edgeScroll);
+  }
+
+  list.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    if (!hold) {
+      const grip = e.target.closest('.grip');
+      if (!grip) return;
+      e.preventDefault();
+      lift(grip.closest('.drag-row'), e, grip);
+      return;
+    }
+    const el = e.target.closest('.drag-row');
+    if (!el || e.target.closest('input, textarea, .vslider, .grip')) return;
+    press = { el, x: e.clientX, y: e.clientY, target: e.target };
+    press.timer = setTimeout(() => { if (press) { lift(press.el, press.last ?? e, list); press = null; } }, HOLD_MS);
+  });
+  list.addEventListener('pointermove', e => {
+    if (drag) { e.preventDefault(); drag.y = e.clientY; follow(); return; }
+    if (!press) return;
+    press.last = e;
+    // Moving before the hold completes is a scroll or a swipe, not a drag
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > SLOP) { clearTimeout(press.timer); press = null; }
+  });
+  const drop = () => {
+    if (press) { clearTimeout(press.timer); press = null; }
+    if (!drag) return;
+    cancelAnimationFrame(raf);
+    swallowUntil = performance.now() + 400;
+    const { el, start } = drag;
+    drag = null;
+    const from = el.style.transform;
+    el.style.transform = '';
+    el.classList.remove('lifted');
+    list.classList.remove('dragging');
+    el.animate([{ transform: from }, { transform: 'none' }], GLIDE);
+    const now = rows();
+    if (now.some((r, i) => r !== start[i])) onReorder(now);
+    onDrop();
+  };
+  list.addEventListener('pointerup', drop);
+  list.addEventListener('pointercancel', drop);
+  list.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+  // The release of a hold isn't a tap on whatever was under the finger; nor is the long-press menu
+  list.addEventListener('click', e => { if (performance.now() < swallowUntil) { e.stopPropagation(); e.preventDefault(); } }, true);
+  if (hold) list.addEventListener('contextmenu', e => { if (e.target.closest('.drag-row')) e.preventDefault(); });
+}

@@ -55,3 +55,24 @@ test('every region has an anchor that maps back to itself', () => {
     assert.equal(regionAt({ x: a.fx * H, y: a.fy * H, z: 0 }, normal), regionId, regionId);
   }
 });
+
+test('the sides of the waist are back, not belly; the side of the pelvis is hip', () => {
+  const p = (fx, fy) => ({ x: fx * H, y: fy * H, z: 0.02 });
+  // Just in front of the midline on the flank: the old front/back split called this belly
+  assert.equal(regionAt(p(0.09, 0.58), { x: 0.6, y: 0, z: 0.5 }, H, 0.55), 'lower_back_left');
+  assert.equal(regionAt(p(-0.09, 0.68), { x: -0.9, y: 0, z: 0.2 }, H, 0.6), 'mid_back_right');
+  // Clearly on the front: belly and chest
+  assert.equal(regionAt(p(0.01, 0.58), { x: 0, y: 0, z: 1 }, H, 0.95), 'abdomen');
+  assert.equal(regionAt(p(0.05, 0.72), { x: 0.2, y: 0, z: 0.9 }, H, 0.9), 'chest_left');
+  // Side of the pelvis, even a little behind the midline
+  assert.equal(regionAt(p(0.1, 0.5), { x: 0.9, y: 0, z: -0.2 }, H, 0.45), 'hip_left');
+  assert.equal(regionAt(p(0.05, 0.49), { x: 0.2, y: 0, z: -0.9 }, H, 0.1), 'buttock_left');
+  // Lower belly above the crotch, groin below it
+  assert.equal(regionAt(p(0.01, 0.515), { x: 0, y: 0, z: 1 }, H, 0.9), 'abdomen');
+  assert.equal(regionAt(p(0.02, 0.48), { x: 0, y: 0, z: 1 }, H, 0.9), 'groin_left');
+});
+
+test('skin facing inwards, between the buttocks, is still buttock', () => {
+  assert.equal(regionAt({ x: 0.012 * H, y: 0.49 * H, z: -0.1 }, { x: -0.9, y: 0, z: -0.3 }, H, 0.05), 'buttock_left');
+  assert.equal(regionAt({ x: -0.012 * H, y: 0.49 * H, z: -0.1 }, { x: 0.9, y: 0, z: -0.3 }, H, 0.05), 'buttock_right');
+});

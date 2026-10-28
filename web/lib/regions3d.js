@@ -6,18 +6,27 @@
 
 export const H = 1.8;
 
-const LEVELS = [['upper', 0.70], ['mid', 0.62], ['lower', 0.53]];
+// Spine levels by height: lumbar up to just above the waist, thoracic above that, upper back from the shoulder blades
+const LEVELS = [['upper', 0.72], ['mid', 0.655], ['lower', 0.53]];
+
+// How far forward (0 = back surface, 1 = front surface) a point must be to count as chest or belly.
+// The sides of the waist sit just in front of the midline, and pain there is back pain, not belly pain.
+const CHEST_FROM = 0.55, BELLY_FROM = 0.62;
 
 /**
  * point: {x,y,z} in model space; normal: surface normal there (optional).
- * facing: 'front' | 'back' when the caller has measured which half of the body the point is on
- * (more reliable than the normal on curved or sideways-facing skin). Returns a regionId.
+ * depth: where the point sits between the body's back and front surfaces at that height, 0–1, when the
+ * caller has measured it (more reliable than the normal on curved skin). 'front' / 'back' also work.
+ * Returns a regionId.
  */
-export function regionAt(point, normal = null, height = H, facing = null) {
+export function regionAt(point, normal = null, height = H, depth = null) {
   const fy = point.y / height, fx = point.x / height, ax = Math.abs(fx);
   const side = fx >= 0 ? 'left' : 'right';
-  const back = facing ? facing === 'back' : normal ? normal.z < 0 : point.z < 0;
-  const lateral = !facing && normal ? Math.abs(normal.x) > 0.75 : false;
+  const t = depth === 'front' ? 1 : depth === 'back' ? 0 : depth;
+  const back = t != null ? t < 0.5 : normal ? normal.z < 0 : point.z < 0;
+  // Skin facing outwards to the side: the flank of the waist, the side of the hip. (Skin facing
+  // inwards, like between the buttocks or the thighs, doesn't count.)
+  const lateral = normal ? normal.x * Math.sign(fx || 1) > 0.7 : false;
 
   // Height bands are calibrated to the Free Pack male base mesh (web/assets/body.obj): neck at 87–91 %,
   // A-pose arms from the shoulder (about 11 % out, 80 % up) down to the hands (about 39 % out, 52 % up),
@@ -31,16 +40,17 @@ export function regionAt(point, normal = null, height = H, facing = null) {
     return `hand_${side}`;
   }
   if (fy >= 0.53) {
-    if (back || lateral) {
-      const level = LEVELS.find(([, min]) => fy >= min)[0];
-      return `${level}_back_${ax < 0.03 ? 'centre' : side}`;
-    }
-    return fy >= 0.66 ? `chest_${side}` : 'abdomen';
+    const chest = fy >= 0.66;
+    const front = !back && !lateral && (t == null || t >= (chest ? CHEST_FROM : BELLY_FROM));
+    if (front) return chest ? `chest_${side}` : 'abdomen';
+    const level = LEVELS.find(([, min]) => fy >= min)[0];
+    return `${level}_back_${ax < 0.03 ? 'centre' : side}`;
   }
   if (fy >= 0.45) {                                             // pelvis
     if (lateral) return `hip_${side}`;
     if (back) return `buttock_${side}`;
-    return ax > 0.065 ? `hip_${side}` : `groin_${side}`;
+    if (ax > 0.065) return `hip_${side}`;
+    return fy >= 0.505 ? 'abdomen' : `groin_${side}`;           // the crotch is at about 49 %
   }
   if (fy >= 0.31) return `${back ? 'thigh_back' : 'thigh_front'}_${side}`;
   if (fy >= 0.25) return `knee_${side}`;
@@ -54,7 +64,7 @@ export function regionAnchor(regionId) {
   const m = regionId.match(/^(.*?)_(left|right|centre)$/);
   const [part, side] = m ? [m[1], m[2]] : [regionId, 'centre'];
   const sx = side === 'left' ? 1 : side === 'right' ? -1 : 0;
-  const back = { upper_back: 0.75, mid_back: 0.66, lower_back: 0.575 };
+  const back = { upper_back: 0.76, mid_back: 0.69, lower_back: 0.59 };
   if (back[part] != null) return { fx: sx * 0.06, fy: back[part], back: true };
   const table = {
     head: [0, 0.95, true], neck: [0, 0.86, true], shoulder: [0.1, 0.84, true],

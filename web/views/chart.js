@@ -6,14 +6,15 @@ import { dayLabel, parseDate } from '../lib/dates.js';
 let uid = 0;
 const DASH = 18;
 
-// Muted palettes that read well on charcoal; each series is a two-stop gradient
+// Muted palettes that read well on charcoal. The line and its key are drawn in the first colour, so
+// a line looks the same wherever it sits; the second only deepens the area fill underneath.
 export const PALETTES = {
-  pain: ['#f6a091', '#e2687f'],
-  stressor: ['#f3c27a', '#e8875a'],
-  helper: ['#7fd6c8', '#7b86f0'],
+  pain: ['#f4908a', '#e2687f'],
+  stressor: ['#f3b46e', '#e8875a'],
+  helper: ['#74d4c0', '#4fb3a6'],
 };
-// For extra series the user adds to the chart, in order
-export const EXTRA_PALETTES = [['#c9a8ff', '#8f6cf0'], ['#a6e39a', '#4fb39a'], ['#9fd0ff', '#5a8cf0'], ['#ffb0d6', '#e46aa6']];
+// For extra series the user adds to the chart, in order; each a hue none of the above use
+export const EXTRA_PALETTES = [['#b9a0ff', '#8f6cf0'], ['#8fc4ff', '#5a8cf0'], ['#ff9fcf', '#e46aa6'], ['#dfe07a', '#b8b84a']];
 
 /** Catmull-Rom spline through points, as cubic Béziers, with control points clamped to the plot. */
 function smoothPath(pts, top, bottom) {
@@ -33,8 +34,9 @@ function smoothPath(pts, top, bottom) {
  * series: [{ key, label, palette, values: [0..1 | null] per day, format: i => string }]
  * hidden: Set of series keys to hide. onToggle(key) flips one. onAdd: opens the picker for more lines.
  * focus: index of the day the key shows by default (today). fadeLeft: the data carries on before the first day.
+ * marks: [{ i, text }] days to flag with a faint dotted line (routine changes); the text shows when that day is focused.
  */
-export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true }) {
+export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [] }) {
   const id = ++uid;
   // Side padding keeps the first and last day labels whole instead of clipped by the card edge
   const W = 340, H = 196, top = 46, bottom = 176, left = 16 + (fadeLeft ? 0 : DASH), right = W - 16;
@@ -63,21 +65,29 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
         s('stop', { offset: '0%', 'stop-color': sr.palette[0], 'stop-opacity': 0.6 }),
         s('stop', { offset: '55%', 'stop-color': sr.palette[1], 'stop-opacity': 0.22 }),
         s('stop', { offset: '100%', 'stop-color': sr.palette[1], 'stop-opacity': 0 })),
-      s('linearGradient', { id: `stroke-${sr.key}-${id}`, gradientUnits: 'userSpaceOnUse', x1: left, y1: 0, x2: right, y2: 0 },
-        s('stop', { offset: '0%', 'stop-color': sr.palette[0] }), s('stop', { offset: '100%', 'stop-color': sr.palette[1] })),
     ]));
 
   // Each series joins its logged days with one continuous curve; days without a check-in are bridged
   // (and dimmed in the day ruler) rather than leaving a hole in the chart
+  // A lone day is a flat dash, so two lines with the same value would draw exactly on top of each
+  // other; dashes that would touch are spread a few pixels apart so every colour shows
+  const taken = [];
+  const apart = yy => {
+    const free = c => c >= top && c <= bottom && !taken.some(t => Math.abs(t - c) < 5);
+    const out = [0, -5, 5, -10, 10, -15, 15, -20, 20].map(d => yy + d).find(free) ?? yy;
+    taken.push(out);
+    return out;
+  };
   const areas = visible.map(sr => {
-    const pts = sr.values.flatMap((v, i) => (v == null || !days[i].logged ? [] : [{ x: x(i), y: y(v) }]));
+    let pts = sr.values.flatMap((v, i) => (v == null || !days[i].logged ? [] : [{ x: x(i), y: y(v) }]));
+    if (pts.length === 1) pts = [{ ...pts[0], y: apart(pts[0].y) }];
     const runs = pts.length ? [pts] : [];
     return s('g', { class: 'series' }, runs.map(pts => {
       const line = smoothPath(pts, top, bottom);
       return [
         // A lone first day is just its level line; the area starts once there's a curve
         pts.length > 1 ? s('path', { class: 'area', fill: `url(#fill-${sr.key}-${id})`, d: `${line} L${pts.at(-1).x},${bottom} L${pts[0].x},${bottom} Z` }) : null,
-        s('path', { class: 'line', stroke: `url(#stroke-${sr.key}-${id})`, filter: `url(#glow-${id})`, d: line }),
+        s('path', { class: 'line', stroke: sr.palette[0], filter: `url(#glow-${id})`, d: line }),
       ];
     }));
   });
@@ -90,16 +100,22 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
       s('text', { x: x(i), y: 10, 'text-anchor': 'middle', class: 'dow' }, parseDate(d.date).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3).toUpperCase()),
       s('text', { x: x(i), y: 24, 'text-anchor': 'middle', class: 'dom' }, String(parseDate(d.date).getDate()))) : null)),
     s('line', { class: 'baseline', x1: left, x2: right, y1: bottom, y2: bottom }),
+    // Routine changes: a dotted line under the curves, so before and after are easy to compare
+    marks.map(m => s('g', { class: 'mark', 'data-i': m.i },
+      s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom - 4 }),
+      s('circle', { cx: x(m.i), cy: bottom, r: 2.5 }))),
     s('g', { class: 'plot', mask: `url(#fade-${id})` }, areas),
     hair);
 
   // One key: each line's name and its value on the focused day (today unless the finger is on the chart)
   const when = h('span', { class: 'when' });
+  const markNote = h('span', { class: 'mark-note' });
+  const markAt = new Map(marks.map(m => [m.i, m.text]));
   const keys = series.map(sr => {
     const val = h('strong');
     const btn = h('button', {
       type: 'button', class: `key${hidden.has(sr.key) ? '' : ' on'}`, 'aria-pressed': String(!hidden.has(sr.key)),
-      style: `--c1:${sr.palette[0]};--c2:${sr.palette[1]}`, onclick: () => onToggle(sr.key),
+      style: `--c:${sr.palette[0]}`, onclick: () => onToggle(sr.key),
     }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, sr.label), val);
     return { sr, btn, val };
   });
@@ -112,7 +128,10 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     for (const g of svg.querySelectorAll('.day-label')) g.classList.toggle('on', Number(g.dataset.i) === i);
     const d = days[i];
     when.textContent = d.logged ? dayLabel(d.date) : `${dayLabel(d.date)} · no check-in`;
-    for (const k of keys) k.val.textContent = d.logged ? k.sr.format(i) : '–';
+    markNote.textContent = markAt.get(i) ?? '';
+    for (const g of svg.querySelectorAll('.mark')) g.classList.toggle('on', Number(g.dataset.i) === i);
+    // Days without a value just show the name; no placeholder dashes
+    for (const k of keys) { const v = d.logged ? k.sr.format(i) : ''; k.val.textContent = /^–/.test(v) ? '' : v; }
   }
   const pick = e => {
     const r = svg.getBoundingClientRect();
@@ -124,7 +143,7 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   svg.addEventListener('pointerleave', () => focus(home));
   focus(home);
 
-  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when), legend);
+  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when, markNote), legend);
 }
 
 function summaryLabel(days, series) {

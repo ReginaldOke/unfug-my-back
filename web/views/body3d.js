@@ -7,8 +7,9 @@ import { h, vibrate } from '../lib/ui.js';
 import { REGIONS, regionById } from '../lib/regions.js';
 import { regionAt, regionAnchor, H } from '../lib/regions3d.js';
 
-// Turn the loaded model so it faces +Z. The Free Pack male base mesh faces −Z, hence a half turn.
-const MODEL_YAW = Math.PI;
+// Turn the loaded model so it faces +Z (the region map's front). The Free Pack male base mesh already
+// faces +Z, so no turn: an earlier half turn here showed its front first and swapped front and back.
+const MODEL_YAW = 0;
 const MODEL_URLS = ['assets/body.obj', 'assets/body.glb'];
 
 export function webglAvailable() {
@@ -111,8 +112,8 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     onChange(markers);
   }
 
-  /** Front or back half: is the point nearer the body's back surface or its front, along this line? */
-  function facingAt(p) {
+  /** Where the point sits between the body's back (0) and front (1) surfaces, along a front-to-back line. */
+  function depthAt(p) {
     const surfaceZ = fromZ => {
       const origin = body.localToWorld(new THREE.Vector3(p.x, p.y, fromZ));
       const target = body.localToWorld(new THREE.Vector3(p.x, p.y, 0));
@@ -121,7 +122,7 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     };
     const front = surfaceZ(3), back = surfaceZ(-3);
     if (front == null || back == null || front - back < 0.02) return null;
-    return p.z < (front + back) / 2 ? 'back' : 'front';
+    return Math.min(1, Math.max(0, (p.z - back) / (front - back)));
   }
 
   // ---------- tapping ----------
@@ -144,7 +145,7 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     const point = body.worldToLocal(hit.point.clone());
     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld)
       .applyQuaternion(body.quaternion.clone().invert());
-    const regionId = regionAt(point, normal, H, facingAt(point));
+    const regionId = regionAt(point, normal, H, depthAt(point));
     if (markers.some(m => m.regionId === regionId)) return removeRegion(regionId);
     markers.push({
       regionId, side: regionById[regionId].side, intensity: defaultIntensity(), quality: 'ache',

@@ -6,7 +6,7 @@ const KEY = 'unfug-my-back/v1';
 
 export const TABLES = [
   'factors', 'factorChanges', 'factorLogs', 'dailyEntries', 'painMarkers', 'flares',
-  'reminderEvents', 'routines', 'routineCompletions', 'aiSummaries',
+  'reminderEvents', 'routines', 'routineCompletions', 'aiSummaries', 'healthDays', 'routineChanges',
 ];
 
 const ACTIVE_HOURS = { on: true, start: '08:00', end: '22:00' };

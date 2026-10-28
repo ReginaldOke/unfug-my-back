@@ -1,5 +1,5 @@
 // Reminder settings drawer, opened from the Today movement card and from Settings.
-import { h, sheet, segmented, iconButton, toast } from '../lib/ui.js';
+import { h, sheet, segmented, toast } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import * as reminders from '../lib/reminders.js';
 import { notificationStatus } from '../lib/notify.js';
@@ -74,7 +74,7 @@ export function openReminderSheet() {
         : h('p', { class: 'hint' }, perm === 'granted' ? 'Notifications are on.' : perm === 'denied' ? 'Notifications are blocked in your phone’s settings.' : 'Add the app to your home screen to get notifications.'));
 
     return h('div', { class: 'stack' },
-      h('div', { class: 'row between' }, h('h2', {}, 'Reminders'), iconButton('✕', 'Close', close)),
+      h('h2', {}, 'Reminders'),
       body);
   });
 }

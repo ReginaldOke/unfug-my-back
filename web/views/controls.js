@@ -6,17 +6,22 @@ import * as R from '../lib/repos.js';
 
 const GLYPHS = {
   bolt: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M13.5 2 5 13.5h6L10 22l9-12h-6.2L13.5 2Z" fill="currentColor"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M20.5 14.6A8.5 8.5 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1Z" fill="currentColor"/></svg>',
   wave: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M2 12c2.2-4.5 4.3-4.5 6.5 0s4.3 4.5 6.5 0 4.3-4.5 6.5 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
 };
 
 /**
  * Control Center slider (Figma "Slider 1×2"): a glass capsule with a light fill and one glyph.
  * The fill tracks the finger continuously and settles on the whole number when released.
- * value may be null (not set yet).
+ * value may be null (not set yet). Defaults to a 0–10 score; step and unit suit other scales.
+ * describe(v): optional word for the value ("Well"), shown under the bar in place of the label once set.
+ * colours: 'highIsBad' (pain, stress) or 'highIsGood' (sleep) tints the fill green → yellow → red as it
+ * rises, or the other way round; leave it out for the plain tint.
  */
-export function VSlider({ label, value = null, onChange, onCommit = () => {}, glyph = 'bolt', tint = 'neutral' }) {
-  const max = 10;
+export function VSlider({ label, value = null, onChange, onCommit = () => {}, glyph = 'bolt', tint = 'neutral', max = 10, step = 1, unit = '/10', spoken = v => `${v} out of ${max}`, describe = null, colours = null }) {
+  const snap = v => Math.round(v / step) * step;
   const num = h('span', { class: 'vs-num' });
+  const caption = h('div', { class: 'vs-label' }, label);
   const fill = h('div', { class: 'vs-fill', 'aria-hidden': 'true' });
   // The glyph is drawn twice: light on the empty track, dark on the fill (clipped to the filled part)
   const icon = h('span', { class: 'vs-glyph', 'aria-hidden': 'true' });
@@ -24,21 +29,42 @@ export function VSlider({ label, value = null, onChange, onCommit = () => {}, gl
   const iconOnFill = h('div', { class: 'vs-glyph-clip', 'aria-hidden': 'true' }, h('span', { class: 'vs-glyph dark' }));
   iconOnFill.firstChild.innerHTML = GLYPHS[glyph];
   const track = h('div', {
-    class: `vslider tint-${tint}`, role: 'slider', tabindex: 0, 'aria-label': label,
+    class: `vslider sprung tint-${tint}${colours ? ' hued' : ''}`, role: 'slider', tabindex: 0, 'aria-label': label,
     'aria-valuemin': 0, 'aria-valuemax': max,
   }, icon, fill, iconOnFill);
 
-  const paint = frac => {
-    fill.style.transform = `scaleY(${frac})`;
-    iconOnFill.style.clipPath = `inset(${(1 - frac) * 100}% 0 0 0)`;
+  // Green (hue 135) at the good end, through yellow (48) to red (2) at the bad end
+  const hueAt = f => {
+    const bad = colours === 'highIsGood' ? 1 - f : f;
+    return bad <= 0.5 ? 135 - bad * 2 * 87 : 48 - (bad - 0.5) * 2 * 46;
   };
+  const draw = frac => {
+    const f = clamp(frac, 0, 1);
+    fill.style.transform = `scaleY(${frac < 0 ? 0 : Math.min(frac, 1.015)})`;
+    iconOnFill.style.clipPath = `inset(${(1 - f) * 100}% 0 0 0)`;
+    if (colours) track.style.setProperty('--h', hueAt(f).toFixed(1));
+  };
+
+  // A small spring moves the fill: stiff while dragging so it stays under the finger with a touch of
+  // weight, softer on release so it settles onto the whole number with a slight overshoot
+  let cur = 0, vel = 0, target = 0, raf = 0, held = false;
+  function tick() {
+    const k = held ? 0.34 : 0.13, damping = held ? 0.56 : 0.74;
+    vel = (vel + (target - cur) * k) * damping;
+    cur += vel;
+    if (Math.abs(target - cur) < 0.0006 && Math.abs(vel) < 0.0006) { cur = target; draw(cur); raf = 0; return; }
+    draw(cur);
+    raf = requestAnimationFrame(tick);
+  }
+  const paint = frac => { target = frac; if (!raf) raf = requestAnimationFrame(tick); };
 
   function setValue(v, fromUser) {
     const changed = v !== value;
     value = v;
     num.textContent = v == null ? '–' : String(v);
     track.setAttribute('aria-valuenow', v ?? '');
-    track.setAttribute('aria-valuetext', v == null ? 'Not set' : `${v} out of 10`);
+    track.setAttribute('aria-valuetext', v == null ? 'Not set' : describe ? `${spoken(v)}, ${describe(v)}` : spoken(v));
+    if (describe) caption.textContent = v == null ? label : describe(v);
     if (fromUser && changed) {
       vibrate(4);
       num.animate?.([{ transform: 'scale(1.1)' }, { transform: 'scale(1)' }], { duration: 180, easing: 'ease-out' });
@@ -53,15 +79,17 @@ export function VSlider({ label, value = null, onChange, onCommit = () => {}, gl
   const drag = e => {
     const frac = fracAt(e);
     paint(frac);
-    setValue(Math.round(frac * max), true);
+    setValue(snap(frac * max), true);
   };
   track.addEventListener('pointerdown', e => {
     track.setPointerCapture(e.pointerId);
     track.classList.add('dragging');
+    held = true;
     drag(e);
   });
   track.addEventListener('pointermove', e => { if (track.hasPointerCapture(e.pointerId)) drag(e); });
   const release = () => {
+    held = false;
     track.classList.remove('dragging');
     if (value != null) paint(value / max); // settle onto the whole number
   };
@@ -70,9 +98,9 @@ export function VSlider({ label, value = null, onChange, onCommit = () => {}, gl
   track.addEventListener('pointercancel', release);
   track.addEventListener('keydown', e => {
     if (e.key === 'Enter' && value != null) { e.preventDefault(); onCommit(value); return; }
-    const step = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
+    const dir = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
     let next = null;
-    if (step) next = clamp((value ?? 0) + step, 0, max);
+    if (dir) next = clamp((value ?? 0) + dir * step, 0, max);
     if (e.key === 'Home') next = 0;
     if (e.key === 'End') next = max;
     if (next == null) return;
@@ -87,9 +115,9 @@ export function VSlider({ label, value = null, onChange, onCommit = () => {}, gl
   requestAnimationFrame(() => requestAnimationFrame(() => { if (value != null) paint(value / max); }));
 
   return h('div', { class: 'vslider-wrap' },
-    h('div', { class: 'vs-readout' }, num, h('span', { class: 'vs-unit' }, '/10')),
+    h('div', { class: 'vs-readout' }, num, h('span', { class: 'vs-unit' }, unit)),
     track,
-    h('div', { class: 'vs-label' }, label));
+    caption);
 }
 
 // 0–60 min in 5s, then 75 min–8 h in 15s, so short and long days both get usable precision.
@@ -142,8 +170,33 @@ export function emojiTint(emoji) {
   return tint;
 }
 
-export function FactorTile({ factor: f, selections, onChange = () => {} }) {
+export const INTENSITY = ['', 'Easy', 'Moderate', 'Hard'];
+
+/** The small pencil used for "edit" on cards and tiles. */
+export const PENCIL = () => {
+  const el = h('span', { class: 'glyph' });
+  el.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>';
+  return el;
+};
+
+/** Intensity last logged for a factor, else moderate. */
+const lastIntensity = f => R.factors.logs(f.id).find(l => l.intensity)?.intensity ?? 2;
+
+/**
+ * intensities: optional Map of factorId → 1–3. When given, a selected tile shows a chip that cycles
+ * Easy → Moderate → Hard (for exercise, where how hard matters as much as how long). On a done/not
+ * tile (a routine) the swipe sets how hard instead of how much.
+ * action: optional link or button for the top-right corner (a routine's edit pencil). On a routine
+ * tile the effort isn't a button: it's set by the swipe and shown as bars and a word under the name,
+ * with the fill tinted green, yellow or red.
+ */
+export function FactorTile({ factor: f, selections, intensities = null, onChange = () => {}, title = f.name, action = null }) {
   const scale = scaleFor(f);
+  const swipeEffort = !!intensities && f.measureType === 'yesno';
+  const bars = () => h('span', { class: 'bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
+  const effort = !intensities ? null : swipeEffort
+    ? h('span', { class: 'tile-intensity static' }, bars(), h('span', { class: 'lbl' }))
+    : h('button', { type: 'button', class: 'tile-intensity' }, bars(), h('span', { class: 'lbl' }));
   const tint = emojiTint(f.icon);
   const fill = h('div', { class: 'tile-fill', 'aria-hidden': 'true' });
   const valueBtn = h('button', { type: 'button', class: 'tile-value', 'aria-label': `Type exact amount for ${f.name}` });
@@ -152,22 +205,47 @@ export function FactorTile({ factor: f, selections, onChange = () => {} }) {
     fill,
     h('div', { class: 'tile-top' },
       h('span', { class: 'well', 'aria-hidden': 'true' }, f.icon || ROLE_ICON[f.role]),
-      h('span', { class: 'role-mark', 'aria-hidden': 'true' }, ROLE_ICON[f.role])),
-    h('div', { class: 'tile-bottom' }, h('span', { class: 'tile-title' }, f.name), h('span', { class: 'tile-detail' }, valueBtn, hint)));
+      action ? h('span', { class: 'tile-action-wrap' }, action) : (!swipeEffort && effort) || h('span', { class: 'role-mark', 'aria-hidden': 'true' }, ROLE_ICON[f.role])),
+    h('div', { class: 'tile-bottom' }, h('span', { class: 'tile-title' }, title), h('span', { class: 'tile-detail' }, valueBtn, hint, swipeEffort ? effort : null)));
+  if (action) el.classList.add('has-action');
 
   function paint() {
     const on = selections.has(f.id), v = selections.get(f.id);
     el.classList.toggle('on', on);
     el.setAttribute('aria-pressed', String(on));
-    fill.style.transform = `scaleX(${!on ? 0 : f.measureType === 'yesno' ? 1 : Math.max(0.06, scale.fraction(v))})`;
+    const frac = !on ? 0 : swipeEffort ? (intensities.get(f.id) ?? 2) / 3 : f.measureType === 'yesno' ? 1 : Math.max(0.06, scale.fraction(v));
+    fill.style.transform = `scaleX(${frac})`;
     valueBtn.textContent = on ? fmtAmount(f, v) : '';
     valueBtn.hidden = !on || f.measureType === 'yesno';
-    hint.textContent = on ? (f.measureType === 'yesno' ? 'Yes' : '') : f.measureType === 'yesno' ? 'Tap' : 'Tap or swipe →';
+    hint.textContent = on ? (f.measureType === 'yesno' && !swipeEffort ? 'Yes' : '') : f.measureType === 'yesno' && !swipeEffort ? 'Tap' : 'Tap or swipe →';
     el.setAttribute('aria-label', `${f.name}, ${on ? fmtAmount(f, v) : 'not selected'}${f.measureType === 'yesno' ? '' : '. Use arrow keys to change the amount.'}`);
+    if (effort) {
+      const lvl = intensities.get(f.id) ?? 0;
+      effort.hidden = !on;
+      effort.dataset.level = lvl;
+      effort.lastChild.textContent = INTENSITY[lvl];
+      if (swipeEffort) el.dataset.effort = on ? lvl : '';
+      else effort.setAttribute('aria-label', `${f.name} intensity: ${INTENSITY[lvl]}. Tap to change.`);
+    }
   }
+
+  const syncIntensity = () => {
+    if (!intensities) return;
+    if (!selections.has(f.id)) intensities.delete(f.id);
+    else if (!intensities.has(f.id)) intensities.set(f.id, lastIntensity(f));
+  };
 
   function setValue(v) {
     if (v > 0) selections.set(f.id, v); else selections.delete(f.id);
+    syncIntensity();
+    paint();
+    onChange();
+  }
+
+  function setEffort(lvl) {
+    if (!lvl) selections.delete(f.id);
+    else { selections.set(f.id, 1); intensities.set(f.id, lvl); }
+    syncIntensity();
     paint();
     onChange();
   }
@@ -175,6 +253,7 @@ export function FactorTile({ factor: f, selections, onChange = () => {} }) {
   function toggle() {
     if (selections.has(f.id)) selections.delete(f.id);
     else selections.set(f.id, defaultAmount(f));
+    syncIntensity();
     vibrate(6);
     paint();
     onChange();
@@ -182,18 +261,26 @@ export function FactorTile({ factor: f, selections, onChange = () => {} }) {
 
   let start = null, dragging = false;
   el.addEventListener('pointerdown', e => {
-    if (e.target === valueBtn || e.target.closest('input')) return;
-    start = { x: e.clientX, y: e.clientY, v: selections.get(f.id) ?? 0, w: el.getBoundingClientRect().width };
+    if (e.target === valueBtn || e.target.closest('input, .tile-intensity, .tile-action-wrap')) return;
+    const lvl = selections.has(f.id) ? intensities?.get(f.id) ?? 2 : 0;
+    start = { x: e.clientX, y: e.clientY, v: selections.get(f.id) ?? 0, lvl, w: el.getBoundingClientRect().width };
     dragging = false;
   });
   el.addEventListener('pointermove', e => {
-    if (!start || f.measureType === 'yesno') return;
+    if (!start || (f.measureType === 'yesno' && !swipeEffort)) return;
     const dx = e.clientX - start.x, dy = e.clientY - start.y;
     if (!dragging) {
       if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
       dragging = true;
       el.setPointerCapture(e.pointerId);
       el.classList.add('dragging');
+    }
+    if (swipeEffort) {
+      // Thirds of the tile: easy, moderate, hard; all the way left un-ticks it
+      const lvl = Math.ceil(clamp(start.lvl / 3 + dx / start.w, 0, 1) * 3);
+      const now = selections.has(f.id) ? intensities.get(f.id) : 0;
+      if (lvl !== now) { vibrate(3); setEffort(lvl); }
+      return;
     }
     const next = scale.fromFraction(clamp(scale.fraction(start.v) + dx / start.w, 0, 1));
     if (next !== (selections.get(f.id) ?? 0)) { vibrate(3); setValue(next); }
@@ -208,7 +295,16 @@ export function FactorTile({ factor: f, selections, onChange = () => {} }) {
     if (e.target !== el) return;
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
-    if (d && f.measureType !== 'yesno') { e.preventDefault(); setValue(scale.step(selections.get(f.id) ?? 0, d)); }
+    if (d && swipeEffort) { e.preventDefault(); setEffort(clamp((selections.has(f.id) ? intensities.get(f.id) : 0) + d, 0, 3)); }
+    else if (d && f.measureType !== 'yesno') { e.preventDefault(); setValue(scale.step(selections.get(f.id) ?? 0, d)); }
+  });
+
+  if (!swipeEffort) effort?.addEventListener('click', e => {
+    e.stopPropagation();
+    intensities.set(f.id, (intensities.get(f.id) ?? 2) % 3 + 1);
+    vibrate(4);
+    paint();
+    onChange();
   });
 
   // Tap the number to type an exact value
@@ -224,6 +320,7 @@ export function FactorTile({ factor: f, selections, onChange = () => {} }) {
     input.select();
   });
 
+  syncIntensity();
   paint();
   el.refresh = paint;
   return el;

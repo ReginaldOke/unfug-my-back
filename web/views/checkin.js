@@ -1,23 +1,30 @@
-// Daily survey: six quick steps, with a streak at the end.
+// Daily survey: a few quick steps, with a streak at the end.
 import { h, toast, iconButton } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate, addDays, dayLabel, weekdayLetter } from '../lib/dates.js';
-import { VSlider, FactorTile, defaultAmount } from './controls.js';
+import { VSlider, FactorTile, defaultAmount, PENCIL } from './controls.js';
+import { HEALTH_IMPORT } from '../lib/health.js';
+import { sleepWord } from '../lib/labels.js';
 import { Body3D, RegionList, webglAvailable } from './body3d.js';
 import { quickAddFactor } from './factor.js';
 import { voiceSupported, startDictation } from '../lib/voice.js';
 
 const STEPS = [
-  { id: 'pain', title: 'How much does your back hurt?', sub: 'Right now, in your back or legs. 0 is none, 10 is the worst you’ve had.' },
-  { id: 'stress', title: 'How stressed were you today?', sub: 'Work, money, people, anything. 0 is calm, 10 is overwhelmed.' },
+  { id: 'pain', title: 'How much does your back hurt?' },
+  { id: 'stress', title: 'How stressed were you today?' },
+  { id: 'sleep', title: 'How did you sleep last night?' },
   { id: 'where', title: 'Where do you feel it most?', sub: 'Tap where it hurts.' },
-  { id: 'stressors', title: 'What did you do today?', sub: 'Tap what you did. Swipe right to add time.' },
-  { id: 'helpers', title: 'What did you do for your back?', sub: 'Tap anything that counts.' },
+  { id: 'move', title: 'Exercise', sub: 'Tap what you did. Swipe for how hard or how long.' },
+  { id: 'stressors', title: 'Stressors', sub: 'Anything that might have strained your back. Swipe right to add time.' },
+  { id: 'helpers', title: 'Helpers', sub: 'Anything you did for your back.' },
   { id: 'notes', title: 'Anything else?', sub: 'Optional.' },
 ];
 
-// Drafts survive leaving the survey (e.g. to add a factor) within this session
+// Drafts survive leaving the survey (e.g. to add a factor or log a routine) within this session
 const drafts = new Map();
+
+/** The check-in in progress for a date, if any (the routine log updates it rather than saving twice). */
+export const checkinDraft = date => drafts.get(date);
 
 // 3D body map; a plain list of regions only where the phone can't draw 3D
 const has3D = webglAvailable();
@@ -26,7 +33,9 @@ function freshDraft(date) {
   const existing = R.checkins.entryFor(date);
   return {
     startedAt: Date.now(), step: 0,
-    pain: existing?.painScore ?? null, stress: existing?.stressScore ?? null, sleep: existing?.sleepQuality ?? null,
+    pain: existing?.painScore ?? null, stress: existing?.stressScore ?? null,
+    sleep: existing?.sleepQuality ?? null,
+    intensity: R.checkins.intensities(date),
     notes: existing?.notes ?? '',
     selections: R.checkins.factorValues(date),
     markers: existing ? R.checkins.markersFor(existing.id).map(({ regionId, side, intensity, quality, modelPoint }) => ({ regionId, side, intensity, quality, modelPoint })) : [],
@@ -74,7 +83,7 @@ export function CheckinView(ctx) {
     progress.setAttribute('aria-valuenow', draft.step + 1);
     progress.setAttribute('aria-valuetext', `Step ${draft.step + 1} of ${STEPS.length}: ${st.title}`);
     body.replaceChildren(
-      h('div', { class: 'step-head' }, h('h1', { tabindex: -1 }, st.title), h('p', { class: 'muted' }, st.sub)),
+      h('div', { class: 'step-head' }, h('h1', { tabindex: -1 }, st.title), st.sub ? h('p', { class: 'muted' }, st.sub) : null),
       stepContent(st.id));
     renderFooter();
     body.scrollTop = 0;
@@ -102,7 +111,7 @@ export function CheckinView(ctx) {
         last ? (existing ? 'Update' : 'Finish') : 'Next'));
   }
 
-  const isSlider = id => id === 'pain' || id === 'stress';
+  const isSlider = id => id === 'pain' || id === 'stress' || id === 'sleep';
 
   /** Move to the next step after a beat, so the user sees their answer land. */
   function advanceSoon(delay) {
@@ -110,9 +119,9 @@ export function CheckinView(ctx) {
     setTimeout(() => { if (draft.step === stepAtStart) go(stepAtStart + 1); }, delay);
   }
 
-  function sliderStep(key, label, glyph) {
+  function sliderStep(key, label, glyph, scale = {}) {
     return h('div', { class: 'levels single' }, VSlider({
-      label, value: draft[key], glyph, tint: key,
+      label, value: draft[key], glyph, tint: key, colours: key === 'sleep' ? 'highIsGood' : 'highIsBad', ...scale,
       onChange: v => { draft[key] = v; },
       onCommit: () => advanceSoon(320),
     }));
@@ -122,6 +131,7 @@ export function CheckinView(ctx) {
     switch (id) {
       case 'pain': return sliderStep('pain', 'Pain', 'bolt');
       case 'stress': return sliderStep('stress', 'Stress', 'wave');
+      case 'sleep': return h('div', { class: 'sleep-step' }, sliderStep('sleep', 'Sleep', 'moon', { describe: sleepWord }), healthStrip('sleep'));
       case 'where': {
         const yEntry = R.checkins.entryFor(yesterday);
         const yMarkers = yEntry ? R.checkins.markersFor(yEntry.id) : [];
@@ -137,34 +147,86 @@ export function CheckinView(ctx) {
             h('button', { type: 'button', class: 'chip glass', onclick: () => { map.setMarkers(yMarkers); toast('Same spots as yesterday'); advanceSoon(650); } }, '↺ Same as yesterday')) : null,
           map);
       }
-      case 'stressors': return factorGrid(['trigger', 'unsure'], 'trigger');
-      case 'helpers': return factorGrid(['helper'], 'helper');
+      case 'move': {
+        const ids = [...R.routines.all().map(r => r.linkedFactorId), ...R.factors.forCheckin([], { exercise: true }).map(f => f.id)];
+        return h('div', { class: 'stack' }, sameAsYesterday(ids), healthStrip('steps'), routinesSection(), factorGrid([], { exercise: true, label: 'Other exercise', same: false }));
+      }
+      case 'stressors': return factorGrid(['trigger', 'unsure'], { role: 'trigger' });
+      case 'helpers': return factorGrid(['helper'], { role: 'helper' });
       case 'notes': return notesStep();
     }
   }
 
-  function factorGrid(roles, addRole) {
+  /** The day's steps or last night's hours asleep from Apple Health, or a way to bring them in. */
+  function healthStrip(kind) {
+    if (!HEALTH_IMPORT) return null;
+    const [key, icon, fmt, ask] = kind === 'sleep'
+      ? ['sleepHours', '🛌', v => [h('strong', {}, `${v} h`), ' asleep'], 'Show your sleep here']
+      : ['steps', '👟', v => [h('strong', {}, v.toLocaleString()), ' steps'], 'Show your steps here'];
+    const v = R.health.day(date)?.[key];
+    if (v != null) {
+      return h('div', { class: 'steps-strip glass' },
+        h('span', { class: 'well', 'aria-hidden': 'true' }, icon),
+        h('span', { class: 'grow' }, fmt(v)),
+        h('span', { class: 'hint' }, 'Apple Health'));
+    }
+    return R.health.has(key) ? null : h('a', { class: 'steps-strip link', href: '#/health' },
+      h('span', { class: 'well', 'aria-hidden': 'true' }, icon),
+      h('span', { class: 'grow' }, ask),
+      h('span', { class: 'hint' }, 'Apple Health ›'));
+  }
+
+  /** Your routines first: tick the one you did, swipe for how hard, Edit to log that day's session. */
+  function routinesSection() {
+    const list = R.routines.all();
+    const back = encodeURIComponent(date);
+    const tiles = list.map(r => FactorTile({
+      factor: R.routines.factorFor(r), title: r.name, selections: draft.selections, intensities: draft.intensity,
+      action: h('a', { class: 'well action tile-action', href: `#/routine/${r.id}?date=${back}&from=checkin`, 'aria-label': `Edit ${r.name} for this day`, title: 'Edit' }, PENCIL()),
+    }));
+    return h('div', { class: 'stack tight' },
+      h('h3', { class: 'section-label' }, 'Routines'),
+      h('div', { class: 'tile-grid' }, tiles,
+        h('a', { class: 'tile add routine-add', href: `#/routine/new?from=checkin&date=${back}` },
+          h('span', { class: 'well' }, '+'),
+          h('span', { class: 'tile-title' }, list.length ? 'New routine' : 'Add your routine'),
+          list.length ? null : h('span', { class: 'tile-hint' }, 'Gym, stretching, anything you repeat'))));
+  }
+
+  /** Copies yesterday's amounts (and how hard) for these items, if yesterday had any of them. */
+  function sameAsYesterday(ids) {
+    const want = new Set(ids);
+    const yValues = [...R.checkins.factorValues(yesterday)].filter(([fid]) => want.has(fid));
+    if (!yValues.length) return null;
+    const yIntensity = R.checkins.intensities(yesterday);
+    return h('button', {
+      type: 'button', class: 'chip glass same', onclick: () => {
+        for (const [fid, v] of yValues) {
+          draft.selections.set(fid, v);
+          if (yIntensity.has(fid)) draft.intensity.set(fid, yIntensity.get(fid));
+        }
+        render();
+        toast('Copied yesterday');
+      },
+    }, '↺ Same as yesterday');
+  }
+
+  function factorGrid(roles, { role = 'helper', exercise = false, label = null, same = true }) {
     const grid = h('div', { class: 'tile-grid' });
+    const intensities = exercise ? draft.intensity : null;
     const fill = () => grid.replaceChildren(
-      ...R.factors.forCheckin(roles, date).map(f => FactorTile({ factor: f, selections: draft.selections })),
+      ...R.factors.forCheckin(roles, { exercise }).map(f => FactorTile({ factor: f, selections: draft.selections, intensities })),
       h('button', {
         type: 'button', class: 'tile add', onclick: async () => {
-          const added = await quickAddFactor({ role: addRole });
+          const added = await quickAddFactor({ role, exercise });
           for (const f of added) draft.selections.set(f.id, defaultAmount(f));
           if (added.length) fill();
         },
-      }, h('span', { class: 'well' }, '+'), h('span', { class: 'tile-title' }, addRole === 'helper' ? 'Add a helper' : 'Add a stressor')));
+      }, h('span', { class: 'well' }, '+'), h('span', { class: 'tile-title' }, exercise ? 'Add exercise' : role === 'helper' ? 'Add a helper' : 'Add a stressor')));
     fill();
-    const yValues = R.checkins.factorValues(yesterday);
-    const yForRoles = [...yValues].filter(([fid]) => { const f = R.factors.get(fid); return f && !f.isArchived && roles.includes(f.role); });
-    return h('div', {},
-      yForRoles.length ? h('button', {
-        type: 'button', class: 'chip glass same', onclick: () => {
-          for (const [fid, v] of yForRoles) draft.selections.set(fid, v);
-          fill();
-          toast('Copied yesterday');
-        },
-      }, '↺ Same as yesterday') : null,
+    return h('div', { class: label ? 'stack tight' : '' },
+      label ? h('h3', { class: 'section-label' }, label) : null,
+      same ? sameAsYesterday(R.factors.forCheckin(roles, { exercise }).map(f => f.id)) : null,
       grid);
   }
 
@@ -219,7 +281,8 @@ export function CheckinView(ctx) {
       h('div', { class: 'week-dots', 'aria-label': 'This week' }, week.map(d => h('span', { class: R.checkins.entryFor(d) ? 'on' : '' }, h('i'), h('small', {}, weekdayLetter(d))))),
       h('div', { class: 'stats-row' },
         stat(draft.pain ?? '–', '/10', 'Pain'),
-        stat(draft.stress ?? '–', '/10', 'Stress')),
+        stat(draft.stress ?? '–', '/10', 'Stress'),
+        stat(draft.sleep ?? '–', '/10', 'Sleep')),
       h('a', { class: 'btn primary wide', href: '#/' }, 'See your dashboard'));
   }
 

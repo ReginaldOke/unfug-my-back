@@ -51,7 +51,7 @@ export function SetupView(ctx) {
       const list = h('div', { class: 'card-grid sortable' });
       const done = h('button', { type: 'button', class: 'chip glass done-edit', hidden: true, onclick: () => sort.setEditing(false) }, 'Done');
       // Your list, in your order. Switched-off ones stay until you leave, then live in Add your own
-      const shown = new Set(R.factors.all().filter(f => roles.includes(f.role)).map(f => f.id));
+      const shown = new Set(R.factors.all().filter(f => roles.includes(f.role) && !f.routineId).map(f => f.id));
       const fill = () => list.replaceChildren(
         ...R.factors.all({ archived: true }).filter(f => shown.has(f.id)).sort((a, b) => a.sortWeight - b.sortWeight).map(f => h('div', { class: 'sortable-item', 'data-id': f.id },
           SelectCard({

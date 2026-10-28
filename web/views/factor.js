@@ -8,20 +8,23 @@ import { SelectCard } from './controls.js';
 
 /**
  * Tall drawer to add a stressor or helper: your own at the top, common ones you haven't switched on below.
- * Resolves with every factor added or switched on (possibly none).
+ * Resolves with every factor added or switched on (possibly none). exercise: adds to the check-in's
+ * exercise step instead (counted as a helper until the patterns say otherwise).
  */
-export function quickAddFactor({ role = 'trigger', status = 'suspected', title } = {}) {
+export function quickAddFactor({ role = 'trigger', status = 'suspected', title, exercise = false } = {}) {
   return new Promise(resolve => {
     const added = [];
     let measure = 'minutes';
+    if (exercise) role = 'helper';
     const roles = role === 'helper' ? ['helper'] : ['trigger', 'unsure'];
+    const kind = exercise ? 'exercise' : role === 'helper' ? 'helper' : 'stressor';
     sheet(close => {
-      const name = h('input', { type: 'text', class: 'glass-input', required: true, maxlength: 60, placeholder: role === 'helper' ? 'Foam rolling' : 'Doomscrolling', 'aria-label': 'Name', enterkeyhint: 'done' });
+      const name = h('input', { type: 'text', class: 'glass-input', required: true, maxlength: 60, placeholder: { exercise: 'Climbing', helper: 'Foam rolling', stressor: 'Doomscrolling' }[kind], 'aria-label': 'Name', enterkeyhint: 'done' });
       const form = h('form', {
         class: 'stack', onsubmit: e => {
           e.preventDefault();
           if (!name.value.trim()) return name.focus();
-          added.push(R.factors.create({ name: name.value.trim(), role, measureType: measure, status }));
+          added.push(R.factors.create({ name: name.value.trim(), role, measureType: measure, status, ...(exercise ? { category: 'exercise' } : {}) }));
           close();
         },
       },
@@ -29,14 +32,14 @@ export function quickAddFactor({ role = 'trigger', status = 'suspected', title }
       field('Track it as', segmented([['minutes', 'Time'], ['count', 'Count'], ['yesno', 'Yes / no']], measure, v => { measure = v; }, 'Track it as')),
       h('button', { type: 'submit', class: 'btn primary' }, 'Add'));
 
-      const suggestions = R.factors.all({ archived: true }).filter(f => f.isArchived && roles.includes(f.role));
+      const suggestions = R.factors.all({ archived: true }).filter(f => f.isArchived && !f.routineId && (exercise ? R.isExercise(f) : roles.includes(f.role) && !R.isExercise(f)));
       // Typing focuses the field straight away on desktop; on phones the keyboard would cover the suggestions
       if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => name.focus({ preventScroll: true }), 50);
       return h('div', { class: 'stack' },
-        h('div', { class: 'row between' }, h('h2', {}, title || (role === 'helper' ? 'Add a helper' : 'Add a stressor')), iconButton('✕', 'Close', close)),
+        h('h2', {}, title || { exercise: 'Add exercise', helper: 'Add a helper', stressor: 'Add a stressor' }[kind]),
         form,
         suggestions.length ? h('div', { class: 'stack' },
-          h('h3', { class: 'section-label' }, role === 'helper' ? 'Common helpers' : 'Common stressors'),
+          h('h3', { class: 'section-label' }, { exercise: 'More kinds', helper: 'Common helpers', stressor: 'Common stressors' }[kind]),
           h('div', { class: 'card-grid' }, suggestions.map(f => SelectCard({
             icon: f.icon || ROLE_ICON[f.role], title: f.name, on: false,
             onToggle: on => {

@@ -6,9 +6,10 @@ import { HomeView } from './views/home.js';
 import { CheckinView } from './views/checkin.js';
 import { SetupView } from './views/setup.js';
 import { FactorDetailView } from './views/factor.js';
-import { RoutinesView, RoutineEditView, RoutineRunView } from './views/routines.js';
+import { RoutinesView, RoutineEditView, RoutineRunView, RoutineLogView } from './views/routines.js';
 import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
+import { HealthView } from './views/health.js';
 
 R.init();
 
@@ -22,8 +23,10 @@ const routes = [
   [/^\/routine\/new$/, RoutineEditView],
   [/^\/routine\/([\w-]+)\/edit$/, RoutineEditView],
   [/^\/routine\/([\w-]+)\/run$/, RoutineRunView, { flow: true }],
+  [/^\/routine\/([\w-]+)$/, RoutineLogView],
   [/^\/settings$/, SettingsView],
   [/^\/help$/, HelpView],
+  [/^\/health$/, HealthView],
 ];
 
 const app = document.getElementById('app');

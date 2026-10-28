@@ -2,7 +2,8 @@
 import { localDate } from './dates.js';
 
 export const ANALYSIS_PROMPT = `You are analysing a personal back pain diary exported as JSON.
-Pain and stress are 0 to 10. Factors have a role (trigger, helper, unsure); the app calls triggers "stressors".
+Pain, stress and sleepQuality are 0 to 10 (sleepQuality is the night before; 10 is slept well). healthDays has daily steps and sleep from Apple Health.
+factorLogs may carry intensity: 1 easy, 2 moderate, 3 hard. routineChanges marks days the movement routine changed: compare pain before and after. Factors have a role (trigger, helper, unsure); the app calls triggers "stressors".
 1. Summarise pain trends and flare frequency over the period.
 2. For each factor, compare pain on days with vs without it at same day, next day and two days later.
 3. Check dose response for minute and count factors.
@@ -40,10 +41,12 @@ export function buildExport(data, { from, to, regions = [] }) {
     routines: data.routines,
     routineCompletions: data.routineCompletions.filter(c => inRange(dayOf(c.timestamp))),
     reminderEvents: data.reminderEvents.filter(e => e.firedAt && inRange(dayOf(e.firedAt))),
+    healthDays: (data.healthDays ?? []).filter(d => inRange(d.date)),
+    routineChanges: (data.routineChanges ?? []).filter(c => inRange(c.date)),
   };
 }
 
-export const CSV_TABLES = ['dailyEntries', 'factorLogs', 'painMarkers', 'flares', 'factors', 'factorChanges', 'routineCompletions', 'reminderEvents', 'routines', 'bodyRegions'];
+export const CSV_TABLES = ['dailyEntries', 'factorLogs', 'healthDays', 'painMarkers', 'flares', 'factors', 'factorChanges', 'routineCompletions', 'reminderEvents', 'routines', 'bodyRegions'];
 
 export function toCSV(rows) {
   if (!rows.length) return '';

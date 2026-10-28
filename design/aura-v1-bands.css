@@ -1,0 +1,32 @@
+/* Saved header gradient, version 1 (diagonal colour bands across the hero, fading out by ~440px).
+   To restore: replace the "Header glow" block in web/styles.css with everything below. */
+
+/* Header glow: the logo's colours (warm white, soft pink, coral) with a deep navy band, as a grainy
+   blurred gradient behind the top of each tab page. It scrolls away with the page and fades out. */
+.aura {
+  position: absolute; top: 0; left: 0; right: 0; height: 440px; z-index: -1; pointer-events: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+.aura::before {
+  content: ''; position: absolute; inset: -25% -30%;
+  /* Diagonal bands, like light through a blind: navy, then crimson into coral, with the logo's warm
+     white catching the edge. The top stays dark so the title reads. */
+  background:
+    radial-gradient(22% 9% at 72% 35%, rgba(255, 222, 210, 0.75), transparent 70%),
+    radial-gradient(55% 11% at 58% 44%, rgba(236, 78, 52, 0.95), transparent 72%),
+    radial-gradient(48% 9% at 40% 52%, rgba(196, 48, 40, 0.85), transparent 72%),
+    radial-gradient(60% 10% at 46% 32%, rgba(30, 44, 112, 0.95), transparent 72%),
+    radial-gradient(40% 9% at 22% 40%, rgba(120, 30, 52, 0.8), transparent 72%),
+    radial-gradient(30% 10% at 88% 50%, rgba(242, 150, 128, 0.6), transparent 72%);
+  transform: rotate(-14deg);
+  filter: blur(22px) saturate(120%);
+  animation: aura-drift 24s ease-in-out infinite alternate;
+}
+.aura::after {
+  content: ''; position: absolute; inset: 0; opacity: 0.32; mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes aura-drift { to { transform: translate3d(-5%, 2%, 0) rotate(-10deg) scale(1.1); } }
+body.in-flow .aura { display: none; }
+@media (prefers-reduced-motion: reduce) { .aura::before { animation: none; } }

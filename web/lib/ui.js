@@ -77,13 +77,78 @@ export function iconButton(icon, label, onclick, props = {}) {
   return btn;
 }
 
-/** Bottom sheet built on <dialog>, so focus trapping and Escape come for free. */
+const SHEET_EASE = 'cubic-bezier(.32, .72, 0, 1)'; // the iOS sheet curve
+
+/**
+ * Bottom sheet built on <dialog>, so focus trapping and Escape come for free. It slides up on open;
+ * swipe it down (it follows the finger) or tap outside to close.
+ */
 export function sheet(build, { onClose, tall = false } = {}) {
   const dlg = h('dialog', { class: `sheet${tall ? ' tall' : ''}` });
-  const close = () => dlg.close();
+  let closing = false;
+  const close = () => slideOut(0);
+
+  /** Slides the rest of the way down from `from` px, then closes. */
+  function slideOut(from, velocity = 0) {
+    if (closing) return;
+    closing = true;
+    dlg.classList.add('closing');
+    const dist = dlg.offsetHeight - from;
+    // A fast flick finishes faster; a tap outside takes the standard 300 ms
+    const ms = velocity > 0 ? Math.max(140, Math.min(300, dist / velocity)) : 300;
+    dlg.animate([{ transform: `translateY(${from}px)` }, { transform: 'translateY(100%)' }], { duration: ms, easing: velocity ? 'cubic-bezier(.2, .6, .4, 1)' : SHEET_EASE, fill: 'forwards' })
+      .finished.then(() => dlg.close(), () => dlg.close());
+  }
+
   dlg.append(h('div', { class: 'sheet-grabber', 'aria-hidden': 'true' }), build(close));
   dlg.addEventListener('close', () => { dlg.remove(); onClose?.(); });
+  dlg.addEventListener('cancel', e => { e.preventDefault(); close(); }); // Escape slides out too
   dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+
+  // Swipe down to dismiss. Starts only when the sheet is scrolled to the top and the finger moves down
+  let drag = null, swallowUntil = 0;
+  // The release of a drag isn't a tap on whatever was under the finger
+  dlg.addEventListener('click', e => { if (performance.now() < swallowUntil) { e.stopPropagation(); e.preventDefault(); } }, true);
+  const y = e => (e.touches ? e.touches[0].clientY : e.clientY);
+  const x = e => (e.touches ? e.touches[0].clientX : e.clientX);
+  const start = e => {
+    if (closing || e.target.closest('input, textarea, select, .vslider, .sortable')) return;
+    drag = { x0: x(e), y0: y(e), dy: 0, active: false, samples: [] };
+  };
+  const move = e => {
+    if (!drag) return;
+    const dx = x(e) - drag.x0, dy = y(e) - drag.y0;
+    if (!drag.active) {
+      if (Math.abs(dy) < 6 && Math.abs(dx) < 6) return;
+      if (dy <= 0 || Math.abs(dx) > dy || dlg.scrollTop > 0) { drag = null; return; }
+      drag.active = true;
+      dlg.classList.add('dragging');
+    }
+    e.preventDefault();
+    // Past the top it resists, like iOS
+    drag.dy = dy > 0 ? dy : -Math.sqrt(-dy) * 2;
+    drag.samples.push([performance.now(), drag.dy]);
+    if (drag.samples.length > 5) drag.samples.shift();
+    dlg.style.transform = `translateY(${drag.dy}px)`;
+  };
+  const end = () => {
+    if (!drag?.active) { drag = null; return; }
+    const { dy, samples } = drag;
+    drag = null;
+    dlg.classList.remove('dragging');
+    const [t0, y0] = samples[0] ?? [0, 0], [t1, y1] = samples.at(-1) ?? [1, 0];
+    const v = t1 > t0 ? (y1 - y0) / (t1 - t0) : 0; // px per ms
+    dlg.style.transform = '';
+    swallowUntil = performance.now() + 350;
+    if (dy > dlg.offsetHeight * 0.3 || (v > 0.5 && dy > 20)) return slideOut(dy, Math.max(v, 1));
+    dlg.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }], { duration: 380, easing: 'cubic-bezier(.2, 1.15, .4, 1)' });
+  };
+  dlg.addEventListener('touchstart', start, { passive: true });
+  dlg.addEventListener('touchmove', move, { passive: false });
+  dlg.addEventListener('touchend', end);
+  dlg.addEventListener('touchcancel', end);
+  dlg.addEventListener('mousedown', e => { start(e); if (!drag) return; const up = () => { end(); removeEventListener('mousemove', move); removeEventListener('mouseup', up); }; addEventListener('mousemove', move); addEventListener('mouseup', up); });
+
   document.body.append(dlg);
   dlg.showModal();
   return { dlg, close };

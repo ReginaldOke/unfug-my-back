@@ -5,13 +5,14 @@ import { buildExport } from '../lib/export.js';
 import { REGIONS } from '../lib/regions.js';
 import { localDate } from '../lib/dates.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
+import { HEALTH_IMPORT } from '../lib/health.js';
 
 const row = (href, title, detail) => h('a', { class: 'list-row', href },
   h('span', { class: 'grow' }, title, detail ? h('span', { class: 'hint block' }, detail) : null),
   h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
 
 export function SettingsView() {
-  const active = R.factors.all();
+  const active = R.factors.all().filter(f => !f.routineId);
   const nStress = active.filter(f => f.role !== 'helper').length, nHelp = active.length - nStress;
   const rem = R.settings().reminder;
 
@@ -22,7 +23,8 @@ export function SettingsView() {
       row('#/setup?step=stressors&edit=1', 'Stressors & helpers', `${nStress} stressors · ${nHelp} helpers`),
       h('button', { type: 'button', class: 'list-row', onclick: openReminderSheet },
         h('span', { class: 'grow' }, 'Reminders', h('span', { class: 'hint block' }, rem.enabled ? `Move every ${rem.intervalMin} min · ${hoursSummary(rem)}` : 'Move nudges off')),
-        h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
+      HEALTH_IMPORT ? row('#/health', 'Apple Health', R.health.all().length ? `Steps and sleep for ${R.health.all().length} days` : 'Bring in steps and sleep') : null),
 
     dataSection(),
 
