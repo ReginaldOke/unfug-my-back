@@ -20,7 +20,7 @@ const TYPES = {
 };
 
 const SYSTEM = `You help one person understand their own back pain diary. You are not their clinician.
-Write for a phone screen: plain language, short sentences, under 350 words, markdown with these sections:
+Write for a phone screen: plain language, short sentences, under 350 words. Write the way a good physio would text a client: specific and direct, no filler, no hype, no em dashes. Use markdown with these sections:
 ## In short — two or three sentences on the overall picture.
 ## Patterns — the strongest associations, each with the numbers behind it (days with vs without, lag, sample size).
 ## What seems to help

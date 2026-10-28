@@ -13,7 +13,7 @@ const ASSETS = [
   'lib/ai.js', 'lib/analysis.js', 'lib/dates.js', 'lib/export.js', 'lib/labels.js', 'lib/markdown.js',
   'lib/motion.js', 'lib/notify.js', 'lib/regions.js', 'lib/regions3d.js', 'lib/reminders-core.js',
   'lib/reminders.js', 'lib/repos.js', 'lib/seed.js', 'lib/store.js', 'lib/ui.js', 'lib/voice.js',
-  'views/body3d.js', 'views/bodymap.js', 'views/chart.js', 'views/checkin.js', 'views/controls.js',
+  'views/body3d.js', 'views/chart.js', 'views/checkin.js', 'views/controls.js',
   'views/factor.js', 'views/help.js', 'views/home.js', 'views/routines.js', 'views/settings.js', 'views/setup.js',
   'vendor/three/build/three.module.js', 'vendor/three/build/three.core.js',
   'vendor/three/examples/jsm/controls/OrbitControls.js', 'vendor/three/examples/jsm/loaders/OBJLoader.js',

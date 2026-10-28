@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { h, vibrate } from '../lib/ui.js';
-import { regionById } from '../lib/regions.js';
+import { REGIONS, regionById } from '../lib/regions.js';
 import { regionAt, regionAnchor, H } from '../lib/regions3d.js';
 
 // Turn the loaded model so it faces +Z. The Free Pack male base mesh faces −Z, hence a half turn.
@@ -22,9 +22,8 @@ export function webglAvailable() {
 export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {}, onAdd = () => {} }) {
   const canvas = h('canvas', { class: 'body3d-canvas', role: 'img', 'aria-label': '3D body. Drag to turn it, pinch to zoom, tap where it hurts.' });
   const label = h('div', { class: 'body3d-label', 'aria-live': 'polite' });
-  const hint = h('div', { class: 'body3d-hint', 'aria-hidden': 'true' }, 'Drag to turn · pinch to zoom · tap where it hurts');
   const chips = h('div', { class: 'chips wrap center body3d-chips' });
-  const stage = h('div', { class: 'body3d' }, canvas, label, hint);
+  const stage = h('div', { class: 'body3d' }, canvas, label);
   const root = h('div', { class: 'body3d-wrap' }, stage, chips);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -85,7 +84,7 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
       markerGroup.add(core, glow);
     }
     chips.replaceChildren(...markers.map(m => h('button', {
-      type: 'button', class: 'chip on', 'aria-label': `Remove ${regionById[m.regionId].displayName}`,
+      type: 'button', class: 'chip spot', 'aria-label': `Remove ${regionById[m.regionId].displayName}`,
       onclick: () => { removeRegion(m.regionId); },
     }, regionById[m.regionId].displayName, h('span', { 'aria-hidden': 'true' }, ' ✕'))));
   }
@@ -133,7 +132,6 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld)
       .applyQuaternion(body.quaternion.clone().invert());
     const regionId = regionAt(point, normal);
-    if (!regionId) return say('Tap your back, hips or legs');
     if (markers.some(m => m.regionId === regionId)) return removeRegion(regionId);
     markers.push({
       regionId, side: regionById[regionId].side, intensity: defaultIntensity(), quality: 'ache',
@@ -284,4 +282,26 @@ function haloTexture() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
+}
+
+/** Fallback where WebGL isn't available: the regions as a list of toggles. Same interface as Body3D. */
+export function RegionList({ markers, defaultIntensity = () => 5, onChange = () => {}, onAdd = () => {} }) {
+  const root = h('div', { class: 'chips wrap center region-list' });
+  const render = () => root.replaceChildren(...REGIONS.map(r => {
+    const on = markers.some(m => m.regionId === r.regionId);
+    return h('button', {
+      type: 'button', class: `chip${on ? ' on' : ''}`, 'aria-pressed': String(on),
+      onclick: () => {
+        const i = markers.findIndex(m => m.regionId === r.regionId);
+        if (i >= 0) markers.splice(i, 1);
+        else markers.push({ regionId: r.regionId, side: r.side, intensity: defaultIntensity(), quality: 'ache', modelPoint: null });
+        render();
+        onChange(markers);
+        if (i < 0) onAdd(r.regionId);
+      },
+    }, r.displayName);
+  }));
+  root.setMarkers = arr => { markers.splice(0, markers.length, ...arr.map(m => ({ ...m }))); render(); onChange(markers); };
+  render();
+  return root;
 }

@@ -3,12 +3,15 @@ import { h, toast, iconButton, select, confirmSheet } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate } from '../lib/dates.js';
 
+/** Set when a routine is finished, read once by the Today screen to play its celebration. */
+export const justFinished = { id: null };
+
 export function RoutinesView() {
   const today = localDate();
   const list = R.routines.all();
   return h('div', { class: 'view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Routines'), h('a', { class: 'icon-btn glass', href: '#/routine/new', 'aria-label': 'New routine' }, '+')),
-    list.length ? null : h('p', { class: 'muted' }, 'Define a short movement routine. It counts as a helper each time you finish it.'),
+    list.length ? null : h('p', { class: 'muted' }, 'Add a short set of moves. Each time you finish it, it’s logged as a helper.'),
     list.map(r => {
       const done = R.routines.completionsOn(today, r.id).length;
       return h('section', { class: 'card glass routine-card' },
@@ -27,7 +30,7 @@ export function RoutineEditView(ctx) {
     name: r?.name ?? '',
     items: structuredClone(r?.items ?? [{ name: '', dose: '' }]),
     schedule: [...(r?.schedule ?? ['09:00'])],
-    linkedFactorId: r?.linkedFactorId ?? R.factors.all().find(f => f.name === 'Mobility routine')?.id ?? '',
+    linkedFactorId: r?.linkedFactorId ?? R.factors.all().find(f => f.name === 'Stretching')?.id ?? '',
   };
   const itemsBox = h('div', { class: 'stack tight' });
   const timesBox = h('div', { class: 'chips wrap' });
@@ -86,7 +89,9 @@ export function RoutineRunView(ctx) {
 
   const finish = completed => {
     R.routines.complete(r.id, completed);
-    toast(completed ? 'Routine done. Logged as a helper.' : 'Logged as partly done');
+    // Today celebrates the finish on the routine tile (see home.js); a partial session just gets a note
+    if (completed) justFinished.id = r.id;
+    else toast('Logged as partly done');
     location.hash = '#/';
   };
 
@@ -102,7 +107,7 @@ export function RoutineRunView(ctx) {
         h('p', { class: 'dose-big' }, it.dose),
         r.items[i + 1] ? h('p', { class: 'hint' }, `Next: ${r.items[i + 1].name}`) : null),
       h('div', { class: 'flow-footer' },
-        i > 0 ? h('button', { type: 'button', class: 'btn ghost', onclick: () => { i--; render(); } }, 'Back') : h('span'),
+        i > 0 ? iconButton('‹', 'Back', () => { i--; render(); }) : h('span'),
         h('button', { type: 'button', class: 'btn primary wide', onclick: () => (last ? finish(true) : (i++, render())) }, last ? 'Done' : 'Next')));
     root.querySelector('h1').focus({ preventScroll: true });
   }

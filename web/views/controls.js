@@ -14,18 +14,24 @@ const GLYPHS = {
  * The fill tracks the finger continuously and settles on the whole number when released.
  * value may be null (not set yet).
  */
-export function VSlider({ label, value = null, onChange, onCommit = () => {}, glyph = 'bolt' }) {
+export function VSlider({ label, value = null, onChange, onCommit = () => {}, glyph = 'bolt', tint = 'neutral' }) {
   const max = 10;
   const num = h('span', { class: 'vs-num' });
   const fill = h('div', { class: 'vs-fill', 'aria-hidden': 'true' });
+  // The glyph is drawn twice: light on the empty track, dark on the fill (clipped to the filled part)
   const icon = h('span', { class: 'vs-glyph', 'aria-hidden': 'true' });
   icon.innerHTML = GLYPHS[glyph];
+  const iconOnFill = h('div', { class: 'vs-glyph-clip', 'aria-hidden': 'true' }, h('span', { class: 'vs-glyph dark' }));
+  iconOnFill.firstChild.innerHTML = GLYPHS[glyph];
   const track = h('div', {
-    class: 'vslider', role: 'slider', tabindex: 0, 'aria-label': label,
+    class: `vslider tint-${tint}`, role: 'slider', tabindex: 0, 'aria-label': label,
     'aria-valuemin': 0, 'aria-valuemax': max,
-  }, fill, icon);
+  }, icon, fill, iconOnFill);
 
-  const paint = frac => { fill.style.transform = `scaleY(${frac})`; };
+  const paint = frac => {
+    fill.style.transform = `scaleY(${frac})`;
+    iconOnFill.style.clipPath = `inset(${(1 - frac) * 100}% 0 0 0)`;
+  };
 
   function setValue(v, fromUser) {
     const changed = v !== value;
@@ -107,12 +113,42 @@ export function defaultAmount(f) {
  * Factor tile for the daily survey. Tap selects; swipe sideways sets how much (the fill grows with it).
  * touch-action: pan-y keeps vertical page scrolling with the browser while horizontal drags come to us.
  */
+// Average colour of an emoji, sampled from its rendered pixels (saturated pixels count more), cached.
+// Used for a very faint tint on each tile, so custom factors get one too.
+const tintCache = new Map();
+export function emojiTint(emoji) {
+  if (!emoji) return null;
+  if (tintCache.has(emoji)) return tintCache.get(emoji);
+  let tint = null;
+  try {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.font = '26px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 16, 18);
+    const px = ctx.getImageData(0, 0, 32, 32).data;
+    let r = 0, g = 0, b = 0, w = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 128) continue;
+      const max = Math.max(px[i], px[i + 1], px[i + 2]), min = Math.min(px[i], px[i + 1], px[i + 2]);
+      const weight = 0.15 + (max - min) / 255; // favour the colourful parts over outlines and greys
+      r += px[i] * weight; g += px[i + 1] * weight; b += px[i + 2] * weight; w += weight;
+    }
+    if (w) tint = `${Math.round(r / w)}, ${Math.round(g / w)}, ${Math.round(b / w)}`;
+  } catch { /* canvas unavailable: no tint */ }
+  tintCache.set(emoji, tint);
+  return tint;
+}
+
 export function FactorTile({ factor: f, selections, onChange = () => {} }) {
   const scale = scaleFor(f);
+  const tint = emojiTint(f.icon);
   const fill = h('div', { class: 'tile-fill', 'aria-hidden': 'true' });
   const valueBtn = h('button', { type: 'button', class: 'tile-value', 'aria-label': `Type exact amount for ${f.name}` });
   const hint = h('span', { class: 'tile-hint' });
-  const el = h('div', { class: `tile factor role-${f.role}`, role: 'button', tabindex: 0 },
+  const el = h('div', { class: `tile factor role-${f.role}`, role: 'button', tabindex: 0, style: tint ? `--tint: ${tint}` : null },
     fill,
     h('div', { class: 'tile-top' },
       h('span', { class: 'well', 'aria-hidden': 'true' }, f.icon || ROLE_ICON[f.role]),

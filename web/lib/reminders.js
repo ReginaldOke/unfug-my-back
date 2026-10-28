@@ -63,10 +63,10 @@ function fire(ev, now) {
 function showMovementBanner(ev) {
   const minutes = Math.max(5, Math.round((ev.stationaryMinutesBefore ?? R.settings().reminder.intervalMin) / 5) * 5);
   const items = R.routines.all()[0]?.items ?? [];
-  const idea = items.length ? ` Maybe: ${items[Math.floor(Math.random() * items.length)].name.toLowerCase()}.` : '';
+  const idea = items.length ? ` Try: ${items[Math.floor(Math.random() * items.length)].name.toLowerCase()}.` : '';
   notify({
     key: 'move',
-    title: 'Time for a quick move?',
+    title: 'Time to move',
     body: `You've been still for about ${minutes} minutes.${idea}`,
     actions: [
       { label: 'Moving now', primary: true, run: () => respond(ev.id, 'moved') },
@@ -136,7 +136,7 @@ function checkDailyReminders(now) {
 
   if (due('checkin', s.checkinTime) && !R.checkins.entryFor(today)) {
     notify({
-      key: 'checkin', title: 'Evening check-in', body: 'One minute to log today. Keep your streak going.',
+      key: 'checkin', title: 'Time to check in', body: 'Takes about a minute.',
       actions: [{ label: 'Start', primary: true, run: () => { location.hash = '#/checkin'; } }],
     });
   }
@@ -144,7 +144,7 @@ function checkDailyReminders(now) {
     r.schedule.forEach((t, i) => {
       if (!due(`routine:${r.id}:${t}`, t) || R.routines.completionsOn(today, r.id).length > i) return;
       notify({
-        key: `routine:${r.id}`, title: r.name, body: `${r.items.length} moves, a few minutes.`,
+        key: `routine:${r.id}`, title: r.name, body: `${r.items.length} moves, about ${Math.max(5, Math.round(r.items.length * 1.5 / 5) * 5)} minutes.`,
         actions: [
           { label: 'Start', primary: true, run: () => { location.hash = `#/routine/${r.id}/run`; } },
           { label: 'Mark done', run: () => R.routines.complete(r.id, true) },

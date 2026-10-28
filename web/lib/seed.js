@@ -1,34 +1,36 @@
-// Personal-build seed data (SPEC.md › Seed data). `defaultOn` controls what's pre-selected in setup;
-// everything else is offered but switched off until chosen.
+// Seed data. New users start with the most common back pain stressors and helpers switched on
+// (`defaultOn`); the rest are offered in Settings › Stressors & helpers but start switched off.
 
-const f = (name, role, measureType, unit, category, icon, defaultOn = true) => ({ name, role, measureType, unit, category, icon, defaultOn });
+const f = (name, role, measureType, unit, category, icon, defaultOn = false) => ({ name, role, measureType, unit, category, icon, defaultOn });
 
 export const SEED_FACTORS = [
-  // Stressors
-  f('Desk sitting', 'trigger', 'minutes', 'min', 'posture', '🪑'),
-  f('Driving', 'trigger', 'minutes', 'min', 'activity', '🚗'),
-  f('Guitar (seated)', 'trigger', 'minutes', 'min', 'activity', '🎸'),
-  f('Poor sleep', 'trigger', 'yesno', '', 'lifestyle', '🌙'),
+  // Most common stressors (on by default)
+  f('Long sitting', 'trigger', 'minutes', 'min', 'posture', '🪑', true),
+  f('Driving', 'trigger', 'minutes', 'min', 'activity', '🚗', true),
+  f('Heavy lifting or bending', 'trigger', 'minutes', 'min', 'activity', '📦', true),
+  f('Poor sleep', 'trigger', 'yesno', '', 'lifestyle', '🌙', true),
+  f('Hunched over phone or laptop', 'trigger', 'minutes', 'min', 'posture', '📱', true),
+  // Most common helpers (on by default)
+  f('Walking', 'helper', 'minutes', 'min', 'exercise', '🚶', true),
+  f('Stretching', 'helper', 'minutes', 'min', 'recovery', '🧘', true),
+  f('Strength exercise', 'helper', 'minutes', 'min', 'exercise', '🏋️', true),
+  // More options, off until chosen
   f('Crossed-leg sitting', 'trigger', 'yesno', '', 'posture', '🦵'),
+  f('Guitar (seated)', 'trigger', 'minutes', 'min', 'activity', '🎸'),
   f('Crunches or sit-ups', 'trigger', 'count', 'reps', 'exercise', '🔁'),
   f('Training volume above plan', 'trigger', 'yesno', '', 'exercise', '📈'),
+  f('Heavy bag carrying', 'trigger', 'minutes', 'min', 'activity', '🎒'),
   f('Lying propped up in bed', 'unsure', 'minutes', 'min', 'posture', '🛏️'),
-  f('Manual work (lifting, bending)', 'unsure', 'minutes', 'min', 'activity', '🔨'),
   f('Handstands', 'unsure', 'count', 'times', 'exercise', '🤸'),
   f('Glute bridges', 'unsure', 'count', 'reps', 'exercise', '🌉'),
   f('Calisthenics session', 'unsure', 'minutes', 'min', 'exercise', '💪'),
-  f('Long phone scrolling', 'trigger', 'minutes', 'min', 'posture', '📱', false),
-  f('Heavy bag carrying', 'trigger', 'minutes', 'min', 'activity', '🎒', false),
-  // Helpers
-  f('Walking', 'helper', 'minutes', 'min', 'exercise', '🚶'),
-  f('Stretching', 'helper', 'minutes', 'min', 'recovery', '🧘'),
   f('Mobility routine', 'helper', 'count', 'times', 'recovery', '🔄'),
   f('Extension breaks', 'helper', 'count', 'times', 'recovery', '🐍'),
   f('Running', 'helper', 'minutes', 'min', 'exercise', '🏃'),
   f('Cycling', 'helper', 'minutes', 'min', 'exercise', '🚴'),
-  f('Swimming', 'helper', 'minutes', 'min', 'exercise', '🏊', false),
-  f('Heat pack', 'helper', 'yesno', '', 'recovery', '♨️', false),
-  f('Standing desk', 'helper', 'minutes', 'min', 'posture', '🧍', false),
+  f('Swimming', 'helper', 'minutes', 'min', 'exercise', '🏊'),
+  f('Heat pack', 'helper', 'yesno', '', 'recovery', '♨️'),
+  f('Standing desk', 'helper', 'minutes', 'min', 'posture', '🧍'),
 ];
 
 export const SEED_ROUTINE = {

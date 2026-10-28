@@ -25,7 +25,7 @@ export function SetupView(ctx) {
     if (!R.settings().onboarded) {
       R.setSettings({ onboarded: true });
       reminders.reschedule();
-      toast('All set. Check in this evening.');
+      toast('Saved');
     }
     location.hash = editing ? '#/settings' : '#/';
   }
@@ -65,8 +65,8 @@ export function SetupView(ctx) {
       return h('div', { class: 'stack' },
         h('h1', { tabindex: -1 }, id === 'stressors' ? 'What tends to set it off?' : 'What tends to help?'),
         h('p', { class: 'muted' }, id === 'stressors'
-          ? 'Switch on anything you suspect. These become tiles in your daily check-in. You can change them any time.'
-          : 'Movement and recovery habits you want to track.'),
+          ? 'Pick the ones you want to track. You can change this later.'
+          : 'Pick the ones you do.'),
         list,
         id === 'stressors' && !editing ? h('a', { class: 'hint safety-link', href: '#/help' }, 'This app tracks patterns; it doesn’t diagnose. See warning signs that need a doctor ›') : null);
     }
@@ -79,7 +79,7 @@ export function SetupView(ctx) {
     }, perm === 'granted' ? 'Notifications on ✓' : perm === 'denied' ? 'Notifications blocked in browser settings' : perm === 'unsupported' ? 'Notifications not supported here' : 'Allow notifications');
     return h('div', { class: 'stack' },
       h('h1', { tabindex: -1 }, 'Nudges to move'),
-      h('p', { class: 'muted' }, 'If you haven’t moved for a while during the day, you’ll get a gentle nudge. Moving resets the timer.'),
+      h('p', { class: 'muted' }, 'If you sit still too long, you’ll get a reminder to move.'),
       h('section', { class: 'card glass stack' },
         h('h2', {}, 'Nudge after sitting still for'),
         segmented([[30, '30 min'], [45, '45 min'], [60, '60 min']], s.reminder.intervalMin,

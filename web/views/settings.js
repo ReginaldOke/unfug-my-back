@@ -30,8 +30,8 @@ export function SettingsView() {
   const aiLine = h('p', { class: 'hint' }, 'Checking…');
   aiStatus().then(({ ai }) => {
     aiLine.textContent = ai
-      ? 'Connected. “Analyse my data” on Today shows a summary in one tap.'
-      : 'No API key on the server, so “Analyse my data” copies your diary for you to paste into Claude. See README to connect.';
+      ? 'Connected. “Analyse my data” shows a summary here.'
+      : '“Analyse my data” copies your diary so you can paste it into Claude.';
   });
 
   const perm = notificationStatus();
@@ -75,12 +75,12 @@ function dataSection() {
 
   return h('section', { class: 'card glass stack' },
     h('h2', {}, 'Your data'),
-    h('p', { class: 'hint' }, 'Stays on this device. The export includes the analysis prompt, so you can attach it to Claude as is.'),
+    h('p', { class: 'hint' }, 'Saves your diary as one file. It includes instructions for Claude, so you can attach it to a chat as is.'),
     h('div', { class: 'row' }, from, h('span', { class: 'hint' }, 'to'), to),
     h('button', { type: 'button', class: 'btn primary', onclick: () => shareOrDownload(`unfug-my-back-${from.value}-to-${to.value}.json`, JSON.stringify(exportData(), null, 2), 'application/json') }, 'Export'),
     h('button', {
       type: 'button', class: 'btn danger', onclick: async () => {
-        if (!(await confirmSheet('Delete everything?', 'All check-ins, stressors, helpers and routines on this device will be erased. Export first if you want a copy.', 'Delete all', { danger: true }))) return;
+        if (!(await confirmSheet('Delete everything?', 'This erases every check-in, stressor, helper and routine on this device. Export first if you want a copy.', 'Delete all', { danger: true }))) return;
         R.wipeEverything();
         location.hash = '#/';
         location.reload();

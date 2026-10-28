@@ -34,10 +34,6 @@ function render() {
   cleanups.forEach(fn => fn());
   cleanups = [];
   const [path = '/', qs = ''] = (location.hash.slice(1) || '/').split('?');
-  if (!R.settings().onboarded && path !== '/setup' && path !== '/help') {
-    location.replace('#/setup');
-    return;
-  }
   let view = NotFound, args = [], opts = {};
   for (const [re, v, o = {}] of routes) {
     const m = path.match(re);
@@ -72,12 +68,8 @@ onBanners(list => bannersEl.replaceChildren(...list.map(b => h('div', { class: '
 
 window.addEventListener('hashchange', render);
 render();
-if (R.settings().onboarded) reminders.start();
-else window.addEventListener('hashchange', function startOnce() {
-  if (!R.settings().onboarded) return;
-  window.removeEventListener('hashchange', startOnce);
-  reminders.start();
-});
+// New users start on Today with sensible defaults; setup is optional (Settings › Stressors & helpers)
+reminders.start();
 
 // Installable app: offline support and updates on each open (see sw.js)
 if ('serviceWorker' in navigator) {

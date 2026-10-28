@@ -12,10 +12,22 @@ test('back of the torso maps to level and column; person’s left is +x', () => 
   assert.equal(at(0.05, 0.66, -1), 'mid_back_left');
 });
 
-test('front of the torso has no region; head and arms are ignored', () => {
-  assert.equal(at(0, 0.6, 1), null);
-  assert.equal(at(0, 0.95, -1), null);
-  assert.equal(at(0.2, 0.6, -1), null);
+test('every tap lands somewhere: head, shoulders, arms, chest and belly have regions', () => {
+  assert.equal(at(0, 0.95, -1), 'head');
+  assert.equal(at(0.1, 0.84, -1), 'shoulder_left');
+  assert.equal(at(-0.2, 0.71, 1), 'upper_arm_right');
+  assert.equal(at(0.29, 0.62, -1), 'forearm_left');
+  assert.equal(at(0.38, 0.52, 1), 'hand_left');
+  assert.equal(at(0.06, 0.72, 1), 'chest_left');
+  assert.equal(at(0, 0.6, 1), 'abdomen');
+});
+
+test('a grid of taps over the whole body never comes back empty', () => {
+  for (let fy = 0; fy <= 1; fy += 0.02) {
+    for (let fx = -0.4; fx <= 0.4; fx += 0.02) {
+      for (const nz of [-1, 1]) assert.ok(at(fx, fy, nz), `no region at ${fx.toFixed(2)}, ${fy.toFixed(2)}`);
+    }
+  }
 });
 
 test('pelvis splits into buttocks, hips and groin', () => {

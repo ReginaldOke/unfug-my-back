@@ -52,7 +52,7 @@ export function FactorDetailView(ctx) {
         ? h('p', { class: 'lead' }, insightSentence(a))
         : h('p', { class: 'muted' }, notEnoughSentence(a)),
       h('div', { class: 'lag-bars' }, a.lags.map(l => lagBar(l))),
-      h('p', { class: 'hint' }, 'Associations, not causes. Based on your check-ins only.')),
+      h('p', { class: 'hint' }, 'Shows what tends to go together, not what causes what.')),
 
     a.dose.length ? h('section', { class: 'card glass' },
       h('h2', {}, 'By amount'),
@@ -69,11 +69,11 @@ export function FactorDetailView(ctx) {
       h('h2', {}, 'Settings'),
       field('Type', segmented(ROLE_OPTIONS, f.role, v => { R.factors.save(f.id, { role: v }); toast('Saved'); }, 'Type')),
       field('Track it as', segmented(MEASURE_OPTIONS.slice(0, 3), f.measureType, v => { R.factors.save(f.id, { measureType: v }); toast('Saved'); }, 'Track it as'),
-        'Changing this affects how past amounts read.'),
+        'Past entries will show in the new format.'),
       h('button', {
         type: 'button', class: 'btn ghost', onclick: () => {
           R.factors.setArchived(f.id, !f.isArchived);
-          toast(f.isArchived ? 'Back in your check-in' : 'Hidden from check-ins. History kept.');
+          toast(f.isArchived ? 'Back in your check-in' : 'Hidden. Past entries are kept.');
           history.back();
         },
       }, f.isArchived ? 'Show in check-ins again' : 'Hide from check-ins')),
@@ -86,9 +86,9 @@ const LAG_NAME = ['Same day', 'Next day', '2 days later'];
 
 export function insightSentence(a) {
   const b = a.best;
-  const dir = b.delta > 0 ? 'higher' : 'lower';
-  const when = ['on days with', 'the day after', 'two days after'][b.lag];
-  return `Pain is ${Math.abs(b.delta).toFixed(1)} points ${dir} ${when} ${a.factor.name.toLowerCase()} (${b.meanWith.toFixed(1)} vs ${b.meanWithout.toFixed(1)}; ${b.nWith} days with, ${b.nWithout} without; ${a.early ? 'early sign' : `${b.confidence} confidence`}).`;
+  const when = ['On days with', 'The day after', 'Two days after'][b.lag];
+  const sure = a.early ? 'early sign' : `${b.confidence} confidence`;
+  return `${when} ${a.factor.name.toLowerCase()}, pain averages ${b.meanWith.toFixed(1)}, against ${b.meanWithout.toFixed(1)} without. ${b.nWith} days with, ${b.nWithout} without, ${sure}.`;
 }
 
 function notEnoughSentence(a) {
@@ -96,7 +96,7 @@ function notEnoughSentence(a) {
   const parts = [];
   if (l.needWith) parts.push(`${l.needWith} more day${l.needWith > 1 ? 's' : ''} with it`);
   if (l.needWithout) parts.push(`${l.needWithout} more without`);
-  return `Not enough data yet: needs ${parts.join(' and ')}.`;
+  return `Not enough days yet. Needs ${parts.join(' and ')}.`;
 }
 
 function lagBar(l) {

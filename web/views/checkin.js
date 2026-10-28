@@ -1,32 +1,26 @@
 // Daily survey: five quick steps, aimed at under a minute, with a streak at the end.
-import { h, toast, iconButton, segmented } from '../lib/ui.js';
+import { h, toast, iconButton } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate, addDays, dayLabel, pad, weekdayLetter } from '../lib/dates.js';
 import { VSlider, FactorTile } from './controls.js';
-import { BodyMap } from './bodymap.js';
-import { Body3D, webglAvailable } from './body3d.js';
+import { Body3D, RegionList, webglAvailable } from './body3d.js';
 import { quickAddFactor } from './factor.js';
 import { voiceSupported, startDictation } from '../lib/voice.js';
 
 const STEPS = [
-  { id: 'pain', title: 'How much does your back hurt?', sub: 'Physical pain right now, in your back or legs. 0 is none, 10 is the worst you can imagine.' },
-  { id: 'stress', title: 'How stressed were you today?', sub: 'Mental pressure from work, worry or life in general. 0 is calm, 10 is overwhelmed.' },
-  { id: 'where', title: 'Where do you feel it most?', sub: 'Tap the spot. Go back to add more.' },
-  { id: 'stressors', title: 'What did today involve?', sub: 'Tap what applies. Swipe right for more time.' },
-  { id: 'helpers', title: 'What helped?', sub: 'Movement and recovery you did today.' },
-  { id: 'notes', title: 'Anything specific?', sub: 'Optional. Type or say it.' },
+  { id: 'pain', title: 'How much does your back hurt?', sub: 'Right now, in your back or legs. 0 is none, 10 is the worst you’ve had.' },
+  { id: 'stress', title: 'How stressed were you today?', sub: 'Work, money, people, anything. 0 is calm, 10 is overwhelmed.' },
+  { id: 'where', title: 'Where do you feel it most?', sub: 'Tap where it hurts.' },
+  { id: 'stressors', title: 'What did you do today?', sub: 'Tap what you did. Swipe right to add time.' },
+  { id: 'helpers', title: 'What did you do for your back?', sub: 'Tap anything that counts.' },
+  { id: 'notes', title: 'Anything else?', sub: 'Optional.' },
 ];
 
 // Drafts survive leaving the survey (e.g. to add a factor) within this session
 const drafts = new Map();
 
-// 3D body map by default where WebGL works; the 2D chart stays available (and is the accessible fallback)
-const MAP_MODE_KEY = 'unfug-my-back/map-mode';
+// 3D body map; a plain list of regions only where the phone can't draw 3D
 const has3D = webglAvailable();
-let mapMode = (() => {
-  if (!has3D) return '2d';
-  try { return localStorage.getItem(MAP_MODE_KEY) || '3d'; } catch { return '3d'; }
-})();
 
 function freshDraft(date) {
   const existing = R.checkins.entryFor(date);
@@ -100,7 +94,7 @@ export function CheckinView(ctx) {
   function renderFooter() {
     const st = STEPS[draft.step];
     const last = draft.step === STEPS.length - 1;
-    const back = draft.step > 0 ? h('button', { type: 'button', class: 'btn ghost', onclick: () => go(draft.step - 1) }, 'Back') : h('span');
+    const back = draft.step > 0 ? iconButton('‹', 'Back', () => go(draft.step - 1)) : h('span');
     // Slider steps advance on release; Next only appears when revisiting a step that already has a value
     if (isSlider(st.id)) {
       footer.replaceChildren(back, draft[st.id] == null
@@ -128,7 +122,7 @@ export function CheckinView(ctx) {
 
   function sliderStep(key, label, glyph) {
     return h('div', { class: 'levels single' }, VSlider({
-      label, value: draft[key], glyph,
+      label, value: draft[key], glyph, tint: key,
       onChange: v => { draft[key] = v; },
       onCommit: () => advanceSoon(320),
     }));
@@ -147,20 +141,11 @@ export function CheckinView(ctx) {
           markers: draft.markers, defaultIntensity: () => draft.pain ?? 5, onChange: renderFooter,
           onAdd: () => { if (!revisit) advanceSoon(650); },
         };
-        const holder = h('div', { class: 'map-holder' });
-        let map;
-        const show = mode => {
-          mapMode = mode;
-          try { localStorage.setItem(MAP_MODE_KEY, mode); } catch { /* storage blocked */ }
-          map = mode === '3d' ? Body3D(opts) : BodyMap(opts);
-          holder.replaceChildren(map);
-        };
-        show(mapMode);
+        const map = has3D ? Body3D(opts) : RegionList(opts);
         return h('div', {},
-          h('div', { class: 'row between map-tools' },
-            yMarkers.length ? h('button', { type: 'button', class: 'chip glass', onclick: () => { map.setMarkers(yMarkers); toast('Same spots as yesterday'); advanceSoon(650); } }, '↺ Same as yesterday') : h('span'),
-            has3D ? segmented([['3d', '3D'], ['2d', '2D']], mapMode, show, 'Body view') : null),
-          holder);
+          yMarkers.length ? h('div', { class: 'map-tools' },
+            h('button', { type: 'button', class: 'chip glass', onclick: () => { map.setMarkers(yMarkers); toast('Same spots as yesterday'); advanceSoon(650); } }, '↺ Same as yesterday')) : null,
+          map);
       }
       case 'stressors': return factorGrid(['trigger', 'unsure'], 'trigger');
       case 'helpers': return factorGrid(['helper'], 'helper');
@@ -241,7 +226,7 @@ export function CheckinView(ctx) {
     return h('div', { class: 'done-screen' },
       h('div', { class: 'burst', 'aria-hidden': 'true' }, Array.from({ length: 14 }, (_, i) => h('i', { style: `--a:${i * (360 / 14)}deg` }))),
       h('div', { class: 'done-ring' }, h('span', { class: 'big-num' }, String(streak)), h('span', { class: 'unit' }, streak === 1 ? 'day' : 'days')),
-      h('h1', {}, streak > 1 ? `${streak}-day streak` : 'Logged. Day one.'),
+      h('h1', {}, streak > 1 ? `${streak}-day streak` : 'Day one'),
       h('div', { class: 'week-dots', 'aria-label': 'This week' }, week.map(d => h('span', { class: R.checkins.entryFor(d) ? 'on' : '' }, h('i'), h('small', {}, weekdayLetter(d))))),
       h('div', { class: 'stats-row' },
         stat(`${seconds}`, 's', fast ? 'Under a minute' : 'Time taken'),

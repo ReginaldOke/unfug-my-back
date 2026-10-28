@@ -23,8 +23,9 @@ function seed() {
   S.batch(() => {
     SEED_FACTORS.forEach(({ defaultOn, ...f }, i) =>
       S.insert('factors', { ...f, status: 'suspected', isArchived: !defaultOn, sortWeight: i, source: 'seed' }));
-    const mobility = S.table('factors').find(f => f.name === 'Mobility routine');
-    S.insert('routines', { ...SEED_ROUTINE, linkedFactorId: mobility?.id ?? null, isArchived: false });
+    // The starter routine counts towards a helper that's on by default
+    const stretching = S.table('factors').find(f => f.name === 'Stretching');
+    S.insert('routines', { ...SEED_ROUTINE, linkedFactorId: stretching?.id ?? null, isArchived: false });
     S.settings().seeded = true;
   });
 }
@@ -147,7 +148,10 @@ export const routines = {
     return S.batch(() => {
       S.insert('routineCompletions', { routineId, timestamp: S.nowISO(), completed });
       if (completed && r?.linkedFactorId) {
-        S.insert('factorLogs', { factorId: r.linkedFactorId, date: localDate(), timestamp: S.nowISO(), value: 1, source: 'manual', dailyEntryId: null });
+        // Timed helpers get an estimate of ~1.5 min per move (rounded to 5); counted helpers get 1
+        const f = factors.get(r.linkedFactorId);
+        const value = f?.measureType === 'minutes' ? Math.max(5, Math.round((r.items.length * 1.5) / 5) * 5) : 1;
+        S.insert('factorLogs', { factorId: r.linkedFactorId, date: localDate(), timestamp: S.nowISO(), value, source: 'manual', dailyEntryId: null });
       }
     });
   },
