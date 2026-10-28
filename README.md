@@ -21,6 +21,12 @@ ANTHROPIC_API_KEY=sk-ant-... npm start
 
 Without a key, "Analyse my data" copies your diary and the analysis prompt and opens claude.ai so you can paste them in.
 
+## Use it on your phone
+
+Live site: https://reginaldoke.github.io/unfug-my-back/ (redeploys on every push to `main`).
+
+On iPhone, open it in **Safari → Share → Add to Home Screen**. It then opens full screen, works offline, and its data isn't cleared the way website data can be after 7 days unused. Data lives on the phone; use Settings → Export now and then as a backup. Claude analysis on the live site uses copy and paste (there's no server there to hold an API key).
+
 ## Tests
 
 ```bash

@@ -9,7 +9,7 @@ import { regionAt, regionAnchor, H } from '../lib/regions3d.js';
 
 // Turn the loaded model so it faces +Z. The Free Pack male base mesh faces −Z, hence a half turn.
 const MODEL_YAW = Math.PI;
-const MODEL_URLS = ['assets/body.glb', 'assets/body.obj'];
+const MODEL_URLS = ['assets/body.obj', 'assets/body.glb'];
 
 export function webglAvailable() {
   try {
@@ -207,8 +207,7 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
 
 async function loadModel(material) {
   for (const url of MODEL_URLS) {
-    const res = await fetch(url, { method: 'HEAD' }).catch(() => null);
-    if (!res?.ok) continue;
+    // Loaded directly (no existence check first) so the offline copy from the service worker is used
     try {
       const obj = url.endsWith('.glb')
         ? (await new (await import('three/addons/loaders/GLTFLoader.js')).GLTFLoader().loadAsync(url)).scene
@@ -220,7 +219,7 @@ async function loadModel(material) {
       });
       return normalise(obj);
     } catch (e) {
-      console.warn(`Could not load ${url}, using the built-in figure`, e);
+      console.info(`No model at ${url}`, e?.message ?? e);
     }
   }
   return standInFigure(material);

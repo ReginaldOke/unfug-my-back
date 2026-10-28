@@ -78,3 +78,12 @@ else window.addEventListener('hashchange', function startOnce() {
   window.removeEventListener('hashchange', startOnce);
   reminders.start();
 });
+
+// Installable app: offline support and updates on each open (see sw.js)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline support unavailable', e));
+  });
+}
+// Ask the browser not to clear the diary under storage pressure (home-screen apps on iOS already get this)
+navigator.storage?.persist?.().catch(() => {});

@@ -6,13 +6,13 @@ import { analyse, copyForClaude, aiStatus } from '../lib/ai.js';
 import { rankInsights, quickSummary, MIN_DAYS } from '../lib/analysis.js';
 import { renderMarkdown } from '../lib/markdown.js';
 import { localDate, addDays, fmtTime, fmtMinutes, minutesSince, dayLabel } from '../lib/dates.js';
-import { ROLE_ICON } from '../lib/labels.js';
-import { PainChart } from './chart.js';
+import { ROLE_ICON, fmtAmount } from '../lib/labels.js';
+import { TrendChart, PALETTES } from './chart.js';
 import { Ruler } from './controls.js';
 import { insightSentence } from './factor.js';
 
 // View state that should survive the periodic re-render
-const ui = { range: 14 };
+const ui = { range: 14, hidden: new Set() };
 let rerender = () => {};
 
 export function HomeView(ctx) {
@@ -50,18 +50,50 @@ function hero(entry, today) {
       h('span', { class: 'eyebrow' }, entry ? 'Pain today' : 'Not checked in yet'),
       h('div', {}, h('span', { class: 'giant' }, entry?.painScore ?? '–'), h('span', { class: 'unit' }, '/10')),
       delta != null ? h('span', { class: `pill-badge ${delta > 0 ? 'up' : 'down'}` }, `${delta > 0 ? '↑' : '↓'} ${Math.abs(delta).toFixed(1)} vs 7-day avg`) : null),
-    h('div', { class: 'streak' }, h('span', { class: 'num' }, String(streak)), h('span', { class: 'hint' }, 'day streak')));
+    h('div', { class: 'hero-side' },
+      h('div', { class: 'streak' }, h('span', { class: 'num' }, String(streak)), h('span', { class: 'hint' }, 'day streak')),
+      h('a', { class: 'btn primary', href: '#/checkin' }, entry ? 'Edit check-in' : 'Check in · 1 min')));
 }
 
 function trendCard(today) {
-  const days = Array.from({ length: ui.range }, (_, i) => addDays(today, i - ui.range + 1))
-    .map(date => ({ date, pain: R.checkins.entryFor(date)?.painScore ?? null }));
-  const flareDates = new Set(R.flares.all().map(f => localDate(new Date(f.timestamp))));
+  const dates = Array.from({ length: ui.range }, (_, i) => addDays(today, i - ui.range + 1));
+  const entries = dates.map(d => R.checkins.entryFor(d));
+  const days = dates.map((date, i) => ({ date, logged: !!entries[i] }));
+  const { mainStressor, topHelper } = quickSummary(R.snapshot(), R.factors.all(), today, ui.range);
 
-  return h('section', { class: 'card glass' },
-    h('div', { class: 'row between' }, h('h2', {}, 'Pain trend'),
+  // Pain on its 0–10 scale; each factor scaled to its own busiest day in the range, so shapes compare
+  const series = [{
+    key: 'pain', label: 'Pain', palette: PALETTES.pain,
+    values: entries.map(e => (e?.painScore == null ? null : e.painScore / 10)),
+    format: i => `${entries[i]?.painScore ?? '–'}/10`,
+  }];
+  for (const [key, pick] of [['stressor', mainStressor], ['helper', topHelper]]) {
+    if (!pick) continue;
+    const f = pick.factor;
+    const amounts = dates.map(d => R.checkins.factorValues(d).get(f.id) ?? 0);
+    const max = Math.max(...amounts, 1);
+    const raw = amounts.map(a => (f.measureType === 'yesno' ? (a ? 0.6 : 0) : a / max));
+    // Light smoothing over neighbouring logged days so the curve reads as a trend, not spikes;
+    // the readout still shows each day's real amount
+    const smooth = raw.map((v, i) => {
+      const near = [[i - 1, 0.25], [i, 0.5], [i + 1, 0.25]].filter(([j]) => days[j]?.logged);
+      const w = near.reduce((t, [, k]) => t + k, 0);
+      return w ? near.reduce((t, [j, k]) => t + raw[j] * k, 0) / w : v;
+    });
+    series.push({
+      key, label: f.name, palette: PALETTES[key],
+      values: smooth.map(v => 0.04 + v * 0.86),
+      format: i => (amounts[i] ? fmtAmount(f, amounts[i]) : 'none'),
+    });
+  }
+
+  return h('section', { class: 'card glass trend-card' },
+    h('div', { class: 'row between' }, h('h2', {}, 'Trends'),
       segmented([[14, '2W'], [30, '1M'], [90, '3M']], ui.range, v => { ui.range = v; rerender(); }, 'Range')),
-    PainChart({ days, flareDates }));
+    TrendChart({
+      days, series, hidden: ui.hidden,
+      onToggle: key => { ui.hidden.has(key) ? ui.hidden.delete(key) : ui.hidden.add(key); rerender(); },
+    }));
 }
 
 function patternsCard(today) {
@@ -76,10 +108,14 @@ function patternsCard(today) {
       h('p', { class: 'muted' }, 'Do your first check-in tonight. Your main stressors show straight away; links with pain sharpen over the following days.'));
   }
 
-  const summaryTile = (label, s, empty) => h('div', { class: 'mini-tile' },
-    h('span', { class: 'eyebrow' }, label),
-    s ? h('a', { class: 'mini-title', href: `#/factor/${s.factor.id}` }, s.factor.name) : h('span', { class: 'mini-title muted' }, empty),
-    s ? h('span', { class: 'hint' }, `${s.days} of last ${Math.min(quick.days, checkins)} days${s.factor.measureType === 'minutes' ? ` · avg ${fmtMinutes(s.avg)}` : ''}`) : null);
+  const span = Math.min(quick.days, checkins);
+  const summaryCol = (label, s, palette) => h('div', { class: 'sum-col' },
+    h('span', { class: 'sum-label' }, h('i', { style: `background:linear-gradient(90deg,${palette[0]},${palette[1]})` }), label),
+    s ? h('a', { class: 'sum-name', href: `#/factor/${s.factor.id}` }, s.factor.name) : h('span', { class: 'sum-name muted' }, 'Nothing yet'),
+    s ? h('span', { class: 'hint' }, [
+      s.days === span ? (span === 1 ? 'Today' : 'Every day') : `${s.days} of ${span} days`,
+      s.factor.measureType === 'minutes' ? `avg ${fmtMinutes(s.avg)}` : null,
+    ].filter(Boolean).join(' · ')) : null);
 
   const list = ready.slice(0, 4).map(a => h('li', {},
     h('a', { class: 'list-row insight', href: `#/factor/${a.factor.id}` },
@@ -92,9 +128,9 @@ function patternsCard(today) {
 
   return h('section', { class: 'card glass' },
     h('div', { class: 'row between' }, h('h2', {}, 'Patterns'), h('span', { class: 'hint' }, `${checkins} check-in${checkins === 1 ? '' : 's'}`)),
-    h('div', { class: 'mini-grid' },
-      summaryTile('Main stressor', quick.mainStressor, 'None logged yet'),
-      summaryTile('Top helper', quick.topHelper, 'None logged yet')),
+    h('div', { class: 'sum-row' },
+      summaryCol('Main stressor', quick.mainStressor, PALETTES.stressor),
+      summaryCol('Top helper', quick.topHelper, PALETTES.helper)),
     list.length ? h('ul', { class: 'list' }, list)
       : h('p', { class: 'hint' }, 'Links with pain appear once a stressor has been logged on at least 2 days, and skipped on 2.'),
     ready.some(a => a.early) ? h('p', { class: 'hint' }, `Early signs are based on a few days and may change. They firm up after ${MIN_DAYS} days with and ${MIN_DAYS} without.`) : null);
