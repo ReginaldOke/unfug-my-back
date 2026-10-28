@@ -192,8 +192,11 @@ export function dragHandles(list, { onReorder = () => {}, hold = false, skip = '
       lift(grip.closest('.drag-row'), e, grip);
       return;
     }
+    // Lists can nest (notes inside a Today section): the innermost one takes the hold
+    if (e.dragClaimed) return;
     const el = e.target.closest('.drag-row');
-    if (!el || e.target.closest(skip)) return;
+    if (!el || !list.contains(el) || e.target.closest(skip)) return;
+    e.dragClaimed = true;
     press = { el, x: e.clientX, y: e.clientY, target: e.target };
     press.timer = setTimeout(() => { if (press) { lift(press.el, press.last ?? e, list); press = null; } }, HOLD_MS);
   });

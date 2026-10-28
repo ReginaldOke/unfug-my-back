@@ -26,12 +26,12 @@ export function ScratchPad() {
   function paint() {
     list.replaceChildren(
       ...notes().map(n => h('li', { class: 'pad-item drag-row', 'data-id': n.id },
-        h('button', { type: 'button', class: 'pad-note', onclick: e => edit(e.currentTarget, n) }, n.text),
-        h('span', { class: 'grip', role: 'button', 'aria-label': `Drag to reorder: ${n.text}`, title: 'Drag to reorder' }, h('i'), h('i'), h('i')))),
+        h('button', { type: 'button', class: 'pad-note', onclick: e => edit(e.currentTarget, n) }, n.text))),
       h('li', {}, h('button', { type: 'button', class: 'pad-add', onclick: e => edit(e.currentTarget, null) }, '+ Add a note')));
   }
-  // Drag a note by its grip to reorder
+  // Hold a note, then drag, to reorder; a tap still edits it
   dragHandles(list, {
+    hold: true,
     onReorder: rows => {
       const byId = new Map(notes().map(n => [n.id, n]));
       save(rows.map(r => byId.get(r.dataset.id)).filter(Boolean));

@@ -1117,7 +1117,7 @@ a.routine-card { text-decoration: none; color: inherit; display: flex; }
 .log-tick { text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
 .pad-item { display: flex; align-items: center; gap: 4px; }
 .pad-item .pad-note { flex: 1; min-width: 0; }
-.pad-item .grip { opacity: 0.45; margin-left: 0; margin-right: -6px; }
+.pad-note { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .pad-item.lifted { background: rgba(40, 40, 44, 0.92); }
 
 /* ---------- Sliders: spring-driven fill, coloured by value ---------- */
