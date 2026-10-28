@@ -76,6 +76,15 @@ export function batch(fn) {
   try { return fn(); } finally { batching--; save(); }
 }
 
+// Another tab or window of the app saved: pick up its copy rather than overwrite it with ours later
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', e => {
+    if (e.key !== KEY || !e.newValue) return;
+    load();
+    listeners.forEach(fn => fn());
+  });
+}
+
 export function subscribe(fn) {
   listeners.add(fn);
   return () => { listeners.delete(fn); };

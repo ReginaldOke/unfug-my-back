@@ -1,8 +1,8 @@
-// Daily survey: five quick steps, aimed at under a minute, with a streak at the end.
+// Daily survey: six quick steps, with a streak at the end.
 import { h, toast, iconButton } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
-import { localDate, addDays, dayLabel, pad, weekdayLetter } from '../lib/dates.js';
-import { VSlider, FactorTile } from './controls.js';
+import { localDate, addDays, dayLabel, weekdayLetter } from '../lib/dates.js';
+import { VSlider, FactorTile, defaultAmount } from './controls.js';
 import { Body3D, RegionList, webglAvailable } from './body3d.js';
 import { quickAddFactor } from './factor.js';
 import { voiceSupported, startDictation } from '../lib/voice.js';
@@ -44,18 +44,8 @@ export function CheckinView(ctx) {
 
   const root = h('div', { class: 'flow' });
   const progress = h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': 1, 'aria-valuemax': STEPS.length });
-  const timer = h('span', { class: 'timer', 'aria-hidden': 'true' });
   const body = h('div', { class: 'flow-body' });
   const footer = h('div', { class: 'flow-footer' });
-
-  const tick = () => {
-    const sec = Math.floor((Date.now() - draft.startedAt) / 1000);
-    timer.textContent = `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
-    timer.classList.toggle('over', sec > 60);
-  };
-  tick();
-  const iv = setInterval(tick, 1000);
-  ctx.onCleanup(() => clearInterval(iv));
 
   const dateSelect = h('select', {
     class: 'date-pill', 'aria-label': 'Day you’re logging',
@@ -66,7 +56,7 @@ export function CheckinView(ctx) {
   root.append(
     h('header', { class: 'flow-head' },
       iconButton('✕', 'Close check-in', () => { location.hash = '#/'; }),
-      dateSelect, timer),
+      dateSelect, h('span', { class: 'head-spacer', 'aria-hidden': 'true' })),
     progress, body, footer);
 
   function go(step) {
@@ -159,8 +149,9 @@ export function CheckinView(ctx) {
       ...R.factors.forCheckin(roles, date).map(f => FactorTile({ factor: f, selections: draft.selections })),
       h('button', {
         type: 'button', class: 'tile add', onclick: async () => {
-          const f = await quickAddFactor({ role: addRole });
-          if (f) { draft.selections.set(f.id, f.measureType === 'yesno' ? 1 : 0); fill(); }
+          const added = await quickAddFactor({ role: addRole });
+          for (const f of added) draft.selections.set(f.id, defaultAmount(f));
+          if (added.length) fill();
         },
       }, h('span', { class: 'well' }, '+'), h('span', { class: 'tile-title' }, addRole === 'helper' ? 'Add a helper' : 'Add a stressor')));
     fill();
@@ -215,21 +206,18 @@ export function CheckinView(ctx) {
     const seconds = Math.round((Date.now() - draft.startedAt) / 1000);
     R.checkins.save(date, { ...draft, durationSeconds: seconds });
     drafts.delete(date);
-    clearInterval(iv);
-    root.replaceChildren(doneScreen(seconds));
+    root.replaceChildren(doneScreen());
   }
 
-  function doneScreen(seconds) {
+  function doneScreen() {
     const streak = R.checkins.streak();
     const week = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
-    const fast = seconds <= 60;
     return h('div', { class: 'done-screen' },
       h('div', { class: 'burst', 'aria-hidden': 'true' }, Array.from({ length: 14 }, (_, i) => h('i', { style: `--a:${i * (360 / 14)}deg` }))),
       h('div', { class: 'done-ring' }, h('span', { class: 'big-num' }, String(streak)), h('span', { class: 'unit' }, streak === 1 ? 'day' : 'days')),
       h('h1', {}, streak > 1 ? `${streak}-day streak` : 'Day one'),
       h('div', { class: 'week-dots', 'aria-label': 'This week' }, week.map(d => h('span', { class: R.checkins.entryFor(d) ? 'on' : '' }, h('i'), h('small', {}, weekdayLetter(d))))),
       h('div', { class: 'stats-row' },
-        stat(`${seconds}`, 's', fast ? 'Under a minute' : 'Time taken'),
         stat(draft.pain ?? '–', '/10', 'Pain'),
         stat(draft.stress ?? '–', '/10', 'Stress')),
       h('a', { class: 'btn primary wide', href: '#/' }, 'See your dashboard'));

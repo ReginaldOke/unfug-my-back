@@ -1,10 +1,11 @@
 // Setup: pick stressors, pick helpers, reminders. Also reused from Settings to edit the lists.
-import { h, segmented, toast, iconButton } from '../lib/ui.js';
+import { h, segmented, toast, iconButton, confirmSheet } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import * as reminders from '../lib/reminders.js';
 import { notificationStatus } from '../lib/notify.js';
 import { SelectCard } from './controls.js';
 import { quickAddFactor } from './factor.js';
+import { makeSortable } from './sortable.js';
 import { ROLE_ICON, MEASURE_OPTIONS } from '../lib/labels.js';
 
 const STEPS = ['stressors', 'helpers', 'reminders'];
@@ -47,26 +48,45 @@ export function SetupView(ctx) {
   function content(id) {
     if (id === 'stressors' || id === 'helpers') {
       const roles = id === 'stressors' ? ['trigger', 'unsure'] : ['helper'];
-      const list = h('div', { class: 'card-grid' });
+      const list = h('div', { class: 'card-grid sortable' });
+      const done = h('button', { type: 'button', class: 'chip glass done-edit', hidden: true, onclick: () => sort.setEditing(false) }, 'Done');
+      // Your list, in your order. Switched-off ones stay until you leave, then live in Add your own
+      const shown = new Set(R.factors.all().filter(f => roles.includes(f.role)).map(f => f.id));
       const fill = () => list.replaceChildren(
-        ...R.factors.all({ archived: true }).filter(f => roles.includes(f.role)).map(f => SelectCard({
-          icon: f.icon || ROLE_ICON[f.role], title: f.name,
-          detail: `${MEASURE_OPTIONS.find(([m]) => m === f.measureType)?.[1] ?? ''}${f.role === 'unsure' ? ' · not sure yet' : ''}`,
-          on: !f.isArchived,
-          onToggle: on => R.factors.setArchived(f.id, !on),
-        })),
+        ...R.factors.all({ archived: true }).filter(f => shown.has(f.id)).sort((a, b) => a.sortWeight - b.sortWeight).map(f => h('div', { class: 'sortable-item', 'data-id': f.id },
+          SelectCard({
+            icon: f.icon || ROLE_ICON[f.role], title: f.name,
+            detail: `${MEASURE_OPTIONS.find(([m]) => m === f.measureType)?.[1] ?? ''}${f.role === 'unsure' ? ' · not sure yet' : ''}`,
+            on: !f.isArchived,
+            onToggle: on => R.factors.setArchived(f.id, !on),
+          }),
+          h('button', {
+            type: 'button', class: 'del', 'aria-label': `Delete ${f.name}`, onclick: async () => {
+              const logged = R.factors.logs(f.id).length;
+              const ok = await confirmSheet(`Delete ${f.name}?`, logged ? `This also deletes the ${logged} day${logged === 1 ? '' : 's'} you logged it.` : 'It comes off your check-in.', 'Delete', { danger: true });
+              if (!ok) return;
+              R.factors.remove(f.id);
+              shown.delete(f.id);
+              fill();
+            },
+          }, '✕'))),
         h('button', {
           type: 'button', class: 'select-card add', onclick: async () => {
-            const f = await quickAddFactor({ role: id === 'stressors' ? 'trigger' : 'helper' });
-            if (f) fill();
+            const added = await quickAddFactor({ role: id === 'stressors' ? 'trigger' : 'helper' });
+            for (const f of added) shown.add(f.id);
+            if (added.length) fill();
           },
-        }, h('span', { class: 'well', 'aria-hidden': 'true' }, '+'), h('span', { class: 'card-title' }, id === 'stressors' ? 'Add your own' : 'Add your own')));
+        }, h('span', { class: 'well', 'aria-hidden': 'true' }, '+'), h('span', { class: 'card-title' }, 'Add your own')));
+      const sort = makeSortable(list, {
+        onEditChange: on => { done.hidden = !on; },
+        onReorder: ids => R.factors.reorder(ids),
+      });
       fill();
       return h('div', { class: 'stack' },
-        h('h1', { tabindex: -1 }, id === 'stressors' ? 'What tends to set it off?' : 'What tends to help?'),
+        h('div', { class: 'row between' }, h('h1', { tabindex: -1 }, id === 'stressors' ? 'What tends to set it off?' : 'What tends to help?'), done),
         h('p', { class: 'muted' }, id === 'stressors'
-          ? 'Pick the ones you want to track. You can change this later.'
-          : 'Pick the ones you do.'),
+          ? 'Pick the ones you want to track. Hold a card to move or delete it.'
+          : 'Pick the ones you do. Hold a card to move or delete it.'),
         list,
         id === 'stressors' && !editing ? h('a', { class: 'hint safety-link', href: '#/help' }, 'This app tracks patterns; it doesn’t diagnose. See warning signs that need a doctor ›') : null);
     }

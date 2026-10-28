@@ -425,7 +425,7 @@ body.in-flow #toast { bottom: calc(100px + env(safe-area-inset-bottom)); }
 .week-dots span { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); }
 .week-dots i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); }
 .week-dots span.on i { background: #fff; border-color: #fff; }
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 380px; }
+.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 380px; }
 .stat { border-radius: 22px; padding: 14px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .stat .num { font-size: 30px; font-weight: 200; }
 .stat .unit { font-size: 12px; color: var(--ink-3); }
@@ -815,3 +815,84 @@ details.more[open] summary { margin-bottom: 10px; }
 @keyframes pop-in { from { transform: scale(0.4); opacity: 0; } }
 @keyframes dot-fill { from { transform: scaleX(0); } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sample-wrap .trend-wrap { margin: 0; }
+
+/* ---------- Chart key: one row, each line's name and its value on the focused day ---------- */
+.trend-readout { font-size: 12px; color: var(--ink-3); min-height: 16px; letter-spacing: 0.01em; }
+.legend { gap: 6px 16px; align-items: center; }
+.key {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0; border: 0; background: none;
+  font-size: 12px; color: var(--ink-3); max-width: 100%; transition: color .25s var(--ease-out), opacity .25s var(--ease-out);
+}
+.key i { flex: none; width: 16px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--c1), var(--c2)); opacity: 0.35; transition: opacity .25s, box-shadow .25s; }
+.key-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+.key strong { color: var(--ink-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.key.on { color: var(--ink-2); }
+.key.on i { opacity: 1; box-shadow: 0 0 8px var(--c2); }
+.key.on strong { color: var(--ink); }
+.sample-chart .key strong { display: none; }
+.key-add {
+  width: 28px; height: 28px; border-radius: 50%; border: 1px dashed rgba(255, 255, 255, 0.22); background: none;
+  color: var(--ink-2); font-size: 17px; line-height: 1; display: inline-grid; place-items: center; transition: background .2s;
+}
+.key-add:hover, .key-add:active { background: rgba(255, 255, 255, 0.08); }
+
+/* ---------- Today tiles that open something when tapped ---------- */
+button.tile.static, a.tile.static { text-align: left; text-decoration: none; cursor: pointer; width: 100%; }
+button.tile.static:active, a.tile.static:active { transform: scale(0.98); }
+.tile.ai-tile { grid-column: 1 / -1; min-height: 110px; }
+.tile.static .num.small { font-size: 30px; }
+.well .glyph { display: inline-grid; place-items: center; }
+
+/* ---------- Notification nudge after the first check-in ---------- */
+.nudge { display: flex; align-items: center; gap: 12px; padding: 10px 8px 10px 16px; border-radius: 22px; font-size: 14px; color: var(--ink-2); animation: rise-in .6s var(--ease-out) both; }
+.nudge-icon { font-size: 16px; filter: saturate(0.6); }
+.btn.small { min-height: 34px; padding: 0 14px; font-size: 14px; }
+.icon-btn.plain { background: none; border: 0; box-shadow: none; width: 34px; height: 34px; color: var(--ink-3); }
+.icon-btn.plain::before { display: none; }
+
+/* ---------- Drawers ---------- */
+.sheet.tall { height: 92dvh; max-height: 92dvh; padding-top: 10px; }
+.section-label { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-top: 10px; }
+hr.sep { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.is-off .dim-off { opacity: 0.4; pointer-events: none; transition: opacity .2s; }
+.day-chips { display: flex; gap: 6px; margin-top: 10px; }
+.day-chip {
+  flex: 1; aspect-ratio: 1; max-width: 44px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04); color: var(--ink-3); font-size: 14px; transition: background .2s, color .2s, transform .2s var(--spring);
+}
+.day-chip.on { background: rgba(255, 255, 255, 0.9); color: #141416; border-color: transparent; font-weight: 600; }
+.day-chip:active { transform: scale(0.92); }
+
+/* ---------- Hold to edit: jiggle, delete badge, lifted card ---------- */
+.sortable-item { position: relative; display: grid; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.sortable-item > .select-card { height: 100%; }
+.sortable-item .del {
+  position: absolute; top: -7px; left: -7px; z-index: 3; width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(60, 60, 66, 0.92); color: #fff; font-size: 11px;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  opacity: 0; transform: scale(0.4); pointer-events: none; transition: opacity .2s, transform .3s var(--spring);
+}
+.sortable.editing .del { opacity: 1; transform: none; pointer-events: auto; }
+.sortable.editing .sortable-item { touch-action: none; cursor: grab; }
+.sortable.editing .sortable-item:not(.lifted) > .select-card { animation: jiggle .32s ease-in-out infinite alternate; }
+.sortable.editing .sortable-item:nth-child(2n) > .select-card { animation-delay: -.16s; }
+.sortable-item.lifted { z-index: 10; cursor: grabbing; transition: none; }
+.sortable-item.lifted > .select-card { box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.16); }
+@keyframes jiggle { from { transform: rotate(-0.7deg); } to { transform: rotate(0.7deg); } }
+@media (prefers-reduced-motion: reduce) { .sortable.editing .sortable-item > .select-card { animation: none; } }
+.done-edit { flex: none; }
+
+/* ---------- Check-in: 3D body fits above the footer, with its spot chips inside it ---------- */
+.head-spacer { width: 44px; flex: none; }
+.body3d { height: clamp(300px, calc(100dvh - 350px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 480px); }
+.body3d-wrap { position: relative; }
+.body3d-chips { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; pointer-events: none; }
+.body3d-chips .chip { pointer-events: auto; }
+.segmented { overflow-y: hidden; scrollbar-width: none; }
+.field > .segmented { display: flex; }
+.field > .segmented button { flex: 1; }
+.row.tight > input[type="time"] { flex: 1; min-width: 0; width: auto; }
+button.list-row { width: 100%; background: none; border: 0; border-radius: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.row > input[type="date"] { flex: 1; min-width: 0; width: auto; }
+.row > input[type="date"] { padding-inline: 10px; font-size: 15px; }

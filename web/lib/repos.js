@@ -12,6 +12,14 @@ export const snapshot = S.snapshot;
 export function init() {
   S.load();
   if (!S.settings().seeded) seed();
+  retireSeeds();
+}
+
+// Seed factors taken out of the defaults: removed for people who never logged them
+const RETIRED = ['Hunched over phone or laptop'];
+function retireSeeds() {
+  const gone = S.table('factors').filter(f => f.source === 'seed' && RETIRED.includes(f.name) && !S.table('factorLogs').some(l => l.factorId === f.id));
+  if (gone.length) S.batch(() => { for (const f of gone) S.removeWhere('factors', x => x.id === f.id); });
 }
 
 export function wipeEverything() {
@@ -36,18 +44,27 @@ export const factors = {
   all: ({ archived = false } = {}) => S.table('factors').filter(f => archived || !f.isArchived),
   get: id => S.table('factors').find(f => f.id === id),
 
-  /** Active factors for the given roles, most-logged in the 14 days before `date` first. */
-  forCheckin(roles, date) {
-    const since = addDays(date, -14);
-    const counts = {};
-    for (const l of S.table('factorLogs')) if (l.date > since && l.date <= date) counts[l.factorId] = (counts[l.factorId] || 0) + 1;
-    return factors.all().filter(f => roles.includes(f.role))
-      .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || a.sortWeight - b.sortWeight);
+  /** Active factors for the given roles, in the order the user arranged them. */
+  forCheckin: roles => factors.all().filter(f => roles.includes(f.role)).sort((a, b) => a.sortWeight - b.sortWeight),
+
+  /** Saves a new order: ids listed first, in that order, keeping everyone else's relative order after. */
+  reorder(ids) {
+    S.batch(() => ids.forEach((id, i) => S.update('factors', id, { sortWeight: i - ids.length })));
+  },
+
+  /** Deletes a factor and everything logged for it. */
+  remove(id) {
+    S.batch(() => {
+      S.removeWhere('factorLogs', l => l.factorId === id);
+      S.removeWhere('factorChanges', c => c.factorId === id);
+      for (const r of S.table('routines')) if (r.linkedFactorId === id) S.update('routines', r.id, { linkedFactorId: null });
+      S.removeWhere('factors', f => f.id === id);
+    });
   },
 
   create(fields) {
     return S.insert('factors', {
-      status: 'suspected', isArchived: false, sortWeight: S.table('factors').length, source: 'user',
+      status: 'suspected', isArchived: false, sortWeight: Math.max(0, ...S.table('factors').map(f => f.sortWeight ?? 0)) + 1, source: 'user',
       category: fields.role === 'helper' ? 'recovery' : 'activity', icon: '', unit: defaultUnit(fields.measureType),
       ...fields,
     });

@@ -1,7 +1,7 @@
 {
   "name": "Unfug My Back",
   "short_name": "Unfug",
-  "description": "A one-minute daily back check-in that finds what sets your pain off and what helps.",
+  "description": "A quick daily back check-in that finds what sets your pain off and what helps.",
   "id": "./",
   "start_url": "./#/",
   "scope": "./",

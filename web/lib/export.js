@@ -1,4 +1,4 @@
-// Export for analysis in Claude (SPEC.md › Export to Claude). Pure, unit-tested in test/export.test.js.
+// Export for analysis in an AI chat (SPEC.md › Export to Claude). Pure, unit-tested in test/export.test.js.
 import { localDate } from './dates.js';
 
 export const ANALYSIS_PROMPT = `You are analysing a personal back pain diary exported as JSON.

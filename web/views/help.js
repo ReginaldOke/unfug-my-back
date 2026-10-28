@@ -21,5 +21,5 @@ export function HelpView() {
       h('p', { class: 'muted' }, 'A stressor is something worth keeping an eye on, not something to avoid. Backs get stronger with gradual use, like anything else you train.')),
     h('section', { class: 'card glass' },
       h('h2', {}, 'Your data'),
-      h('p', { class: 'muted' }, 'Your diary stays on this device. Claude only sees it when you tap Analyse. You can export or delete it in Settings.')));
+      h('p', { class: 'muted' }, 'Your diary stays on this device. It only leaves when you share or export it. You can delete it in Settings.')));
 }

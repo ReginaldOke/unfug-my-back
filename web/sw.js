@@ -2,8 +2,8 @@
 // when there's a connection.
 //  - App files: network first (so every new deploy shows up on the next open), cached copy when offline.
 //  - Google Fonts: cached copy first, refreshed in the background.
-//  - api/*: never cached (Claude analysis needs the live server).
-const CACHE = 'unfug-my-back-v1';
+//  - api/*: never cached (it needs the live server).
+const CACHE = 'unfug-my-back-v2';
 
 // Everything the app needs to start offline. test/sw.test.js checks this list against web/.
 const ASSETS = [
@@ -14,7 +14,8 @@ const ASSETS = [
   'lib/motion.js', 'lib/notify.js', 'lib/regions.js', 'lib/regions3d.js', 'lib/reminders-core.js',
   'lib/reminders.js', 'lib/repos.js', 'lib/seed.js', 'lib/store.js', 'lib/ui.js', 'lib/voice.js',
   'views/body3d.js', 'views/chart.js', 'views/checkin.js', 'views/controls.js',
-  'views/factor.js', 'views/help.js', 'views/home.js', 'views/routines.js', 'views/settings.js', 'views/setup.js',
+  'views/factor.js', 'views/help.js', 'views/home.js', 'views/reminder-sheet.js', 'views/routines.js', 'views/settings.js',
+  'views/setup.js', 'views/sortable.js',
   'vendor/three/build/three.module.js', 'vendor/three/build/three.core.js',
   'vendor/three/examples/jsm/controls/OrbitControls.js', 'vendor/three/examples/jsm/loaders/OBJLoader.js',
 ];

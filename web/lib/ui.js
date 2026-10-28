@@ -78,8 +78,8 @@ export function iconButton(icon, label, onclick, props = {}) {
 }
 
 /** Bottom sheet built on <dialog>, so focus trapping and Escape come for free. */
-export function sheet(build, { onClose } = {}) {
-  const dlg = h('dialog', { class: 'sheet' });
+export function sheet(build, { onClose, tall = false } = {}) {
+  const dlg = h('dialog', { class: `sheet${tall ? ' tall' : ''}` });
   const close = () => dlg.close();
   dlg.append(h('div', { class: 'sheet-grabber', 'aria-hidden': 'true' }), build(close));
   dlg.addEventListener('close', () => { dlg.remove(); onClose?.(); });

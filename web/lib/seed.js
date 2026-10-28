@@ -9,7 +9,6 @@ export const SEED_FACTORS = [
   f('Driving', 'trigger', 'minutes', 'min', 'activity', '🚗', true),
   f('Heavy lifting or bending', 'trigger', 'minutes', 'min', 'activity', '📦', true),
   f('Poor sleep', 'trigger', 'yesno', '', 'lifestyle', '🌙', true),
-  f('Hunched over phone or laptop', 'trigger', 'minutes', 'min', 'posture', '📱', true),
   // Most common helpers (on by default)
   f('Walking', 'helper', 'minutes', 'min', 'exercise', '🚶', true),
   f('Stretching', 'helper', 'minutes', 'min', 'recovery', '🧘', true),

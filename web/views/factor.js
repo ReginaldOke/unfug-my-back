@@ -4,30 +4,48 @@ import * as R from '../lib/repos.js';
 import { ROLE_OPTIONS, ROLE_LABEL, ROLE_ICON, MEASURE_OPTIONS, fmtAmount } from '../lib/labels.js';
 import { analyseFactor } from '../lib/analysis.js';
 import { dayLabel } from '../lib/dates.js';
+import { SelectCard } from './controls.js';
 
-/** Sheet to add a stressor or helper. Resolves with the new factor, or null if cancelled. */
+/**
+ * Tall drawer to add a stressor or helper: your own at the top, common ones you haven't switched on below.
+ * Resolves with every factor added or switched on (possibly none).
+ */
 export function quickAddFactor({ role = 'trigger', status = 'suspected', title } = {}) {
   return new Promise(resolve => {
-    let created = null, measure = 'minutes';
+    const added = [];
+    let measure = 'minutes';
+    const roles = role === 'helper' ? ['helper'] : ['trigger', 'unsure'];
     sheet(close => {
-      const name = h('input', { type: 'text', class: 'glass-input', required: true, maxlength: 60, placeholder: role === 'helper' ? 'e.g. Foam rolling' : 'e.g. Gardening', 'aria-label': 'Name' });
+      const name = h('input', { type: 'text', class: 'glass-input', required: true, maxlength: 60, placeholder: role === 'helper' ? 'Foam rolling' : 'Doomscrolling', 'aria-label': 'Name', enterkeyhint: 'done' });
       const form = h('form', {
         class: 'stack', onsubmit: e => {
           e.preventDefault();
           if (!name.value.trim()) return name.focus();
-          created = R.factors.create({ name: name.value.trim(), role, measureType: measure, status });
+          added.push(R.factors.create({ name: name.value.trim(), role, measureType: measure, status }));
           close();
         },
       },
-      h('h2', {}, title || (role === 'helper' ? 'New helper' : 'New stressor')),
       name,
       field('Track it as', segmented([['minutes', 'Time'], ['count', 'Count'], ['yesno', 'Yes / no']], measure, v => { measure = v; }, 'Track it as')),
-      h('div', { class: 'row end' },
-        h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Cancel'),
-        h('button', { type: 'submit', class: 'btn primary' }, 'Add')));
-      setTimeout(() => name.focus(), 50);
-      return form;
-    }, { onClose: () => resolve(created) });
+      h('button', { type: 'submit', class: 'btn primary' }, 'Add'));
+
+      const suggestions = R.factors.all({ archived: true }).filter(f => f.isArchived && roles.includes(f.role));
+      // Typing focuses the field straight away on desktop; on phones the keyboard would cover the suggestions
+      if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => name.focus({ preventScroll: true }), 50);
+      return h('div', { class: 'stack' },
+        h('div', { class: 'row between' }, h('h2', {}, title || (role === 'helper' ? 'Add a helper' : 'Add a stressor')), iconButton('✕', 'Close', close)),
+        form,
+        suggestions.length ? h('div', { class: 'stack' },
+          h('h3', { class: 'section-label' }, role === 'helper' ? 'Common helpers' : 'Common stressors'),
+          h('div', { class: 'card-grid' }, suggestions.map(f => SelectCard({
+            icon: f.icon || ROLE_ICON[f.role], title: f.name, on: false,
+            onToggle: on => {
+              R.factors.setArchived(f.id, !on);
+              const i = added.indexOf(f);
+              if (on && i < 0) added.push(f); else if (!on && i >= 0) added.splice(i, 1);
+            },
+          })))) : null);
+    }, { onClose: () => resolve(added.map(f => R.factors.get(f.id)).filter(Boolean)), tall: true });
   });
 }
 

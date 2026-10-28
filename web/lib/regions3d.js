@@ -8,12 +8,16 @@ export const H = 1.8;
 
 const LEVELS = [['upper', 0.70], ['mid', 0.62], ['lower', 0.53]];
 
-/** point: {x,y,z} in model space; normal: surface normal there (optional). Returns a regionId. */
-export function regionAt(point, normal = null, height = H) {
+/**
+ * point: {x,y,z} in model space; normal: surface normal there (optional).
+ * facing: 'front' | 'back' when the caller has measured which half of the body the point is on
+ * (more reliable than the normal on curved or sideways-facing skin). Returns a regionId.
+ */
+export function regionAt(point, normal = null, height = H, facing = null) {
   const fy = point.y / height, fx = point.x / height, ax = Math.abs(fx);
   const side = fx >= 0 ? 'left' : 'right';
-  const back = normal ? normal.z < 0 : point.z < 0;
-  const lateral = normal ? Math.abs(normal.x) > 0.75 : false;
+  const back = facing ? facing === 'back' : normal ? normal.z < 0 : point.z < 0;
+  const lateral = !facing && normal ? Math.abs(normal.x) > 0.75 : false;
 
   // Height bands are calibrated to the Free Pack male base mesh (web/assets/body.obj): neck at 87–91 %,
   // A-pose arms from the shoulder (about 11 % out, 80 % up) down to the hands (about 39 % out, 52 % up),

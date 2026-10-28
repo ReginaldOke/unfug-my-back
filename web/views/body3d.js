@@ -111,6 +111,19 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     onChange(markers);
   }
 
+  /** Front or back half: is the point nearer the body's back surface or its front, along this line? */
+  function facingAt(p) {
+    const surfaceZ = fromZ => {
+      const origin = body.localToWorld(new THREE.Vector3(p.x, p.y, fromZ));
+      const target = body.localToWorld(new THREE.Vector3(p.x, p.y, 0));
+      const hit = new THREE.Raycaster(origin, target.sub(origin).normalize()).intersectObjects(meshes, false)[0];
+      return hit ? body.worldToLocal(hit.point.clone()).z : null;
+    };
+    const front = surfaceZ(3), back = surfaceZ(-3);
+    if (front == null || back == null || front - back < 0.02) return null;
+    return p.z < (front + back) / 2 ? 'back' : 'front';
+  }
+
   // ---------- tapping ----------
   const raycaster = new THREE.Raycaster();
   let down = null;
@@ -131,7 +144,7 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     const point = body.worldToLocal(hit.point.clone());
     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld)
       .applyQuaternion(body.quaternion.clone().invert());
-    const regionId = regionAt(point, normal);
+    const regionId = regionAt(point, normal, H, facingAt(point));
     if (markers.some(m => m.regionId === regionId)) return removeRegion(regionId);
     markers.push({
       regionId, side: regionById[regionId].side, intensity: defaultIntensity(), quality: 'ache',
