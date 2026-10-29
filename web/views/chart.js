@@ -106,8 +106,8 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     marks.map(m => s('g', { class: 'mark', 'data-i': m.i, role: 'button', tabindex: 0, 'aria-label': `Routine change: ${m.texts.join(', ')}. Show details` },
       s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom }),
       s('circle', { class: 'mark-hit', cx: x(m.i), cy: bottom + 11, r: 14 }),
-      s('circle', { class: 'mark-glow', cx: x(m.i), cy: bottom + 11, r: 7 }),
-      s('circle', { class: 'mark-dot', cx: x(m.i), cy: bottom + 11, r: 3.2 }))));
+      s('circle', { class: 'mark-glow', cx: x(m.i), cy: bottom + 11, r: 8.5 }),
+      s('circle', { class: 'mark-dot', cx: x(m.i), cy: bottom + 11, r: 4 }))));
 
   // One key: each line's name and its value on the focused day (today unless the finger is on the chart)
   const when = h('span', { class: 'when' });
@@ -129,7 +129,9 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   const changeKey = marks.length ? h('button', { type: 'button', class: 'key change-key', onclick: () => onMark(null) }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Routine change')) : null;
   const legend = h('div', { class: 'legend', role: 'group', 'aria-label': 'Lines on the chart' }, keys.map(k => k.btn), changeKey, add);
 
+  let current = home;
   function focus(i) {
+    current = i;
     hair.setAttribute('x1', x(i));
     hair.setAttribute('x2', x(i));
     for (const g of svg.querySelectorAll('.day-label')) g.classList.toggle('on', Number(g.dataset.i) === i);
@@ -138,14 +140,19 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     // Days without a value just show the name; no placeholder dashes
     for (const k of keys) { const v = d.logged ? k.sr.format(i) : ''; k.val.textContent = /^–/.test(v) ? '' : v; }
   }
-  const pick = e => {
+  const dayAt = e => {
     const r = svg.getBoundingClientRect();
     const fx = ((e.clientX - r.left) / r.width) * W;
-    focus(Math.max(0, Math.min(n - 1, Math.round(((fx - left) / (right - left)) * (n - 1)))));
+    return Math.max(0, Math.min(n - 1, Math.round(((fx - left) / (right - left)) * (n - 1))));
   };
-  svg.addEventListener('pointermove', pick);
-  svg.addEventListener('pointerdown', pick);
-  svg.addEventListener('pointerleave', () => focus(home));
+  // With a mouse the key follows the pointer and goes back to today when it leaves. On a phone there's
+  // no hover: a tap picks a day and it stays picked; tapping that day again goes back to today.
+  svg.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) focus(dayAt(e)); });
+  svg.addEventListener('pointerdown', e => {
+    const i = dayAt(e);
+    focus(e.pointerType !== 'mouse' && i === current && i !== home ? home : i);
+  });
+  svg.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') focus(home); });
   focus(home);
 
   return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when), legend);

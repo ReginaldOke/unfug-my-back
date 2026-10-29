@@ -54,10 +54,10 @@ body.in-flow { padding-bottom: 0; }
 .ambient {
   position: fixed; inset: -20%; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(34% 26% at 20% 16%, rgba(190, 172, 160, 0.12), transparent 70%),
-    radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.09), transparent 70%),
-    radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.08), transparent 72%),
-    radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.05), transparent 70%),
+    radial-gradient(34% 26% at 20% 16%, rgba(190, 172, 160, 0.07), transparent 70%),
+    radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.05), transparent 70%),
+    radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.05), transparent 72%),
+    radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.03), transparent 70%),
     linear-gradient(180deg, #131315 0%, #0d0d0f 60%, #0a0a0b 100%);
   filter: blur(24px);
   animation: drift 48s ease-in-out infinite alternate;
@@ -83,7 +83,7 @@ body.in-flow { padding-bottom: 0; }
     radial-gradient(40% 3.75% at 20% 11.88%, rgba(120, 30, 52, 0.75), transparent 72%),
     radial-gradient(30% 3.75% at 88% 15.62%, rgba(242, 150, 128, 0.55), transparent 72%),
     /* then a soft lift so the grain reads as grey-black rather than vanishing into the charcoal */
-    linear-gradient(180deg, transparent 14%, rgba(28, 28, 32, 0.24) 24%, rgba(24, 24, 28, 0.2) 45%, rgba(20, 20, 24, 0.14) 70%, rgba(16, 16, 20, 0.06) 100%);
+    linear-gradient(180deg, transparent 14%, rgba(26, 26, 30, 0.16) 24%, rgba(22, 22, 26, 0.13) 45%, rgba(18, 18, 22, 0.08) 70%, rgba(14, 14, 18, 0.03) 100%);
   transform: rotate(-10deg);
   filter: blur(22px) saturate(120%);
   animation: aura-drift 24s ease-in-out infinite alternate;
@@ -1493,7 +1493,7 @@ body:not(.on-home) .ambient::after {
 .trend .mark:focus-visible .mark-glow { fill: rgba(255, 255, 255, 0.3); }
 .key.change-key { cursor: default; }
 .key.change-key, .key.change-key .key-name { text-decoration: none; color: var(--ink-2); }
-.key.change-key i { width: 7px; height: 7px; border-radius: 50%; background: #fbfbfd; opacity: 1; box-shadow: 0 0 6px rgba(255, 255, 255, 0.6); margin: 0 4px; }
+.key.change-key i { width: 7px; height: 7px; border-radius: 50%; background: #fbfbfd; opacity: 1; box-shadow: 0 0 3px rgba(255, 255, 255, 0.7), 0 0 0 4px rgba(255, 255, 255, 0.14), 0 0 9px 3px rgba(255, 255, 255, 0.12); margin: 0 5px; }
 [data-theme="light"] .trend .mark line { stroke: rgba(0, 0, 0, 0.16); }
 [data-theme="light"] .trend .mark .mark-glow { fill: rgba(255, 255, 255, 0.9); filter: blur(2px); }
 [data-theme="light"] .trend .mark .mark-dot { fill: #fff; stroke: rgba(29, 28, 31, 0.28); stroke-width: 0.8; filter: drop-shadow(0 1px 2px rgba(60, 40, 30, 0.25)); }
@@ -1579,8 +1579,25 @@ body:not(.on-home) .ambient::after {
 .key-add { letter-spacing: 1px; font-size: 10px; }
 
 /* The check-in button on Home: clear glass like the tiles under it */
-.btn.primary.hero-cta { background: var(--glass-bg); box-shadow: var(--glass-shadow); }
-/* Settings: the quieter glass of Home's small tiles, with a softer rim and lighter shadow */
-.settings-view .card::before { background: linear-gradient(145deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.07) 22%, rgba(255, 255, 255, 0.015) 48%, rgba(255, 255, 255, 0.03) 72%, rgba(255, 255, 255, 0.12) 100%); }
-.settings-view .card { box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.02), 0 1px 2px rgba(0, 0, 0, 0.15), 0 18px 36px -22px rgba(0, 0, 0, 0.5); }
-[data-theme="light"] .settings-view .card::before { background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.3) 30%, rgba(0, 0, 0, 0.03) 60%, rgba(255, 255, 255, 0.45) 100%); }
+.btn.primary.hero-cta { background: radial-gradient(60% 120% at 14% 0%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 70%), var(--glass-bg); }
+/* Settings cards look like Home's small tiles: no shiny rim, just a faint edge */
+#app .settings-view .card::before { display: none; }
+#app .settings-view .card { border-color: rgba(255, 255, 255, 0.07); }
+[data-theme="light"] #app .settings-view .card { border-color: rgba(0, 0, 0, 0.06); }
+
+/* Check-ins: today's button, then the list by month */
+.checkin-cta { margin: 4px 0 8px; }
+.checkin-group { display: flex; flex-direction: column; gap: 8px; }
+.checkin-list { padding: 4px 18px; gap: 0; }
+.checkin-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+.checkin-row + .checkin-row { border-top: 1px solid var(--line); }
+.checkin-row:active { opacity: 0.7; }
+.checkin-dot {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 14px; font-weight: 500; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--dot) 70%, #fff), var(--dot) 45%, var(--dot2) 100%);
+  box-shadow: 0 6px 16px -6px var(--dot2), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.checkin-when { display: flex; align-items: baseline; gap: 10px; font-size: 15px; }
+.checkin-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; margin-top: 2px; }
+.checkin-row .grow { min-width: 0; }

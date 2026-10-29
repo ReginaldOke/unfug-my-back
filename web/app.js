@@ -10,6 +10,7 @@ import { RoutinesView, RoutineView, RoutineRunView } from './views/routines.js';
 import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
 import { HealthView } from './views/health.js';
+import { CheckinsView } from './views/checkins.js';
 import { startTheme } from './lib/theme.js';
 
 R.init();
@@ -19,6 +20,7 @@ startTheme();
 const routes = [
   [/^\/$/, HomeView],
   [/^\/checkin$/, CheckinView, { flow: true }],
+  [/^\/checkins$/, CheckinsView],
   [/^\/setup$/, SetupView, { flow: true }],
   [/^\/factor\/([\w-]+)$/, FactorDetailView],
   [/^\/routines$/, RoutinesView],
