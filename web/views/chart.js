@@ -124,9 +124,9 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, sr.label), val);
     return { sr, btn, val };
   });
-  const add = onAdd ? h('button', { type: 'button', class: 'key-add', 'aria-label': 'Add a line to the chart', title: 'Add a line', onclick: onAdd }, '+') : null;
+  const add = onAdd ? h('button', { type: 'button', class: 'key-add', 'aria-label': 'Choose what the chart shows', title: 'Chart data', onclick: onAdd }, '•••') : null;
   // The dot gets its own key, but only when there's one in view
-  const changeKey = marks.length ? h('span', { class: 'key change-key' }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Routine change')) : null;
+  const changeKey = marks.length ? h('button', { type: 'button', class: 'key change-key', onclick: () => onMark(null) }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Routine change')) : null;
   const legend = h('div', { class: 'legend', role: 'group', 'aria-label': 'Lines on the chart' }, keys.map(k => k.btn), changeKey, add);
 
   function focus(i) {

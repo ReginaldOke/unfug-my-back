@@ -7,7 +7,7 @@ import { HEALTH_IMPORT } from '../lib/health.js';
 import { notificationStatus } from '../lib/notify.js';
 import { rankInsights, quickSummary } from '../lib/analysis.js';
 import { localDate, addDays, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
-import { ROLE_ICON, fmtAmount } from '../lib/labels.js';
+import { ROLE_ICON, fmtAmount, reminderOn } from '../lib/labels.js';
 import { TrendChart, PALETTES, EXTRA_PALETTES } from './chart.js';
 import { PainCalendar } from './calendar.js';
 import { Ruler, SelectCard, PENCIL } from './controls.js';
@@ -17,7 +17,9 @@ import { dragHandles } from './sortable.js';
 import { ScratchPad, seedNotes } from './pad.js';
 
 // View state that should survive the periodic re-render
-const ui = { range: 7, hidden: new Set(), view: 'chart', month: localDate().slice(0, 7), day: null };
+const ui = { range: 7, hidden: null, view: 'chart', month: localDate().slice(0, 7), day: null };
+// Lines switched off in the chart, remembered between visits (read once the diary has loaded)
+const hiddenLines = () => (ui.hidden ??= new Set(R.settings().chartHidden ?? []));
 let rerender = () => {};
 
 // Sections the user can rearrange by holding and dragging, in the default order
@@ -96,7 +98,7 @@ function hero(entry, today) {
     h('div', { class: 'hero-side' },
       h('div', { class: 'streak' }, h('span', { class: 'num' }, String(streak)), h('span', { class: 'hint' }, 'day streak')),
       // Before the first check-in, the big button over the sample chart is the call to action
-      R.checkins.all().length ? h('a', { class: 'btn primary', href: '#/checkin' }, entry ? 'Edit check-in' : 'Check in') : null));
+      R.checkins.all().length ? h('a', { class: 'btn primary hero-cta', href: '#/checkin' }, entry ? 'Edit check-in' : 'Check in') : null));
 }
 
 const BELL = () => {
@@ -243,10 +245,11 @@ function trendCard(today) {
         viewToggle(),
         segmented([[7, '1W'], [30, '1M'], [90, '3M']], ui.range, v => { ui.range = v; rerender(); }, 'Range'))),
     TrendChart({
-      days, series, hidden: ui.hidden,
-      focus: dates.indexOf(today), fadeLeft: start > first, marks, onMark: openChangeSheet,
-      onToggle: key => { ui.hidden.has(key) ? ui.hidden.delete(key) : ui.hidden.add(key); rerender(); },
-      onAdd: () => openLinePicker([...auto].filter(Boolean)),
+      days, series, hidden: hiddenLines(),
+      focus: dates.indexOf(today), fadeLeft: start > first, marks,
+      onMark: m => openChangeSheet(marks, m?.date),
+      onToggle: key => { toggleHidden(key); rerender(); },
+      onAdd: () => openDataSheet(series.slice(0, 1 + !!mainStressor + !!topHelper), [...auto].filter(Boolean)),
     }));
 }
 
@@ -254,9 +257,19 @@ function trendCard(today) {
 const METRICS = ['stress', 'sleep', 'sleepHours', 'steps'];
 
 /** Pick extra lines for the chart: stress, sleep, steps, or any stressor or helper. */
-function openLinePicker(autoIds) {
+function toggleHidden(key) {
+  const hidden = hiddenLines();
+  hidden.has(key) ? hidden.delete(key) : hidden.add(key);
+  R.setSettings({ chartHidden: [...hidden] });
+}
+
+/**
+ * Everything the chart can show, each with a switch: pain and your main stressor and top helper
+ * (switching these hides them), then stress, sleep and every other stressor or helper (switching
+ * these adds them).
+ */
+function openDataSheet(autoLines, autoIds) {
   const chosen = new Set(R.settings().chartExtras ?? []);
-  const save = () => { R.setSettings({ chartExtras: [...chosen] }); };
   const options = [
     { id: 'stress', icon: '🌀', title: 'Stress', detail: 'From your check-ins' },
     { id: 'sleep', icon: '🌙', title: 'Sleep', detail: 'How well, out of 10' },
@@ -266,27 +279,34 @@ function openLinePicker(autoIds) {
       id: f.id, icon: f.icon || ROLE_ICON[f.role], title: f.name, detail: f.role === 'helper' ? 'Helper' : 'Stressor',
     })),
   ];
-  sheet(close => h('div', { class: 'stack' },
-    h('h2', {}, 'Add to chart'),
-    h('p', { class: 'hint' }, 'Pain, your main stressor and your top helper are always there.'),
-    h('div', { class: 'card-grid' }, options.map(o => SelectCard({
-      icon: o.icon, title: o.title, detail: o.detail, on: chosen.has(o.id),
-      onToggle: on => { on ? chosen.add(o.id) : chosen.delete(o.id); save(); },
-    }))),
-    !HEALTH_IMPORT || R.health.has('steps') ? null : h('a', { class: 'list-row', href: '#/health', onclick: close },
-      h('span', { class: 'grow' }, 'Steps', h('span', { class: 'hint block' }, 'Bring them in from Apple Health')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))), { onClose: () => rerender() });
+  const AUTO_DETAIL = { pain: 'From your check-ins', stressor: 'Main stressor', helper: 'Top helper' };
+  const row = (lead, title, detail, on, onChange) => h('label', { class: 'data-row' },
+    lead, h('span', { class: 'grow' }, title, h('span', { class: 'hint block' }, detail)),
+    h('input', { type: 'checkbox', class: 'switch', checked: on, 'aria-label': `Show ${title}`, onchange: e => onChange(e.target.checked) }));
+  sheet(() => h('div', { class: 'stack data-sheet' },
+    h('h2', {}, 'Chart data'),
+    h('div', { class: 'data-list' },
+      autoLines.map(sr => row(h('i', { class: 'data-swatch', style: `--c:${sr.palette[0]}`, 'aria-hidden': 'true' }), sr.label, AUTO_DETAIL[sr.key],
+        !hiddenLines().has(sr.key), () => toggleHidden(sr.key))),
+      options.map(o => row(h('span', { class: 'data-icon', 'aria-hidden': 'true' }, o.icon), o.title, o.detail,
+        chosen.has(o.id), on => { on ? chosen.add(o.id) : chosen.delete(o.id); R.setSettings({ chartExtras: [...chosen] }); })))),
+  { onClose: () => rerender(), tall: true });
 }
 
-/** What changed in your routines that day; each change opens its routine. */
-function openChangeSheet(mark) {
-  sheet(close => h('div', { class: 'stack change-sheet' },
-    h('div', {}, h('h2', {}, 'Routine change'), h('p', { class: 'hint' }, parseDate(mark.date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))),
-    h('div', { class: 'change-list' }, mark.changes.map(c => h('a', {
-      class: 'change-item', href: R.routines.get(c.routineId) && !R.routines.get(c.routineId).isArchived ? `#/routine/${c.routineId}` : null,
-      onclick: close,
-    },
-      h('span', { class: 'change-dot', 'aria-hidden': 'true' }),
-      h('span', { class: 'grow' }, h('strong', {}, c.name), h('span', { class: 'hint block' }, changeWhat(c))))))));
+/** Every routine change in view, newest first, grouped by day; each change opens its routine. */
+function openChangeSheet(marks, first = null) {
+  const days = [...marks].sort((a, b) => (a.date === first ? -1 : b.date === first ? 1 : b.date.localeCompare(a.date)));
+  sheet(close => h('div', { class: 'stack change-sheet', tabindex: -1 },
+    h('h2', {}, days.length > 1 || days[0]?.changes.length > 1 ? 'Routine changes' : 'Routine change'),
+    days.map(m => h('div', { class: 'change-day' },
+      h('p', { class: 'hint change-date' }, parseDate(m.date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })),
+      h('div', { class: 'change-list' }, m.changes.map(c => {
+        const live = R.routines.get(c.routineId) && !R.routines.get(c.routineId).isArchived;
+        return h(live ? 'a' : 'div', { class: 'change-item', href: live ? `#/routine/${c.routineId}` : null, onclick: live ? close : null },
+          h('span', { class: 'change-dot', 'aria-hidden': 'true' }),
+          h('span', { class: 'grow' }, h('strong', {}, c.name), h('span', { class: 'hint block' }, changeWhat(c))),
+          live ? h('span', { class: 'chev', 'aria-hidden': 'true' }, '›') : null);
+      }))))));
 }
 
 // "Started Daily mobility" under the heading "Daily mobility" reads as just "Started"
@@ -384,7 +404,7 @@ function movementTile() {
     h('div', { class: 'tile-top' }, h('h2', {}, eyebrow), h('span', { class: 'well action', 'aria-hidden': 'true' }, PENCIL())),
     h('div', {}, h('span', { class: `num${big.length > 4 ? ' small' : ''}` }, big), unit ? h('span', { class: 'unit' }, unit) : null),
     Ruler({ value: s.reminder.enabled && !paused && !later ? Math.min(sinceMove, s.reminder.intervalMin) : 0, max: s.reminder.intervalMin }),
-    h('span', { class: 'hint' }, hint));
+    h('span', { class: 'tile-title link' }, hint));
 }
 
 
@@ -392,7 +412,7 @@ function routineTile(today) {
   const r = R.routines.all()[0];
   if (!r) return h('a', { class: 'tile static', href: '#/routine/new' }, h('h2', {}, 'Routine'), h('span', { class: 'tile-title' }, '+ Create a movement routine'));
   const done = R.routines.completionsOn(today, r.id).length;
-  const target = Math.max(1, r.schedule.length);
+  const target = Math.max(1, r.schedule.filter(e => reminderOn(e, today)).length);
   const allDone = done >= target;
   const week = Array.from({ length: 7 }, (_, i) => R.routines.completionsOn(addDays(today, -i), r.id).length).reduce((a, b) => a + b, 0);
   // Play the celebration once, on the first render after finishing a routine

@@ -35,3 +35,37 @@ export function bumpLastNumber(text, by) {
   const n = Math.max(0, Number(m[0]) + by);
   return text.slice(0, m.index) + String(+n.toFixed(2)) + text.slice(m.index + m[0].length);
 }
+
+/** A routine reminder: "18:00" (every day) or "18:00@1,3,5" (only those weekdays, 0 = Sunday). */
+export function parseReminder(entry) {
+  const [time, days] = entry.split('@');
+  return { time, days: days ? days.split(',').map(Number) : null };
+}
+export const formatReminder = (time, days) => (days && days.length && days.length < 7 ? `${time}@${[...days].sort((a, b) => a - b).join(',')}` : time);
+/** Whether a reminder applies on a date (YYYY-MM-DD). */
+export const reminderOn = (entry, date) => {
+  const { days } = parseReminder(entry);
+  return !days || days.includes(new Date(`${date}T12:00:00`).getDay());
+};
+
+// A fitting emoji for a new stressor or helper, from words in its name; first match wins
+const EMOJI_WORDS = [
+  [/guitar/, '🎸'], [/piano|keyboard/, '🎹'], [/gaming|game|console/, '🎮'], [/break|pause|rest\b/, '⏸️'],
+  [/desk|sitting|seated|chair|office/, '🪑'], [/sofa|couch|lounging/, '🛋️'], [/bed|lying|sleep|nap/, '🛏️'],
+  [/driv|car\b|commut/, '🚗'], [/flight|fly|travel|plane/, '✈️'], [/phone|scroll/, '📱'], [/screen|computer|laptop|typing/, '💻'],
+  [/read|book/, '📖'],
+  [/lift|weights|gym|deadlift|squat/, '🏋️'], [/carry|bag|backpack/, '🎒'], [/moving house|boxes|heavy/, '📦'],
+  [/garden/, '🌱'], [/clean|vacuum|chores|housework/, '🧹'], [/cook|kitchen/, '🍳'], [/kid|child|baby/, '👶'],
+  [/stand/, '🧍'], [/bend/, '🙇'], [/stress|work|deadline/, '💼'], [/alcohol|beer|wine|drink/, '🍷'], [/coffee|caffeine/, '☕'],
+  [/run|jog/, '🏃'], [/walk|steps/, '🚶'], [/hik/, '🥾'], [/cycl|bike|spin/, '🚴'], [/swim/, '🏊'], [/row/, '🚣'],
+  [/yoga|pilates|meditat|mindful/, '🧘'], [/breath/, '🌬️'], [/stretch|mobility|flexib/, '🤸'], [/massage/, '💆'],
+  [/physio|chiro|osteo|doctor/, '🩺'], [/heat|hot water|sauna/, '🔥'], [/ice|cold/, '🧊'], [/bath|shower/, '🛁'],
+  [/water|hydrat/, '💧'], [/football|soccer/, '⚽'], [/basketball/, '🏀'], [/tennis|padel|squash/, '🎾'], [/golf/, '⛳'],
+  [/climb|boulder/, '🧗'], [/dance/, '💃'], [/box|martial|kick/, '🥊'],
+  [/core|plank|crunch|sit-?up|push-?up|pull-?up|calisthen|strength/, '💪'],
+];
+export function emojiFor(name, { role, exercise } = {}) {
+  const n = (name ?? '').toLowerCase();
+  const hit = EMOJI_WORDS.find(([re]) => re.test(n));
+  return hit ? hit[1] : exercise ? '💪' : role === 'helper' ? '🌿' : '📍';
+}

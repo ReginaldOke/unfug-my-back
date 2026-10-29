@@ -3,6 +3,7 @@
 import * as R from './repos.js';
 import { localDate } from './dates.js';
 import { parseHM } from './reminders-core.js';
+import { parseReminder, reminderOn } from './labels.js';
 
 const Cap = globalThis.Capacitor;
 export const isNative = !!Cap?.isNativePlatform?.();
@@ -67,8 +68,8 @@ async function plan() {
       if (when > now) list.push({ id: id++, title: 'Time to check in', body: 'Takes about a minute.', schedule: { at: when }, extra: { hash: '#/checkin' } });
     }
     for (const r of R.routines.all()) {
-      r.schedule.forEach((t, i) => {
-        const when = at(date, t);
+      r.schedule.filter(e => reminderOn(e, date)).forEach((e, i) => {
+        const when = at(date, parseReminder(e).time);
         if (when <= now || R.routines.completionsOn(date, r.id).length > i) return;
         list.push({ id: id++, title: R.routineLabel(r), body: `${r.items.length} moves. Tap to start.`, actionTypeId: 'ROUTINE', schedule: { at: when }, extra: { hash: `#/routine/${r.id}` } });
       });

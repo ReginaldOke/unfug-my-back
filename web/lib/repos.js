@@ -2,7 +2,7 @@
 import * as S from './store.js';
 import { localDate, addDays } from './dates.js';
 import { SEED_FACTORS, SEED_ROUTINE } from './seed.js';
-import { defaultUnit } from './labels.js';
+import { defaultUnit, emojiFor } from './labels.js';
 import { regionAt, H } from './regions3d.js';
 import { regionById } from './regions.js';
 
@@ -142,8 +142,9 @@ export const factors = {
   create(fields) {
     return S.insert('factors', {
       status: 'suspected', isArchived: false, sortWeight: Math.max(0, ...S.table('factors').map(f => f.sortWeight ?? 0)) + 1, source: 'user',
-      category: fields.role === 'helper' ? 'recovery' : 'activity', icon: '', unit: defaultUnit(fields.measureType),
+      category: fields.role === 'helper' ? 'recovery' : 'activity', unit: defaultUnit(fields.measureType),
       ...fields,
+      icon: fields.icon || emojiFor(fields.name, { role: fields.role, exercise: fields.category === 'exercise' }),
     });
   },
 
@@ -324,13 +325,13 @@ export const routines = {
    * Saves a day's session: what you did per move. writeLog also ticks the routine for that day (left
    * off when a check-in in progress will save it instead).
    */
-  logSession(id, date, { log, intensity = null }, { writeLog = true } = {}) {
+  logSession(id, date, { log, intensity = null, times = null }, { writeLog = true } = {}) {
     const r = routines.get(id);
     return S.batch(() => {
       const timestamp = date === localDate() ? S.nowISO() : new Date(`${date}T12:00:00`).toISOString();
       const existing = routines.sessionOn(id, date);
-      if (existing) S.update('routineCompletions', existing.id, { log, intensity: intensity ?? existing.intensity ?? null });
-      else S.insert('routineCompletions', { routineId: id, date, timestamp, completed: true, log, intensity });
+      if (existing) S.update('routineCompletions', existing.id, { log, intensity: intensity ?? existing.intensity ?? null, times: times ?? existing.times ?? null });
+      else S.insert('routineCompletions', { routineId: id, date, timestamp, completed: true, log, intensity, times });
       if (writeLog && r?.linkedFactorId) {
         const prev = S.table('factorLogs').find(l => l.factorId === r.linkedFactorId && l.date === date);
         S.removeWhere('factorLogs', l => l.factorId === r.linkedFactorId && l.date === date);
@@ -358,6 +359,15 @@ export const routines = {
   },
   completionsOn: (date, routineId) => S.table('routineCompletions')
     .filter(c => c.completed && c.routineId === routineId && (c.date ?? localDate(new Date(c.timestamp))) === date),
+
+  /** Unmarks a routine for a day: its sessions that day and the tick on its own exercise item. */
+  undo(routineId, date) {
+    const r = routines.get(routineId);
+    S.batch(() => {
+      S.removeWhere('routineCompletions', c => c.routineId === routineId && (c.date ?? localDate(new Date(c.timestamp))) === date);
+      if (r?.linkedFactorId) S.removeWhere('factorLogs', l => l.factorId === r.linkedFactorId && l.date === date);
+    });
+  },
 
   /** Logs a completion; a completed routine also counts towards its linked helper factor. */
   complete(routineId, completed = true) {

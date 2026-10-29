@@ -3,7 +3,7 @@
 import { h, toast, iconButton, confirmSheet, vibrate } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate, dayLabel } from '../lib/dates.js';
-import { bumpLastNumber } from '../lib/labels.js';
+import { bumpLastNumber, parseReminder, formatReminder } from '../lib/labels.js';
 import { checkinDraft } from './checkin.js';
 import { MoveFigure } from './figure.js';
 import { dragHandles } from './sortable.js';
@@ -33,30 +33,57 @@ function groupsOf(list) {
   return out;
 }
 
-/** One card for the group; each variation opens on its own and shows a tick when it's done today. */
+/** One card for the group; tap it to open the first variation, or a chip for that one. */
 function groupCard(days, today) {
   const status = doneStatus(days, today);
-  return h('section', { class: 'card glass routine-card group-card' },
+  return h('section', {
+    class: 'card glass routine-card group-card', role: 'link', tabindex: 0, 'aria-label': `${days[0].group}. Open ${days[0].name}`,
+    onclick: () => { location.hash = `#/routine/${days[0].id}`; },
+    onkeydown: e => { if (e.key === 'Enter') location.hash = `#/routine/${days[0].id}`; },
+  },
     h('div', {}, h('h2', {}, days[0].group), status ? h('p', { class: 'hint' }, status) : null),
     h('div', { class: 'routine-days' }, days.map(r => {
       const done = R.routines.completionsOn(today, r.id).length > 0;
-      return h('a', { class: `chip glass routine-day${done ? ' done' : ''}`, href: `#/routine/${r.id}`, 'aria-label': `${R.routineLabel(r)}, ${r.items.length} moves${done ? ', done today' : ''}` },
-        done ? h('span', { class: 'day-tick', 'aria-hidden': 'true' }, '✓') : null, r.name);
+      return h('a', {
+        class: `chip glass routine-day${done ? ' done' : ''}`, href: `#/routine/${r.id}`,
+        'aria-label': `${R.routineLabel(r)}${done ? ', done today' : ''}. Open`, onclick: e => e.stopPropagation(),
+      }, doneToggle(r, today, done), r.name);
     })));
 }
 
 function routineCard(r, today) {
-      const status = doneStatus([r], today);
-      return h('a', { class: 'card glass routine-card', href: `#/routine/${r.id}`, 'aria-label': `${r.name}${status ? `, ${status}` : ''}. Open` },
-        h('div', {}, h('h2', {}, r.name), status ? h('p', { class: 'hint' }, status) : null),
-        h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, it.dose)))));
+  const status = doneStatus([r], today);
+  const done = R.routines.completionsOn(today, r.id).length > 0;
+  return h('a', { class: 'card glass routine-card', href: `#/routine/${r.id}`, 'aria-label': `${r.name}${status ? `, ${status}` : ''}. Open` },
+    h('div', { class: 'row between' },
+      h('div', {}, h('h2', {}, r.name), status ? h('p', { class: 'hint' }, status) : null),
+      doneToggle(r, today, done)),
+    h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, it.dose)))));
+}
+
+/** The quick way: a circle that marks the routine done for today (with its usual reps), or undoes it. */
+function doneToggle(r, today, done) {
+  return h('button', {
+    type: 'button', class: `done-toggle${done ? ' on' : ''}`, 'aria-pressed': String(done),
+    'aria-label': done ? `Unmark ${R.routineLabel(r)} for today` : `Mark ${R.routineLabel(r)} done for today`,
+    onclick: e => {
+      e.preventDefault(); e.stopPropagation();
+      if (done) { R.routines.undo(r.id, today); toast(`${R.routineLabel(r)} unmarked`); }
+      else {
+        R.routines.logSession(r.id, today, { log: r.items.map(it => ({ name: it.name, did: it.dose || '✓' })) });
+        vibrate(10);
+        toast(`${R.routineLabel(r)} done`);
+      }
+      location.replace('#/routines'); window.dispatchEvent(new HashChangeEvent('hashchange'));
+    },
+  });
 }
 
 const lastDone = id => R.routines.lastDoneDate(id);
 
 /** "Completed 2× today", or "Last done Tuesday", or nothing if it's never been done. */
 function doneStatus(routines, today) {
-  const times = routines.reduce((n, r) => n + R.routines.completionsOn(today, r.id).length, 0);
+  const times = routines.reduce((n, r) => n + R.routines.completionsOn(today, r.id).reduce((k, c) => k + (c.times ?? 1), 0), 0);
   if (times) return `Completed ${times}× today`;
   const last = routines.map(r => lastDone(r.id)).filter(Boolean).sort().at(-1);
   return last ? `Last done ${dayLabel(last).toLowerCase()}` : null;
@@ -66,8 +93,14 @@ function doneStatus(routines, today) {
 // adjusted in one show up in the other. Cleared when the session is saved.
 const sessions = new Map();
 // How hard you went: 1 (easy) to 3 (all out), in fine steps; the word is the nearest half step
-const EFFORT_WORDS = ['Easy', 'Steady', 'Moderate', 'Hard', 'All out'];
+// Whole steps match the check-in's Easy, Moderate and Hard
+const EFFORT_WORDS = ['Easy', 'Light', 'Moderate', 'Tough', 'Hard'];
 const effortWord = v => EFFORT_WORDS[Math.round((v - 1) * 2)];
+const MAX_TIMES = 10;
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const timesWord = n => (n === 1 ? 'Once' : n === 2 ? 'Twice' : `${n} times`);
+// Mobility and stretching are counted (how many times today); everything else is how hard
+const defaultMeasure = name => (/mobility|stretch/i.test(name ?? '') ? 'count' : 'effort');
 
 function sessionFor(r, date, fromCheckin) {
   const key = `${r?.id ?? 'new'}|${date}`;
@@ -84,6 +117,8 @@ function sessionFor(r, date, fromCheckin) {
       return { name: it.name, dose: it.dose, did: now || before.get(it.name) || it.dose || '', done: !!now };
     }),
     intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
+    measure: r?.measure ?? defaultMeasure(`${r?.group ?? ''} ${r?.name ?? ''}`),
+    times: logged?.times ?? 1,
   };
   sessions.set(key, s);
   return s;
@@ -117,15 +152,15 @@ function saveOne(s) {
   const existing = s.id ? R.routines.get(s.id) : null;
   const group = s.group?.trim() || null;
   if (existing?.group && group && existing.group !== group) R.routines.renameGroup(existing.group, group);
-  const changed = !existing || existing.name !== name || (existing.group ?? null) !== group || JSON.stringify(existing.items) !== JSON.stringify(moves)
+  const changed = !existing || existing.name !== name || (existing.group ?? null) !== group || (existing.measure ?? defaultMeasure(`${existing.group ?? ''} ${existing.name}`)) !== s.measure || JSON.stringify(existing.items) !== JSON.stringify(moves)
     || existing.schedule.join() !== [...new Set(s.schedule)].sort().join();
-  const r = changed ? R.routines.save(s.id, { name, group, items: moves, schedule: [...new Set(s.schedule)].sort() }) : R.routines.get(s.id);
+  const r = changed ? R.routines.save(s.id, { name, group, measure: s.measure, items: moves, schedule: [...new Set(s.schedule)].sort() }) : R.routines.get(s.id);
   const done = items.filter(it => it.done);
   if (done.length) {
     const log = items.map(it => ({ name: it.name.trim(), did: it.done ? it.did.trim() || '✓' : '' }));
     // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
     const live = checkinDraft(s.date);
-    R.routines.logSession(r.id, s.date, { log, intensity: s.intensity }, { writeLog: !live });
+    R.routines.logSession(r.id, s.date, s.measure === 'count' ? { log, times: s.times } : { log, intensity: s.intensity }, { writeLog: !live });
     if (live) { live.selections.set(r.linkedFactorId, 1); live.intensity.set(r.linkedFactorId, s.intensity); }
   }
   sessions.delete(s.key);
@@ -204,7 +239,7 @@ export function RoutineView(ctx) {
     const did = h('input', {
       type: 'text', class: 'did-input', value: it.did, inputmode: 'text', enterkeyhint: 'next', placeholder: 'Done',
       'aria-label': `What you did: ${it.name}`,
-      oninput: e => { it.did = e.target.value; tick(true); },
+      oninput: e => { it.did = e.target.value; }, // editing the amount isn't doing the move: tick it yourself
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); const next = row.nextElementSibling?.querySelector('.did-input'); next ? next.focus() : e.target.blur(); } },
     });
     scrubNumber(did, () => it.dose || '0');
@@ -271,49 +306,84 @@ export function RoutineView(ctx) {
   document.addEventListener('pointerdown', closeOnTapAway, { capture: true });
   ctx.onCleanup(() => document.removeEventListener('pointerdown', closeOnTapAway, { capture: true }));
 
-  const add = h('input', {
-    type: 'text', class: 'log-add-input', placeholder: '+ Add a move', 'aria-label': 'Add a move', enterkeyhint: 'done',
-    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); commitAdd(); } },
-    onblur: () => commitAdd(),
+  // Adding a move: its name, then how many; Enter goes from one to the other, then adds it
+  const addName = h('input', {
+    type: 'text', class: 'log-add-input', placeholder: '+ Add a move', 'aria-label': 'New move', enterkeyhint: 'next',
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addReps.focus(); } },
   });
+  const addReps = h('input', {
+    type: 'text', class: 'did-input log-add-reps', placeholder: 'Reps', 'aria-label': 'Reps for the new move', enterkeyhint: 'done',
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); commitAdd(); addName.focus(); } },
+  });
+  const add = h('div', { class: 'log-add-row' }, addName, addReps);
+  // Leaving the pair (not moving between its two boxes) adds what's there
+  add.addEventListener('focusout', e => { if (!add.contains(e.relatedTarget)) commitAdd(); });
   function commitAdd() {
-    const name = add.value.trim();
+    const name = addName.value.trim();
     if (!name) return;
-    const it = { name, dose: '', did: '', done: false };
+    const dose = addReps.value.trim();
+    const it = { name, dose, did: dose, done: false };
     s.items.push(it);
     list.append(moveRow(it));
-    add.value = '';
+    addName.value = ''; addReps.value = '';
   }
 
-  // How hard you went: a three-stop slider, green to red
+  // How it went: how hard (Easy to Hard), or how many times today, whichever this routine measures
   const word = h('span', { class: 'effort-word' });
   const field = h('div', { class: 'effort-field' });
-  const effort = h('input', {
-    type: 'range', class: 'effort-range', min: 1, max: 3, step: 0.01, value: s.intensity, 'aria-label': 'How hard did you go?',
+  const counted = () => s.measure === 'count';
+  const wordFor = v => (counted() ? timesWord(Math.round(v)) : effortWord(v));
+  const value = () => (counted() ? s.times : s.intensity);
+  const range = h('input', {
+    type: 'range', class: 'effort-range', step: 0.01,
     oninput: e => {
-      const before = effortWord(s.intensity);
-      s.intensity = Math.round(Number(e.target.value) * 10) / 10;
-      paintEffort(Number(e.target.value));
-      if (effortWord(s.intensity) !== before) vibrate(4); // a tick as the word changes, not on every pixel
+      const before = wordFor(value());
+      const v = Number(e.target.value);
+      if (counted()) s.times = Math.round(v); else s.intensity = Math.round(v * 10) / 10;
+      paintHow(v);
+      if (wordFor(value()) !== before) vibrate(4); // a tick as the word changes, not on every pixel
     },
   });
-  // The fill and colour follow the finger exactly; green through yellow to red
-  const paintEffort = (v = s.intensity) => {
-    const f = (v - 1) / 2;
-    word.textContent = effortWord(v);
-    effort.setAttribute('aria-valuetext', effortWord(v));
-    effort.style.setProperty('--pct', `${f * 100}%`);
-    field.style.setProperty('--h', String(Math.round(f < 0.5 ? 135 - 87 * f * 2 : 48 - 46 * (f - 0.5) * 2)));
+  // The fill follows the finger exactly; effort runs green to red, a count stays teal
+  const paintHow = (v = value()) => {
+    const [lo, hi] = counted() ? [1, MAX_TIMES] : [1, 3];
+    const f = (v - lo) / (hi - lo);
+    word.textContent = wordFor(v);
+    range.setAttribute('aria-valuetext', wordFor(v));
+    range.setAttribute('aria-label', counted() ? 'How many times?' : 'How hard did you go?');
+    range.style.setProperty('--pct', `${f * 100}%`);
+    field.classList.toggle('counted', counted());
+    field.style.setProperty('--h', String(counted() ? 168 : Math.round(f < 0.5 ? 135 - 87 * f * 2 : 48 - 46 * (f - 0.5) * 2)));
   };
-  field.append(h('div', { class: 'row between' }, h('span', { class: 'field-label' }, 'How hard did you go?'), word), effort);
-  paintEffort();
+  const switcher = h('div', { class: 'measure-switch', role: 'radiogroup', 'aria-label': 'Measure' });
+  const setMeasure = m => {
+    s.measure = m;
+    range.min = 1; range.max = counted() ? MAX_TIMES : 3; range.value = value();
+    switcher.replaceChildren(...[['effort', 'How hard'], ['count', 'How many times']].map(([k, label]) => h('button', {
+      type: 'button', role: 'radio', 'aria-checked': String(s.measure === k), class: s.measure === k ? 'on' : '',
+      onclick: () => { if (s.measure !== k) { setMeasure(k); vibrate(4); } },
+    }, label)));
+    paintHow();
+  };
+  field.append(h('div', { class: 'row between' }, switcher, word), range);
+  setMeasure(s.measure);
 
   // Reminders, as chips; + adds one
-  const times = h('div', { class: 'chips wrap' });
+  const times = h('div', { class: 'reminder-list' });
   const paintTimes = () => times.replaceChildren(
-    ...s.schedule.map((t, i) => h('span', { class: 'chip time' },
-      h('input', { type: 'time', value: t, 'aria-label': `Reminder ${i + 1}`, onchange: e => { s.schedule[i] = e.target.value; } }),
-      h('button', { type: 'button', class: 'x', 'aria-label': `Remove reminder ${i + 1}`, onclick: () => { s.schedule.splice(i, 1); paintTimes(); } }, '✕'))),
+    ...s.schedule.map((entry, i) => {
+      // Each reminder: its time, the days it's on (all lit means every day), and ✕
+      const { time, days } = parseReminder(entry);
+      const on = new Set(days ?? [0, 1, 2, 3, 4, 5, 6]);
+      const set = (t, d) => { s.schedule[i] = formatReminder(t, d.size ? [...d] : [0, 1, 2, 3, 4, 5, 6]); };
+      return h('div', { class: 'reminder-row' },
+        h('input', { type: 'time', class: 'reminder-time', value: time, 'aria-label': `Reminder ${i + 1} time`, onchange: e => set(e.target.value, on) }),
+        h('div', { class: 'reminder-days', role: 'group', 'aria-label': `Reminder ${i + 1} days` }, [1, 2, 3, 4, 5, 6, 0].map(d => h('button', {
+          type: 'button', class: on.has(d) ? 'on' : '', 'aria-pressed': String(on.has(d)), 'aria-label': WEEKDAYS[d],
+          onclick: e => { on.has(d) ? on.delete(d) : on.add(d); e.currentTarget.classList.toggle('on', on.has(d)); e.currentTarget.setAttribute('aria-pressed', String(on.has(d))); set(parseReminder(s.schedule[i]).time, on); vibrate(3); },
+        }, WEEKDAYS[d][0]))),
+        h('button', { type: 'button', class: 'x', 'aria-label': `Remove reminder ${i + 1}`, onclick: () => { s.schedule.splice(i, 1); paintTimes(); } }, '✕'));
+    }),
     h('button', { type: 'button', class: 'chip add', onclick: () => { s.schedule.push('18:00'); paintTimes(); } }, '+ Reminder'));
   paintTimes();
 
@@ -342,7 +412,7 @@ export function RoutineView(ctx) {
   return h('div', { class: 'view routine-page' },
     h('header', { class: 'top-bar' },
       iconButton('‹', 'Back', () => history.back()),
-      h('span', { class: 'eyebrow' }, dayLabel(date)),
+      date === localDate() ? h('span') : h('span', { class: 'eyebrow' }, dayLabel(date)),
       h('div', { class: 'row tight' }, play,
         h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
     title,

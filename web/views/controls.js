@@ -205,7 +205,7 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
     fill,
     h('div', { class: 'tile-top' },
       h('span', { class: 'well', 'aria-hidden': 'true' }, f.icon || ROLE_ICON[f.role]),
-      action ? h('span', { class: 'tile-action-wrap' }, action) : (!swipeEffort && effort) || h('span', { class: 'role-mark', 'aria-hidden': 'true' }, ROLE_ICON[f.role])),
+      action ? h('span', { class: 'tile-action-wrap' }, action) : (!swipeEffort && effort) || null),
     h('div', { class: 'tile-bottom' }, h('span', { class: 'tile-title' }, title), h('span', { class: 'tile-detail' }, valueBtn, hint, swipeEffort ? effort : null)));
   if (action) el.classList.add('has-action');
 

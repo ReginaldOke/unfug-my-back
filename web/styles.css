@@ -83,7 +83,7 @@ body.in-flow { padding-bottom: 0; }
     radial-gradient(40% 3.75% at 20% 11.88%, rgba(120, 30, 52, 0.75), transparent 72%),
     radial-gradient(30% 3.75% at 88% 15.62%, rgba(242, 150, 128, 0.55), transparent 72%),
     /* then a soft lift so the grain reads as grey-black rather than vanishing into the charcoal */
-    linear-gradient(180deg, transparent 14%, rgba(34, 34, 38, 0.3) 24%, rgba(30, 30, 34, 0.28) 45%, rgba(24, 24, 28, 0.2) 70%, rgba(20, 20, 24, 0.1) 100%);
+    linear-gradient(180deg, transparent 14%, rgba(28, 28, 32, 0.24) 24%, rgba(24, 24, 28, 0.2) 45%, rgba(20, 20, 24, 0.14) 70%, rgba(16, 16, 20, 0.06) 100%);
   transform: rotate(-10deg);
   filter: blur(22px) saturate(120%);
   animation: aura-drift 24s ease-in-out infinite alternate;
@@ -773,8 +773,6 @@ details.more[open] summary { margin-bottom: 10px; }
 /* Secondary (glass) buttons sit a step quieter than primary */
 .btn.glass { min-height: 46px; font-size: 15px; background: radial-gradient(60% 120% at 14% 0%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 70%), rgba(255, 255, 255, 0.05); }
 
-.trend .day-label.missing text { opacity: 0.45; }
-.trend .day-label.missing.on text { opacity: 1; }
 .hero-side .btn { align-self: stretch; white-space: nowrap; }
 
 /* ---------- Slider tints: a soft colour that matches the word ---------- */
@@ -1372,10 +1370,10 @@ body:not(.on-home) .ambient { background: var(--bg); }
    still has texture */
 body:not(.on-home) .ambient { filter: none; animation: none; }
 body:not(.on-home) .ambient::after {
-  content: ''; position: absolute; inset: 0; opacity: 0.075;
+  content: ''; position: absolute; inset: 0; opacity: 0.12;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-[data-theme="light"] body:not(.on-home) .ambient::after { opacity: 0.1; filter: invert(1); }
+[data-theme="light"] body:not(.on-home) .ambient::after { opacity: 0.15; filter: invert(1); }
 
 /* Tab bar icons: one line set, same size and stroke */
 #tabs a svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -1502,9 +1500,6 @@ body:not(.on-home) .ambient::after {
 [data-theme="light"] .key.change-key i { background: #fff; box-shadow: 0 0 0 0.8px rgba(29, 28, 31, 0.3), 0 1px 3px rgba(60, 40, 30, 0.2); }
 
 /* The details sheet */
-.change-sheet .change-list { display: flex; flex-direction: column; }
-.change-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit; }
-.change-item:first-child { border-top: 0; }
 .change-item strong { font-weight: 500; }
 .change-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #fbfbfd; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
 [data-theme="light"] .change-dot { background: #fff; box-shadow: 0 0 0 1px rgba(29, 28, 31, 0.3); }
@@ -1515,3 +1510,77 @@ body:not(.on-home) .ambient::after {
 .pad-item::before { content: ''; flex: none; width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3); transform: translateY(-3px); }
 .pad-item.lifted { padding-inline: 8px; }
 .pad-add { margin-top: 4px; font-size: 13px; }
+
+/* Adding a move: name and reps side by side, like the rows above */
+.log-add-row { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 8px 2px; }
+.log-add-row .log-add-input { flex: 1; min-width: 0; border-top: 0; padding: 8px 0; }
+.log-add-row .log-add-reps { touch-action: auto; cursor: text; }
+
+/* Mark a routine done for today, or undo it: a quiet circle that fills teal with a tick */
+.done-toggle {
+  flex: none; position: relative; width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.03);
+  transition: background .2s, border-color .2s, transform .25s var(--spring);
+}
+.done-toggle::before { content: ''; position: absolute; inset: -10px; } /* bigger target than it looks */
+.done-toggle:active { transform: scale(0.9); }
+.done-toggle.on { background: rgba(116, 212, 192, 0.85); border-color: transparent; }
+.done-toggle.on::after { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 5px; border: 1.8px solid #0f2620; border-top: 0; border-right: 0; transform: translate(-50%, -65%) rotate(-45deg); }
+.routine-day .done-toggle { width: 18px; height: 18px; margin-left: -6px; }
+.routine-day .done-toggle.on::after { width: 7px; height: 4px; border-width: 1.5px; }
+.routine-day .day-tick { display: none; }
+.group-card { cursor: pointer; }
+[data-theme="light"] .done-toggle { border-color: rgba(0, 0, 0, 0.2); background: rgba(255, 255, 255, 0.5); }
+
+/* How it went: a quiet two-word switch, then the slider */
+.measure-switch { display: inline-flex; gap: 14px; }
+.measure-switch button { border: 0; background: none; padding: 4px 0; font: inherit; font-size: 14px; color: var(--ink-3); cursor: pointer; transition: color .2s; }
+.measure-switch button.on { color: var(--ink); }
+.effort-field.counted .effort-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, transparent var(--pct, 0%), rgba(24, 24, 26, 0.72) var(--pct, 0%)), linear-gradient(90deg, #4fb3a6, #74d4c0);
+}
+[data-theme="light"] .effort-field.counted .effort-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, transparent var(--pct, 0%), rgba(239, 235, 230, 0.75) var(--pct, 0%)), linear-gradient(90deg, #4fb3a6, #74d4c0);
+}
+
+/* Routine reminders: a time, the days it's on, and ✕ */
+.reminder-list { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.reminder-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.reminder-time { flex: none; width: 118px; min-height: 36px; padding: 0 8px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); color: var(--ink); font: inherit; font-size: 14px; color-scheme: dark; }
+.reminder-days { display: flex; gap: 3px; flex: 1; min-width: 0; }
+.reminder-days button {
+  flex: 1; max-width: 26px; aspect-ratio: 1; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.12);
+  background: none; color: var(--ink-3); font: inherit; font-size: 11px; cursor: pointer; transition: background .2s, color .2s;
+}
+.reminder-days button.on { background: rgba(255, 255, 255, 0.88); border-color: transparent; color: #141416; font-weight: 500; }
+.reminder-row .x { flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--ink-3); cursor: pointer; }
+[data-theme="light"] .reminder-time { border-color: rgba(0, 0, 0, 0.1); background: rgba(255, 255, 255, 0.5); color-scheme: light; }
+[data-theme="light"] .reminder-days button { border-color: rgba(0, 0, 0, 0.14); }
+[data-theme="light"] .reminder-days button.on { background: #1d1c1f; color: #fff; }
+
+/* Routine changes sheet: grouped by day, soft rounded rows, no boxes or rules */
+.sheet:focus, .sheet:focus-visible { outline: none; }
+.sheet a:focus:not(:focus-visible), .sheet button:focus:not(:focus-visible) { outline: none; }
+.change-sheet:focus { outline: none; }
+.change-day { display: flex; flex-direction: column; gap: 2px; }
+.change-date { margin: 4px 0 2px; }
+.change-list { display: flex; flex-direction: column; gap: 2px; }
+.change-item { display: flex; align-items: center; gap: 14px; padding: 12px 12px; margin: 0 -12px; border-radius: 16px; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; transition: background .2s; }
+.change-item:active, .change-item:focus-visible { background: rgba(255, 255, 255, 0.06); outline: none; }
+[data-theme="light"] .change-item:active, [data-theme="light"] .change-item:focus-visible { background: rgba(0, 0, 0, 0.04); }
+.key.change-key { cursor: pointer; }
+
+/* Chart data sheet: one row per line, with a switch */
+.data-list { display: flex; flex-direction: column; }
+.data-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; cursor: pointer; }
+.data-row + .data-row { border-top: 1px solid var(--line); }
+.data-swatch { flex: none; width: 18px; height: 4px; border-radius: 2px; background: var(--c); margin: 0 7px; box-shadow: 0 0 8px var(--c); }
+.data-icon { flex: none; width: 32px; text-align: center; font-size: 18px; }
+.key-add { letter-spacing: 1px; font-size: 10px; }
+
+/* The check-in button on Home: clear glass like the tiles under it */
+.btn.primary.hero-cta { background: var(--glass-bg); box-shadow: var(--glass-shadow); }
+/* Settings: the quieter glass of Home's small tiles, with a softer rim and lighter shadow */
+.settings-view .card::before { background: linear-gradient(145deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.07) 22%, rgba(255, 255, 255, 0.015) 48%, rgba(255, 255, 255, 0.03) 72%, rgba(255, 255, 255, 0.12) 100%); }
+.settings-view .card { box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.02), 0 1px 2px rgba(0, 0, 0, 0.15), 0 18px 36px -22px rgba(0, 0, 0, 0.5); }
+[data-theme="light"] .settings-view .card::before { background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.3) 30%, rgba(0, 0, 0, 0.03) 60%, rgba(255, 255, 255, 0.45) 100%); }

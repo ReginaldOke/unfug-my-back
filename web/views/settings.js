@@ -17,7 +17,7 @@ export function SettingsView() {
   const nStress = active.filter(f => f.role !== 'helper').length, nHelp = active.length - nStress;
   const rem = R.settings().reminder;
 
-  return h('div', { class: 'view' },
+  return h('div', { class: 'view settings-view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Settings')),
 
     h('section', { class: 'card glass' },

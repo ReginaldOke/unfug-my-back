@@ -5,6 +5,7 @@ import { motion } from './motion.js';
 import { notify, dismissKey } from './notify.js';
 import { localDate, minutesSince } from './dates.js';
 import { startNative, syncNotifications } from './native.js';
+import { parseReminder, reminderOn } from './labels.js';
 
 const TICK_MS = 20_000;
 
@@ -149,8 +150,8 @@ function checkDailyReminders(now) {
     });
   }
   for (const r of R.routines.all()) {
-    r.schedule.forEach((t, i) => {
-      if (!due(`routine:${r.id}:${t}`, t) || R.routines.completionsOn(today, r.id).length > i) return;
+    r.schedule.filter(e => reminderOn(e, today)).forEach((e, i) => {
+      if (!due(`routine:${r.id}:${e}`, parseReminder(e).time) || R.routines.completionsOn(today, r.id).length > i) return;
       notify({
         key: `routine:${r.id}`, title: R.routineLabel(r), body: `${r.items.length} moves, about ${Math.max(5, Math.round(r.items.length * 1.5 / 5) * 5)} minutes.`,
         actions: [

@@ -84,7 +84,7 @@ const SHEET_EASE = 'cubic-bezier(.32, .72, 0, 1)'; // the iOS sheet curve
  * swipe it down (it follows the finger) or tap outside to close.
  */
 export function sheet(build, { onClose, tall = false } = {}) {
-  const dlg = h('dialog', { class: `sheet${tall ? ' tall' : ''}` });
+  const dlg = h('dialog', { class: `sheet${tall ? ' tall' : ''}`, tabindex: -1 });
   let closing = false;
   const close = () => slideOut(0);
 
@@ -151,6 +151,8 @@ export function sheet(build, { onClose, tall = false } = {}) {
 
   document.body.append(dlg);
   dlg.showModal();
+  // Focus the sheet, not its first link or button, so nothing opens wearing a focus ring
+  dlg.focus({ preventScroll: true });
   return { dlg, close };
 }
 
