@@ -34,9 +34,9 @@ function smoothPath(pts, top, bottom) {
  * series: [{ key, label, palette, values: [0..1 | null] per day, format: i => string }]
  * hidden: Set of series keys to hide. onToggle(key) flips one. onAdd: opens the picker for more lines.
  * focus: index of the day the key shows by default (today). fadeLeft: the data carries on before the first day.
- * marks: [{ i, texts }] days to flag (routine changes): a dotted line with a small ↻ marker; tapping it lists the changes in the key.
+ * marks: [{ i, texts }] days to flag (routine changes): a soft white dot on the baseline, with a key entry. onMark(mark) on tap.
  */
-export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [] }) {
+export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [], onMark = () => {} }) {
   const id = ++uid;
   // Even side padding, just enough to keep the first and last day labels whole
   const W = 340, H = 196, top = 46, bottom = 176, left = 22, right = W - 22;
@@ -102,28 +102,19 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     s('line', { class: 'baseline', x1: left, x2: right, y1: bottom, y2: bottom }),
     s('g', { class: 'plot', mask: `url(#fade-${id})` }, areas),
     hair,
-    // Routine changes: a dotted line and a small ↻ marker on the baseline, on top so they can be tapped
-    marks.map(m => s('g', { class: 'mark', 'data-i': m.i, role: 'button', tabindex: 0, 'aria-label': `Routine change: ${m.texts.join(', ')}` },
-      s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom - 8 }),
-      s('circle', { class: 'mark-hit', cx: x(m.i), cy: bottom, r: 14 }),
-      s('circle', { class: 'mark-ring', cx: x(m.i), cy: bottom, r: 6.5 }),
-      s('text', { class: 'mark-glyph', x: x(m.i), y: bottom + 2.8, 'text-anchor': 'middle' }, '↻'))));
+    // Routine changes: a small glowing white dot just under the baseline (clear of the selected day's knob), with a faint line up
+    marks.map(m => s('g', { class: 'mark', 'data-i': m.i, role: 'button', tabindex: 0, 'aria-label': `Routine change: ${m.texts.join(', ')}. Show details` },
+      s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom }),
+      s('circle', { class: 'mark-hit', cx: x(m.i), cy: bottom + 11, r: 14 }),
+      s('circle', { class: 'mark-glow', cx: x(m.i), cy: bottom + 11, r: 7 }),
+      s('circle', { class: 'mark-dot', cx: x(m.i), cy: bottom + 11, r: 3.2 }))));
 
   // One key: each line's name and its value on the focused day (today unless the finger is on the chart)
   const when = h('span', { class: 'when' });
-  // Routine changes join the key only while their marker is tapped
-  const changeKeys = h('div', { class: 'change-keys', hidden: true });
-  let openMark = null;
-  function showMark(i) {
-    openMark = openMark === i ? null : i;
-    const m = marks.find(x => x.i === openMark);
-    changeKeys.hidden = !m;
-    changeKeys.replaceChildren(...(m?.texts ?? []).map(text => h('span', { class: 'key change-key' }, h('i', { 'aria-hidden': 'true' }, '↻'), h('span', { class: 'key-name' }, text))));
-    for (const g of svg.querySelectorAll('.mark')) g.classList.toggle('on', Number(g.dataset.i) === openMark);
-  }
   for (const g of svg.querySelectorAll('.mark')) {
-    g.addEventListener('click', e => { e.stopPropagation(); showMark(Number(g.dataset.i)); });
-    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showMark(Number(g.dataset.i)); } });
+    const m = marks.find(x => x.i === Number(g.dataset.i));
+    g.addEventListener('click', e => { e.stopPropagation(); onMark(m); });
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMark(m); } });
   }
   const keys = series.map(sr => {
     const val = h('strong');
@@ -134,7 +125,9 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     return { sr, btn, val };
   });
   const add = onAdd ? h('button', { type: 'button', class: 'key-add', 'aria-label': 'Add a line to the chart', title: 'Add a line', onclick: onAdd }, '+') : null;
-  const legend = h('div', { class: 'legend', role: 'group', 'aria-label': 'Lines on the chart' }, keys.map(k => k.btn), add);
+  // The dot gets its own key, but only when there's one in view
+  const changeKey = marks.length ? h('span', { class: 'key change-key' }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Routine change')) : null;
+  const legend = h('div', { class: 'legend', role: 'group', 'aria-label': 'Lines on the chart' }, keys.map(k => k.btn), changeKey, add);
 
   function focus(i) {
     hair.setAttribute('x1', x(i));
@@ -155,7 +148,7 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   svg.addEventListener('pointerleave', () => focus(home));
   focus(home);
 
-  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when), legend, changeKeys);
+  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when), legend);
 }
 
 function summaryLabel(days, series) {

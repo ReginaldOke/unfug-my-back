@@ -352,7 +352,7 @@ export const routines = {
       if (!m.has(c.date)) m.set(c.date, []);
       const r = routines.get(c.routineId), name = r ? routineLabel(r) : 'Routine';
       // "Started …" and "Stopped …" already name the routine
-      m.get(c.date).push({ name, summary: c.summary, text: /^(Started|Stopped) /.test(c.summary) ? c.summary : `${name}: ${c.summary}` });
+      m.get(c.date).push({ routineId: c.routineId, name, summary: c.summary, text: /^(Started|Stopped) /.test(c.summary) ? c.summary : `${name}: ${c.summary}` });
     }
     return m;
   },

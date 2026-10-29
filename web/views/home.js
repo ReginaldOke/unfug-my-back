@@ -6,7 +6,7 @@ import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { notificationStatus } from '../lib/notify.js';
 import { rankInsights, quickSummary } from '../lib/analysis.js';
-import { localDate, addDays, fmtTime, minutesSince } from '../lib/dates.js';
+import { localDate, addDays, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
 import { ROLE_ICON, fmtAmount } from '../lib/labels.js';
 import { TrendChart, PALETTES, EXTRA_PALETTES } from './chart.js';
 import { PainCalendar } from './calendar.js';
@@ -235,7 +235,7 @@ function trendCard(today) {
 
   const changes = R.routines.changesByDate();
   const marks = dates.flatMap((d, i) => (d <= today && changes.has(d)
-    ? [{ i, texts: changes.get(d).map(c => c.text) }] : []));
+    ? [{ i, date: d, changes: changes.get(d), texts: changes.get(d).map(c => c.text) }] : []));
 
   return h('section', { class: 'card glass trend-card' },
     h('div', { class: 'row between' }, h('h2', {}, 'Trends'),
@@ -244,7 +244,7 @@ function trendCard(today) {
         segmented([[7, '1W'], [30, '1M'], [90, '3M']], ui.range, v => { ui.range = v; rerender(); }, 'Range'))),
     TrendChart({
       days, series, hidden: ui.hidden,
-      focus: dates.indexOf(today), fadeLeft: start > first, marks,
+      focus: dates.indexOf(today), fadeLeft: start > first, marks, onMark: openChangeSheet,
       onToggle: key => { ui.hidden.has(key) ? ui.hidden.delete(key) : ui.hidden.add(key); rerender(); },
       onAdd: () => openLinePicker([...auto].filter(Boolean)),
     }));
@@ -277,36 +277,85 @@ function openLinePicker(autoIds) {
       h('span', { class: 'grow' }, 'Steps', h('span', { class: 'hint block' }, 'Bring them in from Apple Health')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))), { onClose: () => rerender() });
 }
 
-function patternsCard(today) {
-  const data = R.snapshot();
-  const { ready } = rankInsights(data, R.factors.all(), today);
-  const rows = ready.slice(0, 5);
-  const head = h('h2', {}, 'Patterns');
-
-  // Not enough days yet: the shape of what's coming, faint, with one line
-  if (!rows.length) {
-    return h('section', { class: 'card glass patterns' }, head,
-      h('div', { class: 'pat-list ghost', 'aria-hidden': 'true' },
-        [0.55, -0.35, 0.2].map(w => patRow(null, w))),
-      h('p', { class: 'hint' }, 'A few more check-ins and the things that move your pain show up here.'));
-  }
-
-  // Each bar: how much higher (right, coral) or lower (left, teal) pain is on days with it
-  const scale = Math.max(2, ...rows.map(a => Math.abs(a.best.delta)));
-  return h('section', { class: 'card glass patterns' }, head,
-    h('div', { class: 'pat-list' }, rows.map(a => patRow(a, a.best.delta / scale))),
-    h('div', { class: 'pat-axis', 'aria-hidden': 'true' }, h('span'), h('span', {}, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))));
+/** What changed in your routines that day; each change opens its routine. */
+function openChangeSheet(mark) {
+  sheet(close => h('div', { class: 'stack change-sheet' },
+    h('div', {}, h('h2', {}, 'Routine change'), h('p', { class: 'hint' }, parseDate(mark.date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))),
+    h('div', { class: 'change-list' }, mark.changes.map(c => h('a', {
+      class: 'change-item', href: R.routines.get(c.routineId) && !R.routines.get(c.routineId).isArchived ? `#/routine/${c.routineId}` : null,
+      onclick: close,
+    },
+      h('span', { class: 'change-dot', 'aria-hidden': 'true' }),
+      h('span', { class: 'grow' }, h('strong', {}, c.name), h('span', { class: 'hint block' }, changeWhat(c))))))));
 }
 
-/** One factor: its name, then a bar growing out from the centre line. w is -1..1 of the half width. */
+// "Started Daily mobility" under the heading "Daily mobility" reads as just "Started"
+const changeWhat = c => (c.summary.endsWith(c.name) ? c.summary.slice(0, -c.name.length).trim() : c.summary);
+
+function patternsCard(today) {
+  const data = R.snapshot();
+  const factors = R.factors.all();
+  const { ready } = rankInsights(data, factors, today);
+  const head = h('h2', {}, 'Patterns');
+
+  // Before the first check-in: the shape of what's coming, softly tinted
+  if (!data.dailyEntries.length) {
+    return h('section', { class: 'card glass patterns' }, head,
+      h('div', { class: 'pat-list ghost', 'aria-hidden': 'true' }, [0.55, -0.4, 0.22].map(w => patRow(null, w))),
+      h('p', { class: 'hint' }, 'Check in to start seeing what moves your pain.'));
+  }
+
+  // Established patterns first; then early reads from the days so far, so there's something from day one
+  const solid = new Map(ready.filter(a => !a.early).map(a => [a.factor.id, a.best.delta]));
+  const rows = factors.map(f => {
+    if (solid.has(f.id)) return { factor: f, delta: solid.get(f.id), early: false };
+    const q = quickDelta(data, f.id);
+    return q && { factor: f, delta: q.delta, early: true };
+  }).filter(Boolean)
+    .sort((a, b) => (b.delta == null ? -1 : Math.abs(b.delta)) - (a.delta == null ? -1 : Math.abs(a.delta)))
+    .slice(0, 5);
+  if (!rows.length) {
+    return h('section', { class: 'card glass patterns' }, head,
+      h('div', { class: 'pat-list ghost', 'aria-hidden': 'true' }, [0.55, -0.4, 0.22].map(w => patRow(null, w))),
+      h('p', { class: 'hint' }, 'Log a stressor or helper in your check-in to see it here.'));
+  }
+
+  const scale = Math.max(2, ...rows.map(a => Math.abs(a.delta ?? 0)));
+  const allEarly = rows.every(a => a.early);
+  return h('section', { class: 'card glass patterns' }, head,
+    h('div', { class: 'pat-list' }, rows.map(a => patRow(a, (a.delta ?? 0) / scale))),
+    h('div', { class: 'pat-axis', 'aria-hidden': 'true' }, h('span'), h('span', {}, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
+    allEarly ? h('p', { class: 'hint pat-note' }, 'Early days. Sharper with every check-in.') : null);
+}
+
+/**
+ * A first read from however many days there are: pain on check-in days with the factor minus days
+ * without. delta is null while every check-in had it (nothing to compare yet). Null if never logged.
+ */
+function quickDelta(data, factorId) {
+  const pain = new Map(data.dailyEntries.map(e => [e.date, e.painScore]));
+  const withDays = new Set(data.factorLogs.filter(l => l.factorId === factorId && l.value > 0 && pain.has(l.date)).map(l => l.date));
+  if (!withDays.size) return null;
+  const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const withP = [...withDays].map(d => pain.get(d));
+  const withoutP = [...pain].filter(([d]) => !withDays.has(d)).map(([, p]) => p);
+  return { delta: withoutP.length ? mean(withP) - mean(withoutP) : null };
+}
+
+/** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).
+    No difference to show yet (only days with it so far): a dot on the line in its role's colour. */
 function patRow(a, w) {
+  const name = h('span', { class: 'pat-name' }, a ? a.factor.name : '');
+  if (a && a.delta == null) {
+    const dot = h('span', { class: `pat-dot ${a.factor.role === 'helper' ? 'helper' : 'stressor'}` });
+    return h('a', { class: 'pat-row', href: `#/factor/${a.factor.id}`, 'aria-label': `${a.factor.name}: logged, nothing to compare yet` }, name, h('span', { class: 'pat-track' }, dot));
+  }
   const up = w > 0;
   const bar = h('span', { class: `pat-bar ${up ? 'up' : 'down'}${a?.early ? ' early' : ''}`, style: `--w:${Math.abs(w) * 100}%` },
-    a ? h('b', {}, `${up ? '+' : '−'}${Math.abs(a.best.delta).toFixed(1)}`) : null);
-  const inner = [h('span', { class: 'pat-name' }, a ? a.factor.name : ''), h('span', { class: 'pat-track' }, bar)];
-  if (!a) return h('div', { class: 'pat-row' }, inner);
-  const label = `${a.factor.name}: pain ${Math.abs(a.best.delta).toFixed(1)} ${up ? 'higher' : 'lower'} on days with it${a.early ? ', early sign' : ''}`;
-  return h('a', { class: 'pat-row', href: `#/factor/${a.factor.id}`, 'aria-label': label }, inner);
+    a ? h('b', {}, `${up ? '+' : '−'}${Math.abs(a.delta).toFixed(1)}`) : null);
+  if (!a) return h('div', { class: 'pat-row' }, name, h('span', { class: 'pat-track' }, bar));
+  const label = `${a.factor.name}: pain ${Math.abs(a.delta).toFixed(1)} ${up ? 'higher' : 'lower'} on days with it${a.early ? ', early read' : ''}`;
+  return h('a', { class: 'pat-row', href: `#/factor/${a.factor.id}`, 'aria-label': label }, name, h('span', { class: 'pat-track' }, bar));
 }
 
 function movementTile() {

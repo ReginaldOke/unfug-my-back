@@ -67,22 +67,23 @@ body.in-flow { padding-bottom: 0; }
 /* Header glow (version 2): the logo's red and a deep navy across the very top, settling into a long
    grainy grey-black that runs most of the way down the screen. Version 1 is saved in design/. */
 .aura {
-  position: absolute; top: 0; left: 0; right: 0; height: 1000px; z-index: -1; pointer-events: none; overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 72%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 72%, transparent 100%);
+  position: absolute; top: 0; left: 0; right: 0; height: 1600px; z-index: -1; pointer-events: none; overflow: hidden;
+  /* A long eased fade, so the grainy grey melts into the black rather than stopping */
+  --fade: linear-gradient(180deg, #000 0%, #000 25%, rgba(0, 0, 0, 0.9) 38%, rgba(0, 0, 0, 0.72) 50%, rgba(0, 0, 0, 0.5) 62%, rgba(0, 0, 0, 0.3) 74%, rgba(0, 0, 0, 0.14) 86%, rgba(0, 0, 0, 0.04) 95%, transparent 100%);
+  -webkit-mask-image: var(--fade); mask-image: var(--fade);
 }
 .aura::before {
-  content: ''; position: absolute; inset: -12% -30% 0;
+  content: ''; position: absolute; inset: -7.5% -30% 0;
   /* Colour stays in the top ~250px: navy, crimson into coral, the logo's warm white catching the edge */
   background:
-    radial-gradient(20% 5% at 70% 17%, rgba(255, 222, 210, 0.7), transparent 70%),
-    radial-gradient(52% 7% at 58% 20%, rgba(236, 78, 52, 0.95), transparent 72%),
-    radial-gradient(46% 6% at 38% 24%, rgba(196, 48, 40, 0.8), transparent 72%),
-    radial-gradient(60% 7% at 44% 13%, rgba(30, 44, 112, 0.95), transparent 72%),
-    radial-gradient(40% 6% at 20% 19%, rgba(120, 30, 52, 0.75), transparent 72%),
-    radial-gradient(30% 6% at 88% 25%, rgba(242, 150, 128, 0.55), transparent 72%),
+    radial-gradient(20% 3.12% at 70% 10.62%, rgba(255, 222, 210, 0.7), transparent 70%),
+    radial-gradient(52% 4.38% at 58% 12.50%, rgba(236, 78, 52, 0.95), transparent 72%),
+    radial-gradient(46% 3.75% at 38% 15.00%, rgba(196, 48, 40, 0.8), transparent 72%),
+    radial-gradient(60% 4.38% at 44% 8.12%, rgba(30, 44, 112, 0.95), transparent 72%),
+    radial-gradient(40% 3.75% at 20% 11.88%, rgba(120, 30, 52, 0.75), transparent 72%),
+    radial-gradient(30% 3.75% at 88% 15.62%, rgba(242, 150, 128, 0.55), transparent 72%),
     /* then a soft lift so the grain reads as grey-black rather than vanishing into the charcoal */
-    linear-gradient(180deg, transparent 22%, rgba(34, 34, 38, 0.32) 34%, rgba(26, 26, 30, 0.26) 70%, rgba(20, 20, 24, 0.12) 100%);
+    linear-gradient(180deg, transparent 14%, rgba(34, 34, 38, 0.3) 24%, rgba(30, 30, 34, 0.28) 45%, rgba(24, 24, 28, 0.2) 70%, rgba(20, 20, 24, 0.1) 100%);
   transform: rotate(-10deg);
   filter: blur(22px) saturate(120%);
   animation: aura-drift 24s ease-in-out infinite alternate;
@@ -1251,12 +1252,12 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
 [data-theme="light"] .aura::before {
   opacity: 0.55;
   background:
-    radial-gradient(20% 5% at 70% 17%, rgba(255, 236, 226, 0.9), transparent 70%),
-    radial-gradient(52% 7% at 58% 20%, rgba(240, 110, 84, 0.85), transparent 72%),
-    radial-gradient(46% 6% at 38% 24%, rgba(222, 92, 80, 0.6), transparent 72%),
-    radial-gradient(60% 7% at 44% 13%, rgba(80, 100, 190, 0.7), transparent 72%),
-    radial-gradient(40% 6% at 20% 19%, rgba(190, 90, 120, 0.5), transparent 72%),
-    radial-gradient(30% 6% at 88% 25%, rgba(250, 170, 150, 0.6), transparent 72%);
+    radial-gradient(20% 3.12% at 70% 10.62%, rgba(255, 236, 226, 0.9), transparent 70%),
+    radial-gradient(52% 4.38% at 58% 12.50%, rgba(240, 110, 84, 0.85), transparent 72%),
+    radial-gradient(46% 3.75% at 38% 15.00%, rgba(222, 92, 80, 0.6), transparent 72%),
+    radial-gradient(60% 4.38% at 44% 8.12%, rgba(80, 100, 190, 0.7), transparent 72%),
+    radial-gradient(40% 3.75% at 20% 11.88%, rgba(190, 90, 120, 0.5), transparent 72%),
+    radial-gradient(30% 3.75% at 88% 15.62%, rgba(250, 170, 150, 0.6), transparent 72%);
 }
 [data-theme="light"] .aura::after { opacity: 0.25; }
 [data-theme="light"] body::after { opacity: 0.09; mix-blend-mode: multiply; }
@@ -1428,34 +1429,83 @@ body:not(.on-home) .ambient::after {
 .pat-axis > span:last-child { display: flex; justify-content: space-between; }
 .pat-axis small { font-size: 11px; color: var(--ink-3); }
 /* Before there's enough data: faint placeholder bars */
-.pat-list.ghost .pat-bar { background: rgba(255, 255, 255, 0.1); box-shadow: none; }
-.pat-list.ghost .pat-name::before { content: ''; display: block; width: 70%; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
 [data-theme="light"] .pat-track::before { background: rgba(0, 0, 0, 0.12); }
 [data-theme="light"] .pat-row:active { background: rgba(0, 0, 0, 0.04); }
-[data-theme="light"] .pat-list.ghost .pat-bar, [data-theme="light"] .pat-list.ghost .pat-name::before { background: rgba(0, 0, 0, 0.08); }
 
-/* Routine change on the chart: a dotted line and a small ↻ ring on the baseline; tap it to show what changed */
+
+/* Patterns before the first check-in: soft coral and teal hints with a slow shimmer, not grey blocks */
+.pat-list.ghost .pat-bar { box-shadow: none; animation: pat-grow .8s var(--ease-out) both, pat-breathe 3.2s ease-in-out 1s infinite alternate; }
+.pat-list.ghost .pat-bar.up { background: linear-gradient(90deg, rgba(226, 104, 127, 0.28), rgba(244, 144, 138, 0.12)); }
+.pat-list.ghost .pat-bar.down { background: linear-gradient(270deg, rgba(79, 179, 166, 0.28), rgba(116, 212, 192, 0.12)); }
+.pat-list.ghost .pat-name::before { content: ''; display: block; width: 64%; height: 7px; border-radius: 4px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)); }
+.pat-list.ghost .pat-track::before { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.12), transparent); }
+@keyframes pat-breathe { to { opacity: 0.55; } }
+[data-theme="light"] .pat-list.ghost .pat-name::before { background: linear-gradient(90deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.02)); }
+[data-theme="light"] .pat-list.ghost .pat-track::before { background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.12), transparent); }
+/* Logged but nothing to compare yet: a dot on the line in its role's colour, gently pulsing */
+.pat-dot { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; animation: pat-pulse 2.4s ease-in-out infinite; }
+.pat-dot.stressor { background: radial-gradient(circle at 35% 30%, #f8cf98, #e8875a); box-shadow: 0 0 0 4px rgba(243, 180, 110, 0.14); }
+.pat-dot.helper { background: radial-gradient(circle at 35% 30%, #a6ead9, #4fb3a6); box-shadow: 0 0 0 4px rgba(116, 212, 192, 0.14); }
+@keyframes pat-pulse { 50% { transform: scale(0.85); } }
+.pat-note { margin-top: -4px; }
+@media (prefers-reduced-motion: reduce) { .pat-dot, .pat-list.ghost .pat-bar { animation: none; } }
+/* Settings section titles read like the list rows beside them */
+.card h2.row-title { font-size: 16px; font-weight: 400; color: var(--ink); letter-spacing: 0; }
+
+/* ---------- Check-in sliders in light mode: glass tube, glossy fill, coloured glow ---------- */
+[data-theme="light"] .vslider {
+  background:
+    radial-gradient(90% 34% at 50% 0%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.1));
+  -webkit-backdrop-filter: blur(14px) saturate(180%); backdrop-filter: blur(14px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    inset 0 -18px 30px -20px rgba(90, 60, 45, 0.18),
+    0 26px 50px -24px rgba(90, 60, 45, 0.35);
+}
+/* The fill: the value's colour, softened for paper, with a vertical sheen so it reads as glass */
+[data-theme="light"] .vslider.hued .vs-fill {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, 0.22) 100%),
+    linear-gradient(180deg, hsl(var(--h, 135) 78% 70%), hsl(var(--h, 135) 66% 54%));
+}
+[data-theme="light"] .vslider.hued {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 26px 50px -20px hsl(var(--h, 135) 70% 50% / 0.5);
+}
+[data-theme="light"] .vslider.hued.dragging, [data-theme="light"] .vslider.hued:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 30px 64px -20px hsl(var(--h, 135) 75% 50% / 0.6);
+}
+[data-theme="light"] .vslider.hued .vs-glyph.dark { color: hsl(var(--h, 135) 50% 20% / 0.72); }
+[data-theme="light"] .vslider .vs-glyph:not(.dark) { color: rgba(29, 28, 31, 0.5); }
+
+/* Routine change: a small glowing white dot on the chart's baseline, like a pearl among the coloured
+   lines; the key shows the same dot, and tapping it opens the details */
 .trend .mark { cursor: pointer; outline: none; }
-.trend .mark line { stroke: rgba(235, 235, 245, 0.32); stroke-width: 1; stroke-dasharray: 0.5 4; stroke-linecap: round; transition: stroke .2s; }
+.trend .mark line { stroke: rgba(255, 255, 255, 0.18); stroke-width: 1; stroke-dasharray: 0.5 4; stroke-linecap: round; }
 .trend .mark .mark-hit { fill: transparent; }
-.trend .mark .mark-ring { fill: #1b1b1f; stroke: rgba(235, 235, 245, 0.5); stroke-width: 1; transition: fill .2s, stroke .2s; }
-.trend .mark .mark-glyph { fill: rgba(235, 235, 245, 0.8); font: 600 8px var(--font); pointer-events: none; }
-.trend .mark.on line { stroke: rgba(235, 235, 245, 0.7); }
-.trend .mark.on .mark-ring, .trend .mark:focus-visible .mark-ring { fill: #f5f5f7; stroke: #f5f5f7; }
-.trend .mark.on .mark-glyph { fill: #141416; }
-/* …and in the key while it's open, styled like the line keys */
-.change-keys { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 8px; animation: rise-in .3s var(--ease-out); }
-.change-keys[hidden] { display: none; }
+.trend .mark .mark-glow { fill: rgba(255, 255, 255, 0.16); filter: blur(2.5px); transition: fill .2s; }
+.trend .mark .mark-dot { fill: #fbfbfd; filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.7)); transition: transform .25s var(--spring); transform-box: fill-box; transform-origin: center; }
+.trend .mark:hover .mark-dot, .trend .mark:focus-visible .mark-dot { transform: scale(1.3); }
+.trend .mark:focus-visible .mark-glow { fill: rgba(255, 255, 255, 0.3); }
 .key.change-key { cursor: default; }
-.key.change-key i { width: 16px; height: 16px; border-radius: 50%; background: none; border: 1px solid rgba(235, 235, 245, 0.5); display: inline-grid; place-items: center; font-size: 9px; font-style: normal; color: var(--ink-2); }
-[data-theme="light"] .trend .mark line { stroke: rgba(0, 0, 0, 0.25); }
-[data-theme="light"] .trend .mark .mark-ring { fill: #fbfaf8; stroke: rgba(0, 0, 0, 0.4); }
-[data-theme="light"] .trend .mark .mark-glyph { fill: rgba(0, 0, 0, 0.7); }
-[data-theme="light"] .trend .mark.on line { stroke: rgba(0, 0, 0, 0.55); }
-[data-theme="light"] .trend .mark.on .mark-ring { fill: #1d1c1f; stroke: #1d1c1f; }
-[data-theme="light"] .trend .mark.on .mark-glyph { fill: #fff; }
-[data-theme="light"] .key.change-key i { border-color: rgba(0, 0, 0, 0.35); }
-.key.change-key, .key.change-key .key-name { text-decoration: none; opacity: 1; color: var(--ink-2); }
-.key.change-key { max-width: 100%; align-items: flex-start; }
-.key.change-key .key-name { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; }
-.key.change-key i { font-size: 10px; color: var(--ink); border-color: rgba(235, 235, 245, 0.6); margin-top: 1px; }
+.key.change-key, .key.change-key .key-name { text-decoration: none; color: var(--ink-2); }
+.key.change-key i { width: 7px; height: 7px; border-radius: 50%; background: #fbfbfd; opacity: 1; box-shadow: 0 0 6px rgba(255, 255, 255, 0.6); margin: 0 4px; }
+[data-theme="light"] .trend .mark line { stroke: rgba(0, 0, 0, 0.16); }
+[data-theme="light"] .trend .mark .mark-glow { fill: rgba(255, 255, 255, 0.9); filter: blur(2px); }
+[data-theme="light"] .trend .mark .mark-dot { fill: #fff; stroke: rgba(29, 28, 31, 0.28); stroke-width: 0.8; filter: drop-shadow(0 1px 2px rgba(60, 40, 30, 0.25)); }
+[data-theme="light"] .key.change-key i { background: #fff; box-shadow: 0 0 0 0.8px rgba(29, 28, 31, 0.3), 0 1px 3px rgba(60, 40, 30, 0.2); }
+
+/* The details sheet */
+.change-sheet .change-list { display: flex; flex-direction: column; }
+.change-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit; }
+.change-item:first-child { border-top: 0; }
+.change-item strong { font-weight: 500; }
+.change-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #fbfbfd; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
+[data-theme="light"] .change-dot { background: #fff; box-shadow: 0 0 0 1px rgba(29, 28, 31, 0.3); }
