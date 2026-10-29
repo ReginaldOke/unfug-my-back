@@ -3,7 +3,7 @@ import { localDate } from './dates.js';
 
 export const ANALYSIS_PROMPT = `You are analysing a personal back pain diary exported as JSON.
 Pain, stress and sleepQuality are 0 to 10 (sleepQuality is the night before; 10 is slept well). healthDays has daily steps and sleep from Apple Health.
-factorLogs may carry intensity: 1 easy, 2 moderate, 3 hard. routineChanges marks days the movement routine changed: compare pain before and after. Factors have a role (trigger, helper, unsure); the app calls triggers "stressors".
+factorLogs may carry intensity from 1 (easy) through 2 (moderate) to 3 (all out), sometimes in between (e.g. 2.4). routineChanges marks days the movement routine changed: compare pain before and after. Factors have a role (trigger, helper, unsure); the app calls triggers "stressors".
 1. Summarise pain trends and flare frequency over the period.
 2. For each factor, compare pain on days with vs without it at same day, next day and two days later.
 3. Check dose response for minute and count factors.

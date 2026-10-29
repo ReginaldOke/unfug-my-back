@@ -18,7 +18,10 @@
   --glass-solid: rgba(22, 22, 24, 0.78);
   --glass-edge: rgba(255, 255, 255, 0.06);
   --glass-shadow: inset 0 0 28px rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.18), 0 22px 44px -22px rgba(0, 0, 0, 0.6);
-  --glass-blur: blur(14px) saturate(170%) brightness(1.04);
+  /* Cards and tiles are clear tinted glass: the grain shows through. Only layers floating over content
+     (tab bar, banners, sheets) blur what's behind them. */
+  --glass-blur: none;
+  --float-blur: blur(18px) saturate(170%);
   /* Specular rim: bright top-left, fading round the edge, a softer catch bottom-right */
   --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 22%, rgba(255, 255, 255, 0.02) 48%, rgba(255, 255, 255, 0.05) 72%, rgba(255, 255, 255, 0.26) 100%);
   --ease-out: cubic-bezier(.2, .8, .2, 1);
@@ -51,10 +54,10 @@ body.in-flow { padding-bottom: 0; }
 .ambient {
   position: fixed; inset: -20%; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(34% 26% at 20% 16%, rgba(190, 172, 160, 0.20), transparent 70%),
-    radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.16), transparent 70%),
-    radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.14), transparent 72%),
-    radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.08), transparent 70%),
+    radial-gradient(34% 26% at 20% 16%, rgba(190, 172, 160, 0.12), transparent 70%),
+    radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.09), transparent 70%),
+    radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.08), transparent 72%),
+    radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.05), transparent 70%),
     linear-gradient(180deg, #131315 0%, #0d0d0f 60%, #0a0a0b 100%);
   filter: blur(24px);
   animation: drift 48s ease-in-out infinite alternate;
@@ -79,7 +82,7 @@ body.in-flow { padding-bottom: 0; }
     radial-gradient(40% 6% at 20% 19%, rgba(120, 30, 52, 0.75), transparent 72%),
     radial-gradient(30% 6% at 88% 25%, rgba(242, 150, 128, 0.55), transparent 72%),
     /* then a soft lift so the grain reads as grey-black rather than vanishing into the charcoal */
-    linear-gradient(180deg, transparent 22%, rgba(44, 44, 50, 0.45) 34%, rgba(34, 34, 40, 0.38) 70%, rgba(26, 26, 30, 0.2) 100%);
+    linear-gradient(180deg, transparent 22%, rgba(34, 34, 38, 0.32) 34%, rgba(26, 26, 30, 0.26) 70%, rgba(20, 20, 24, 0.12) 100%);
   transform: rotate(-10deg);
   filter: blur(22px) saturate(120%);
   animation: aura-drift 24s ease-in-out infinite alternate;
@@ -692,7 +695,7 @@ details.more[open] summary { margin-bottom: 10px; }
 
 /* ---------- Trends chart (reference: multi-series glow areas, day ruler on top) ---------- */
 .trend-card { gap: 10px; }
-.trend-wrap { display: flex; flex-direction: column; gap: 12px; margin: 0 -8px; }
+.trend-wrap { display: flex; flex-direction: column; gap: 12px; margin: 0 -6px; }
 .trend { width: 100%; height: auto; display: block; touch-action: pan-y; overflow: visible; }
 .trend .day-line { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
 .trend .baseline { stroke: rgba(255, 255, 255, 0.1); }
@@ -1012,16 +1015,21 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 }
 .cal-cell span { position: relative; z-index: 1; }
 .cal-cell::before { content: ''; position: absolute; inset: 12%; border-radius: 50%; transition: transform .25s var(--spring), box-shadow .2s; }
-.cal-cell.logged { color: var(--ink); }
-.cal-cell.logged::before { background: var(--dot); }
-.cal-cell.today::before { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.7); }
-.cal-cell.sel::before { transform: scale(1.12); box-shadow: 0 0 0 2px #fff; }
+/* A logged day: a soft glassy dot in the chart's colours, lit from the top-left, with a faint glow */
+.cal-cell.logged { color: #fff; font-weight: 500; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.cal-cell.logged::before {
+  background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--dot) 70%, #fff), var(--dot) 45%, var(--dot2) 100%);
+  opacity: 0.88; box-shadow: 0 6px 16px -6px var(--dot2), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.cal-cell.today:not(.logged)::before { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.5); }
+.cal-cell.today.logged::before { box-shadow: 0 6px 16px -6px var(--dot2), inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.18); }
+.cal-cell.sel::before { transform: scale(1.1); opacity: 1; box-shadow: 0 8px 20px -6px var(--dot2, transparent), 0 0 0 2px var(--bg), 0 0 0 3.5px rgba(255, 255, 255, 0.85); }
 .cal-cell.future { opacity: 0.35; cursor: default; }
 .cal-cell.empty { cursor: default; }
 .cal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }
 .cal-foot strong { font-weight: 500; }
 .cal-scale { display: inline-flex; align-items: center; gap: 4px; }
-.cal-scale i { width: 10px; height: 10px; border-radius: 50%; }
+.cal-scale i { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 32% 26%, var(--dot), var(--dot2)); }
 .cal-scale small { font-size: 11px; color: var(--ink-3); margin: 0 2px; }
 
 /* ---------- Routine move figure ---------- */
@@ -1036,13 +1044,7 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .move-figure { filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); }
 
 /* ---------- Routine changes on the trend chart ---------- */
-.trend .mark line { stroke: rgba(235, 235, 245, 0.26); stroke-width: 1; stroke-dasharray: 0.5 4; stroke-linecap: round; transition: stroke .2s; }
-.trend .mark circle { fill: #15151a; stroke: rgba(235, 235, 245, 0.45); stroke-width: 1; transition: stroke .2s, fill .2s; }
-.trend .mark.on line { stroke: rgba(235, 235, 245, 0.6); }
-.trend .mark.on circle { fill: #fff; stroke: #fff; }
-.trend-readout .mark-note { flex-basis: 100%; color: var(--ink-2); }
 .trend-readout .mark-note:empty { display: none; }
-.trend-readout .mark-note::before { content: '↻ '; color: var(--ink-3); }
 
 /* Routine change on the calendar: a small dot under the day */
 .cal-cell.changed::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(235, 235, 245, 0.55); }
@@ -1186,9 +1188,6 @@ input.log-name::placeholder { color: var(--ink-3); }
 /* How hard did you go: a three-stop slider, green to yellow to red */
 .effort-field { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
 .effort-word { font-size: 14px; color: var(--ink-2); transition: color .2s; }
-.effort-field:has(.effort-range[data-level="1"]) .effort-word { color: #7fd98f; }
-.effort-field:has(.effort-range[data-level="2"]) .effort-word { color: #f2cf5b; }
-.effort-field:has(.effort-range[data-level="3"]) .effort-word { color: #ff7a6b; }
 .effort-range { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: none; margin: 0; cursor: pointer; }
 .effort-range::-webkit-slider-runnable-track {
   height: 6px; border-radius: 3px;
@@ -1206,10 +1205,6 @@ input.log-name::placeholder { color: var(--ink-3); }
 
 .link-danger { display: block; margin: 28px auto 8px; background: none; border: 0; color: #ff8a7d; font: inherit; font-size: 14px; opacity: .8; cursor: pointer; }
 
-/* Player: − and + around what you did */
-.stepper { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 6px 0 4px; }
-.stepper .icon-btn { width: 46px; height: 46px; font-size: 22px; }
-.stepper .dose-big { min-width: 120px; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
 .routine-page { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 
 /* Routine days: a group card on the list, tabs on the routine page */
@@ -1239,11 +1234,10 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
   --red-2: #c9533f;
   --red-glow: rgba(216, 96, 76, 0.25);
   --helper: #1d1c1f;
-  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.5) 45%, rgba(255, 255, 255, 0.6) 100%);
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.2) 45%, rgba(255, 255, 255, 0.3) 100%);
   --glass-solid: rgba(255, 255, 255, 0.85);
   --glass-edge: rgba(0, 0, 0, 0.05);
   --glass-shadow: inset 0 0 24px rgba(255, 255, 255, 0.5), 0 1px 2px rgba(60, 40, 30, 0.06), 0 18px 40px -22px rgba(60, 40, 30, 0.28);
-  --glass-blur: blur(14px) saturate(160%);
   --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.5) 30%, rgba(0, 0, 0, 0.04) 60%, rgba(255, 255, 255, 0.7) 100%);
   --well: rgba(0, 0, 0, 0.05);
 }
@@ -1265,7 +1259,7 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
     radial-gradient(30% 6% at 88% 25%, rgba(250, 170, 150, 0.6), transparent 72%);
 }
 [data-theme="light"] .aura::after { opacity: 0.25; }
-[data-theme="light"] body::after { opacity: 0.05; mix-blend-mode: multiply; }
+[data-theme="light"] body::after { opacity: 0.09; mix-blend-mode: multiply; }
 
 /* Surfaces that were dark glass */
 [data-theme="light"] .sheet { background: rgba(250, 248, 245, 0.72); }
@@ -1296,9 +1290,6 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
 [data-theme="light"] .role-dot.role-trigger, [data-theme="light"] .link-danger { color: #c4402f; }
 [data-theme="light"] .pill-badge.up { color: #a8392a; }
 [data-theme="light"] .routine-day.done, [data-theme="light"] .routine-card .well.done-mark { color: #2a9a83; }
-[data-theme="light"] .effort-field:has(.effort-range[data-level="1"]) .effort-word { color: #3f9a52; }
-[data-theme="light"] .effort-field:has(.effort-range[data-level="2"]) .effort-word { color: #b08614; }
-[data-theme="light"] .effort-field:has(.effort-range[data-level="3"]) .effort-word { color: #c4402f; }
 [data-theme="light"] .did-input { border-color: rgba(0, 0, 0, 0.08); background: rgba(255, 255, 255, 0.6); }
 [data-theme="light"] .routine-page .log-check { border-color: rgba(0, 0, 0, 0.22); background: rgba(255, 255, 255, 0.6); }
 [data-theme="light"] .add-card, [data-theme="light"] .chip.day-add { border-color: rgba(0, 0, 0, 0.18); }
@@ -1317,3 +1308,154 @@ body:not(.on-home) .ambient { background: var(--bg); }
 .appearance { flex-direction: row; align-items: center; }
 .appearance .segmented { flex: none; width: auto; }
 .appearance .segmented button { padding: 0 14px; }
+
+#tabs, .banner { -webkit-backdrop-filter: var(--float-blur); backdrop-filter: var(--float-blur); }
+[data-theme="light"] .routine-tile .seg-dots i.on { background: linear-gradient(90deg, #4fbfae, #74d4c0); }
+
+/* Charts and calendar in light mode: dark ink where dark mode uses white */
+[data-theme="light"] .chart .gridline, [data-theme="light"] .trend .day-line { stroke: rgba(0, 0, 0, 0.07); }
+[data-theme="light"] .trend .baseline { stroke: rgba(0, 0, 0, 0.12); }
+[data-theme="light"] .chart .hair { stroke: rgba(0, 0, 0, 0.35); }
+[data-theme="light"] .chart .hot-dot, [data-theme="light"] .chart .axis-dot { fill: #1d1c1f; }
+[data-theme="light"] .chart .factor-mark { fill: rgba(0, 0, 0, 0.55); }
+[data-theme="light"] .chart .flare-mark { fill: #d8604c; }
+[data-theme="light"] .chart .axis-today { fill: #fff; }
+[data-theme="light"] .trend .day-label.on text { fill: #1d1c1f; }
+[data-theme="light"] .trend .line { mix-blend-mode: multiply; }
+[data-theme="light"] .trend .hair { stroke: #1d1c1f; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.15)); }
+[data-theme="light"] .cal-cell.changed::after, [data-theme="light"] .cal-key-change::before { background: rgba(0, 0, 0, 0.4); }
+
+/* ---------- Light mode glass, polished ----------
+   Clear glass rather than white plastic: a thin tinted body, a bright specular catch along the top,
+   a hairline inner rim, and a soft warm shadow so each piece lifts off the paper. */
+[data-theme="light"] {
+  --lg-body: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.06));
+  --lg-catch: radial-gradient(80% 120% at 22% -10%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 62%);
+  --lg-edge: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(120, 90, 70, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  --lg-lift: 0 10px 28px -14px rgba(90, 60, 45, 0.32), 0 2px 6px -2px rgba(90, 60, 45, 0.12);
+}
+[data-theme="light"] .btn.primary, [data-theme="light"] .btn.glass {
+  color: var(--ink);
+  background: var(--lg-catch), var(--lg-body);
+  -webkit-backdrop-filter: blur(10px) saturate(180%); backdrop-filter: blur(10px) saturate(180%);
+  box-shadow: var(--lg-edge), var(--lg-lift);
+}
+[data-theme="light"] .btn.primary:active, [data-theme="light"] .btn.glass:active { box-shadow: var(--lg-edge), 0 4px 12px -8px rgba(90, 60, 45, 0.3); }
+[data-theme="light"] .icon-btn.glass, [data-theme="light"] .well.action, [data-theme="light"] .well {
+  background: var(--lg-catch), linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.14));
+  box-shadow: var(--lg-edge), 0 6px 16px -10px rgba(90, 60, 45, 0.3);
+}
+[data-theme="light"] .chip:not(.on):not(.day-add) { background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18)); box-shadow: var(--lg-edge); }
+[data-theme="light"] .segmented { background: rgba(120, 90, 70, 0.07); box-shadow: inset 0 1px 2px rgba(90, 60, 45, 0.08); }
+[data-theme="light"] .segmented button.on, [data-theme="light"] .chip.on { box-shadow: 0 4px 12px -6px rgba(29, 28, 31, 0.5); }
+[data-theme="light"] #tabs {
+  background: var(--lg-catch), linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.2));
+  box-shadow: var(--lg-edge), 0 18px 40px -18px rgba(90, 60, 45, 0.4);
+}
+[data-theme="light"] #tabs a.active { background: rgba(255, 255, 255, 0.7); box-shadow: var(--lg-edge), 0 4px 12px -6px rgba(90, 60, 45, 0.25); }
+[data-theme="light"] .card, [data-theme="light"] .tile:not(.add), [data-theme="light"] .select-card:not(.add) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 16px 36px -22px rgba(90, 60, 45, 0.3); }
+/* Choice cards: icons stay readable when unpicked; the tick ring shows */
+[data-theme="light"] .select-card .well { opacity: 0.9; filter: grayscale(0.35); }
+[data-theme="light"] .select-card .tick { border-color: rgba(0, 0, 0, 0.18); }
+[data-theme="light"] .select-card[aria-pressed="true"] { background: linear-gradient(160deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.45)); }
+[data-theme="light"] .progress i { background: rgba(0, 0, 0, 0.08); }
+[data-theme="light"] .progress i.done { background: rgba(29, 28, 31, 0.35); }
+[data-theme="light"] .progress i.now { background: #1d1c1f; }
+[data-theme="light"] .fig-floor { stroke: rgba(0, 0, 0, 0.12); }
+[data-theme="light"] .fig-limb.far { stroke: rgba(29, 28, 31, 0.25); }
+[data-theme="light"] .move-figure { filter: drop-shadow(0 10px 24px rgba(90, 60, 45, 0.18)); }
+[data-theme="light"] .key:not(.on) .key-name { text-decoration-color: rgba(0, 0, 0, 0.3); }
+[data-theme="light"] .cal-cell.today:not(.logged)::before { box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.3); }
+[data-theme="light"] .cal-cell.sel::before { box-shadow: 0 8px 20px -6px var(--dot2, transparent), 0 0 0 2px var(--bg), 0 0 0 3.5px rgba(29, 28, 31, 0.8); }
+
+/* Other screens: no colour, but the same film grain as Today's header, so the plain background
+   still has texture */
+body:not(.on-home) .ambient { filter: none; animation: none; }
+body:not(.on-home) .ambient::after {
+  content: ''; position: absolute; inset: 0; opacity: 0.075;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+[data-theme="light"] body:not(.on-home) .ambient::after { opacity: 0.1; filter: invert(1); }
+
+/* Tab bar icons: one line set, same size and stroke */
+#tabs a svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#tabs a.tab-cta svg { stroke-width: 2; }
+#tabs a[data-path="/settings"] svg { width: 21px; height: 21px; }
+.tile .tile-top > h2 { font-size: 15px; font-weight: 400; color: var(--ink-2); letter-spacing: -0.01em; }
+.day-tabs .chip.day-add { border: 1px dashed rgba(255, 255, 255, 0.24); color: var(--ink-2); }
+.day-tabs .chip.day-add.round { width: 36px; padding: 0; justify-content: center; font-size: 18px; font-weight: 300; }
+[data-theme="light"] .day-tabs .chip.day-add { border-color: rgba(0, 0, 0, 0.2); }
+/* Player: the routine page's box, bigger */
+.did-input.did-big { width: min(100%, 280px); max-width: none; min-height: 60px; border-radius: 20px; text-align: center; font-size: 22px; font-weight: 300; margin-top: 4px; }
+/* The word's colour follows the slider continuously (--h is set as you drag) */
+.effort-word { color: hsl(var(--h, 48) 70% 66%); transition: none; font-variant-numeric: tabular-nums; }
+[data-theme="light"] .effort-word { color: hsl(var(--h, 48) 62% 36%); }
+.effort-range::-webkit-slider-thumb { transition: transform .2s var(--spring), box-shadow .2s; }
+.effort-range:active::-webkit-slider-thumb { transform: scale(1.18); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 6px hsl(var(--h, 48) 70% 60% / 0.18); }
+/* AI card: title with its line right under it, the button centred on the right */
+.tile.ai-tile { min-height: 0; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; text-align: left; }
+.ai-tile .ai-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ai-tile .ai-text h2 { font-size: 15px; font-weight: 400; color: var(--ink-2); letter-spacing: -0.01em; }
+.ai-tile .ai-text .hint { font-size: 13px; line-height: 1.4; }
+.ai-tile > .well { flex: none; }
+
+/* ---------- Patterns: a diverging bar per factor ----------
+   The centre line is "no difference". A bar to the right (coral) means more pain on days with it, to the
+   left (teal) less. Its length is the size of the difference; early signs are fainter. */
+.patterns { gap: 12px; }
+.pat-list { display: flex; flex-direction: column; }
+.pat-row, .pat-axis { display: grid; grid-template-columns: minmax(0, 38%) 1fr; align-items: center; column-gap: 12px; }
+.pat-row { min-height: 38px; text-decoration: none; color: inherit; border-radius: 12px; -webkit-tap-highlight-color: transparent; transition: background .2s; }
+.pat-row:active { background: rgba(255, 255, 255, 0.05); }
+.pat-name { font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pat-track { position: relative; height: 22px; }
+.pat-track::before { content: ''; position: absolute; left: 50%; top: -8px; bottom: -8px; width: 1px; background: rgba(255, 255, 255, 0.12); }
+.pat-bar {
+  position: absolute; top: 7px; height: 8px; width: calc(var(--w) * 0.4); border-radius: 4px;
+  animation: pat-grow .8s var(--ease-out) both;
+}
+.pat-bar.up { left: 50%; transform-origin: left; background: linear-gradient(90deg, #e2687f, #f4908a); box-shadow: 0 0 12px -2px rgba(244, 144, 138, 0.45); }
+.pat-bar.down { right: 50%; transform-origin: right; background: linear-gradient(270deg, #4fb3a6, #74d4c0); box-shadow: 0 0 12px -2px rgba(116, 212, 192, 0.4); }
+.pat-bar.early { opacity: 0.45; box-shadow: none; }
+.pat-bar b { position: absolute; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pat-bar.up b { left: calc(100% + 6px); }
+.pat-bar.down b { right: calc(100% + 6px); }
+.pat-row:nth-child(2) .pat-bar { animation-delay: 60ms; }
+.pat-row:nth-child(3) .pat-bar { animation-delay: 120ms; }
+.pat-row:nth-child(4) .pat-bar { animation-delay: 180ms; }
+.pat-row:nth-child(5) .pat-bar { animation-delay: 240ms; }
+@keyframes pat-grow { from { transform: scaleX(0); } }
+.pat-axis > span:last-child { display: flex; justify-content: space-between; }
+.pat-axis small { font-size: 11px; color: var(--ink-3); }
+/* Before there's enough data: faint placeholder bars */
+.pat-list.ghost .pat-bar { background: rgba(255, 255, 255, 0.1); box-shadow: none; }
+.pat-list.ghost .pat-name::before { content: ''; display: block; width: 70%; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
+[data-theme="light"] .pat-track::before { background: rgba(0, 0, 0, 0.12); }
+[data-theme="light"] .pat-row:active { background: rgba(0, 0, 0, 0.04); }
+[data-theme="light"] .pat-list.ghost .pat-bar, [data-theme="light"] .pat-list.ghost .pat-name::before { background: rgba(0, 0, 0, 0.08); }
+
+/* Routine change on the chart: a dotted line and a small ↻ ring on the baseline; tap it to show what changed */
+.trend .mark { cursor: pointer; outline: none; }
+.trend .mark line { stroke: rgba(235, 235, 245, 0.32); stroke-width: 1; stroke-dasharray: 0.5 4; stroke-linecap: round; transition: stroke .2s; }
+.trend .mark .mark-hit { fill: transparent; }
+.trend .mark .mark-ring { fill: #1b1b1f; stroke: rgba(235, 235, 245, 0.5); stroke-width: 1; transition: fill .2s, stroke .2s; }
+.trend .mark .mark-glyph { fill: rgba(235, 235, 245, 0.8); font: 600 8px var(--font); pointer-events: none; }
+.trend .mark.on line { stroke: rgba(235, 235, 245, 0.7); }
+.trend .mark.on .mark-ring, .trend .mark:focus-visible .mark-ring { fill: #f5f5f7; stroke: #f5f5f7; }
+.trend .mark.on .mark-glyph { fill: #141416; }
+/* …and in the key while it's open, styled like the line keys */
+.change-keys { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 8px; animation: rise-in .3s var(--ease-out); }
+.change-keys[hidden] { display: none; }
+.key.change-key { cursor: default; }
+.key.change-key i { width: 16px; height: 16px; border-radius: 50%; background: none; border: 1px solid rgba(235, 235, 245, 0.5); display: inline-grid; place-items: center; font-size: 9px; font-style: normal; color: var(--ink-2); }
+[data-theme="light"] .trend .mark line { stroke: rgba(0, 0, 0, 0.25); }
+[data-theme="light"] .trend .mark .mark-ring { fill: #fbfaf8; stroke: rgba(0, 0, 0, 0.4); }
+[data-theme="light"] .trend .mark .mark-glyph { fill: rgba(0, 0, 0, 0.7); }
+[data-theme="light"] .trend .mark.on line { stroke: rgba(0, 0, 0, 0.55); }
+[data-theme="light"] .trend .mark.on .mark-ring { fill: #1d1c1f; stroke: #1d1c1f; }
+[data-theme="light"] .trend .mark.on .mark-glyph { fill: #fff; }
+[data-theme="light"] .key.change-key i { border-color: rgba(0, 0, 0, 0.35); }
+.key.change-key, .key.change-key .key-name { text-decoration: none; opacity: 1; color: var(--ink-2); }
+.key.change-key { max-width: 100%; align-items: flex-start; }
+.key.change-key .key-name { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; }
+.key.change-key i { font-size: 10px; color: var(--ink); border-color: rgba(235, 235, 245, 0.6); margin-top: 1px; }

@@ -34,12 +34,12 @@ function smoothPath(pts, top, bottom) {
  * series: [{ key, label, palette, values: [0..1 | null] per day, format: i => string }]
  * hidden: Set of series keys to hide. onToggle(key) flips one. onAdd: opens the picker for more lines.
  * focus: index of the day the key shows by default (today). fadeLeft: the data carries on before the first day.
- * marks: [{ i, text }] days to flag with a faint dotted line (routine changes); the text shows when that day is focused.
+ * marks: [{ i, texts }] days to flag (routine changes): a dotted line with a small ↻ marker; tapping it lists the changes in the key.
  */
 export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [] }) {
   const id = ++uid;
-  // Side padding keeps the first and last day labels whole instead of clipped by the card edge
-  const W = 340, H = 196, top = 46, bottom = 176, left = 16 + (fadeLeft ? 0 : DASH), right = W - 16;
+  // Even side padding, just enough to keep the first and last day labels whole
+  const W = 340, H = 196, top = 46, bottom = 176, left = 22, right = W - 22;
   const n = days.length;
   const x = i => left + (n === 1 ? (right - left) / 2 : (i / (n - 1)) * (right - left));
   const y = v => bottom - v * (bottom - top);
@@ -100,17 +100,31 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
       s('text', { x: x(i), y: 10, 'text-anchor': 'middle', class: 'dow' }, parseDate(d.date).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3).toUpperCase()),
       s('text', { x: x(i), y: 24, 'text-anchor': 'middle', class: 'dom' }, String(parseDate(d.date).getDate()))) : null)),
     s('line', { class: 'baseline', x1: left, x2: right, y1: bottom, y2: bottom }),
-    // Routine changes: a dotted line under the curves, so before and after are easy to compare
-    marks.map(m => s('g', { class: 'mark', 'data-i': m.i },
-      s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom - 4 }),
-      s('circle', { cx: x(m.i), cy: bottom, r: 2.5 }))),
     s('g', { class: 'plot', mask: `url(#fade-${id})` }, areas),
-    hair);
+    hair,
+    // Routine changes: a dotted line and a small ↻ marker on the baseline, on top so they can be tapped
+    marks.map(m => s('g', { class: 'mark', 'data-i': m.i, role: 'button', tabindex: 0, 'aria-label': `Routine change: ${m.texts.join(', ')}` },
+      s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom - 8 }),
+      s('circle', { class: 'mark-hit', cx: x(m.i), cy: bottom, r: 14 }),
+      s('circle', { class: 'mark-ring', cx: x(m.i), cy: bottom, r: 6.5 }),
+      s('text', { class: 'mark-glyph', x: x(m.i), y: bottom + 2.8, 'text-anchor': 'middle' }, '↻'))));
 
   // One key: each line's name and its value on the focused day (today unless the finger is on the chart)
   const when = h('span', { class: 'when' });
-  const markNote = h('span', { class: 'mark-note' });
-  const markAt = new Map(marks.map(m => [m.i, m.text]));
+  // Routine changes join the key only while their marker is tapped
+  const changeKeys = h('div', { class: 'change-keys', hidden: true });
+  let openMark = null;
+  function showMark(i) {
+    openMark = openMark === i ? null : i;
+    const m = marks.find(x => x.i === openMark);
+    changeKeys.hidden = !m;
+    changeKeys.replaceChildren(...(m?.texts ?? []).map(text => h('span', { class: 'key change-key' }, h('i', { 'aria-hidden': 'true' }, '↻'), h('span', { class: 'key-name' }, text))));
+    for (const g of svg.querySelectorAll('.mark')) g.classList.toggle('on', Number(g.dataset.i) === openMark);
+  }
+  for (const g of svg.querySelectorAll('.mark')) {
+    g.addEventListener('click', e => { e.stopPropagation(); showMark(Number(g.dataset.i)); });
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showMark(Number(g.dataset.i)); } });
+  }
   const keys = series.map(sr => {
     const val = h('strong');
     const btn = h('button', {
@@ -128,8 +142,6 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     for (const g of svg.querySelectorAll('.day-label')) g.classList.toggle('on', Number(g.dataset.i) === i);
     const d = days[i];
     when.textContent = d.logged ? dayLabel(d.date) : `${dayLabel(d.date)} · no check-in`;
-    markNote.textContent = markAt.get(i) ?? '';
-    for (const g of svg.querySelectorAll('.mark')) g.classList.toggle('on', Number(g.dataset.i) === i);
     // Days without a value just show the name; no placeholder dashes
     for (const k of keys) { const v = d.logged ? k.sr.format(i) : ''; k.val.textContent = /^–/.test(v) ? '' : v; }
   }
@@ -143,7 +155,7 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   svg.addEventListener('pointerleave', () => focus(home));
   focus(home);
 
-  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when, markNote), legend);
+  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when), legend, changeKeys);
 }
 
 function summaryLabel(days, series) {

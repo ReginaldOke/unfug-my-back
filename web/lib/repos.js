@@ -28,7 +28,7 @@ function giveRoutinesFactors() {
   const missing = S.table('routines').filter(r => !r.isArchived && !factors.get(r.linkedFactorId)?.routineId);
   if (missing.length) S.batch(() => { for (const r of missing) S.update('routines', r.id, { linkedFactorId: routineFactor(r).id }); });
 }
-/** "Calisthenics · Day 1" for a day in a group, otherwise just the name. */
+/** "Calisthenics · Push" for a variation in a group, otherwise just the name. */
 export const routineLabel = r => (r.group ? `${r.group} · ${r.name}` : r.name);
 
 function routineFactor(r) {
@@ -277,20 +277,24 @@ export const routines = {
       return row;
     });
   },
-  /** The days of a group, in order (a routine on its own is a group of one). */
+  /** The variations of a group, in order (a routine on its own is a group of one). */
   group: r => (r.group ? routines.all().filter(x => x.group === r.group).sort((a, b) => (a.groupOrder ?? 0) - (b.groupOrder ?? 0)) : [r]),
 
-  /** Adds a day after the last one. A routine on its own becomes "Name" with "Day 1" and "Day 2". */
-  addDay(id) {
+  /**
+   * Adds a variation after the last one: "Push" and "Pull", "Day 1" and "Day 2", a short version...
+   * They start as A, B, C, like Workout A and B, ready to rename. A routine on its own becomes the
+   * group, with itself as A.
+   */
+  addVariation(id) {
     return S.batch(() => {
       let r = routines.get(id);
-      if (!r.group) r = routines.save(id, { group: r.name, name: 'Day 1', groupOrder: 0 });
-      const days = routines.group(r);
-      return routines.save(null, { group: r.group, name: `Day ${days.length + 1}`, groupOrder: days.length, items: [], schedule: [] });
+      if (!r.group) r = routines.save(id, { group: r.name, name: 'A', groupOrder: 0 });
+      const n = routines.group(r).length;
+      return routines.save(null, { group: r.group, name: n < 26 ? String.fromCharCode(65 + n) : `Variation ${n + 1}`, groupOrder: n, items: [], schedule: [] });
     });
   },
 
-  /** Renames a group across all its days. */
+  /** Renames a group across all its variations. */
   renameGroup(from, to) {
     S.batch(() => { for (const r of routines.all().filter(x => x.group === from)) routines.save(r.id, { group: to }); });
   },
@@ -346,7 +350,9 @@ export const routines = {
     const m = new Map();
     for (const c of S.table('routineChanges')) {
       if (!m.has(c.date)) m.set(c.date, []);
-      m.get(c.date).push({ name: routines.get(c.routineId)?.name ?? 'Routine', summary: c.summary });
+      const r = routines.get(c.routineId), name = r ? routineLabel(r) : 'Routine';
+      // "Started …" and "Stopped …" already name the routine
+      m.get(c.date).push({ name, summary: c.summary, text: /^(Started|Stopped) /.test(c.summary) ? c.summary : `${name}: ${c.summary}` });
     }
     return m;
   },

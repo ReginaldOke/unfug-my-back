@@ -21,7 +21,7 @@ export function RoutinesView() {
     h('a', { class: 'add-card', href: '#/routine/new' }, '+ New routine'));
 }
 
-/** Routines in list order, the days of a group kept together where the group first appears. */
+/** Routines in list order, the variations of a group kept together where the group first appears. */
 function groupsOf(list) {
   const out = [], seen = new Map();
   for (const r of list) {
@@ -33,12 +33,11 @@ function groupsOf(list) {
   return out;
 }
 
-/** One card for the group; each day opens on its own and shows a tick when it's done today. */
+/** One card for the group; each variation opens on its own and shows a tick when it's done today. */
 function groupCard(days, today) {
-  const last = days.map(r => lastDone(r.id)).filter(Boolean).sort().at(-1);
+  const status = doneStatus(days, today);
   return h('section', { class: 'card glass routine-card group-card' },
-    h('div', {}, h('h2', {}, days[0].group),
-      h('p', { class: 'hint' }, [`${days.length} days`, last ? `last done ${dayLabel(last).toLowerCase()}` : null].filter(Boolean).join(' · '))),
+    h('div', {}, h('h2', {}, days[0].group), status ? h('p', { class: 'hint' }, status) : null),
     h('div', { class: 'routine-days' }, days.map(r => {
       const done = R.routines.completionsOn(today, r.id).length > 0;
       return h('a', { class: `chip glass routine-day${done ? ' done' : ''}`, href: `#/routine/${r.id}`, 'aria-label': `${R.routineLabel(r)}, ${r.items.length} moves${done ? ', done today' : ''}` },
@@ -47,23 +46,28 @@ function groupCard(days, today) {
 }
 
 function routineCard(r, today) {
-      const done = R.routines.completionsOn(today, r.id).length > 0;
-      const last = lastDone(r.id);
-      return h('a', { class: 'card glass routine-card', href: `#/routine/${r.id}`, 'aria-label': `${r.name}, ${r.items.length} moves${done ? ', done today' : ''}. Open` },
-        h('div', { class: 'row between' },
-          h('div', {}, h('h2', {}, r.name),
-            h('p', { class: 'hint' }, [`${r.items.length} move${r.items.length === 1 ? '' : 's'}`, done ? 'done today' : last ? `last done ${dayLabel(last).toLowerCase()}` : null].filter(Boolean).join(' · '))),
-          // The whole card opens it; the corner only says when it's done today
-          done ? h('span', { class: 'well action done-mark', 'aria-hidden': 'true' }, '✓') : null),
+      const status = doneStatus([r], today);
+      return h('a', { class: 'card glass routine-card', href: `#/routine/${r.id}`, 'aria-label': `${r.name}${status ? `, ${status}` : ''}. Open` },
+        h('div', {}, h('h2', {}, r.name), status ? h('p', { class: 'hint' }, status) : null),
         h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, it.dose)))));
 }
 
 const lastDone = id => R.routines.lastDoneDate(id);
 
+/** "Completed 2× today", or "Last done Tuesday", or nothing if it's never been done. */
+function doneStatus(routines, today) {
+  const times = routines.reduce((n, r) => n + R.routines.completionsOn(today, r.id).length, 0);
+  if (times) return `Completed ${times}× today`;
+  const last = routines.map(r => lastDone(r.id)).filter(Boolean).sort().at(-1);
+  return last ? `Last done ${dayLabel(last).toLowerCase()}` : null;
+}
+
 // Sessions in progress, by routine and day, shared by the routine page and the player, so reps
 // adjusted in one show up in the other. Cleared when the session is saved.
 const sessions = new Map();
-const EFFORT = ['', 'Easy', 'Moderate', 'Hard'];
+// How hard you went: 1 (easy) to 3 (all out), in fine steps; the word is the nearest half step
+const EFFORT_WORDS = ['Easy', 'Steady', 'Moderate', 'Hard', 'All out'];
+const effortWord = v => EFFORT_WORDS[Math.round((v - 1) * 2)];
 
 function sessionFor(r, date, fromCheckin) {
   const key = `${r?.id ?? 'new'}|${date}`;
@@ -90,7 +94,7 @@ function sessionFor(r, date, fromCheckin) {
  * Returns the routine, or null if it can't be saved yet.
  */
 function saveSession(s, { fromCheckin }) {
-  // Other days of the group edited in this visit save too, so switching tabs never loses anything
+  // Other variations edited in this visit save too, so switching tabs never loses anything
   const others = s.group ? [...sessions.values()].filter(x => x !== s && x.date === s.date && x.group === s.group && x.id) : [];
   const r = saveOne(s);
   if (!r) return null;
@@ -102,12 +106,12 @@ function saveSession(s, { fromCheckin }) {
   return r;
 }
 
-/** Saves one day's routine and, if any move is ticked, its session. Returns the routine, or null. */
+/** Saves one routine (or variation) and, if any move is ticked, its session. Returns the routine, or null. */
 function saveOne(s) {
   const name = s.name.trim();
   const items = s.items.filter(it => it.name.trim());
   if (s.group !== null && !s.group.trim()) { toast('Give the routine a name'); return null; }
-  if (!name) { toast(s.group ? 'Give the day a name' : 'Give the routine a name'); return null; }
+  if (!name) { toast(s.group ? 'Give this variation a name' : 'Give the routine a name'); return null; }
   if (!items.length) { toast(s.group ? `Add a move to ${name}` : 'Add at least one move'); return null; }
   const moves = items.map(it => ({ name: it.name.trim(), dose: it.dose || it.did.trim() }));
   const existing = s.id ? R.routines.get(s.id) : null;
@@ -152,27 +156,29 @@ export function RoutineView(ctx) {
     onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
   });
 
-  // Days: a tab per day (this one's name is editable), and + to add one
-  function dayTabs() {
-    const addDay = h('button', {
-      type: 'button', class: 'chip day-add', onclick: () => {
+  // Variations: a tab for each (this one's name is editable), and + to add one
+  function variationTabs() {
+    const add = h('button', {
+      type: 'button', class: `chip add day-add${s.group === null ? '' : ' round'}`, 'aria-label': 'Add a variation', onclick: () => {
         if (!s.id && !saveDraftRoutine()) return;
-        if (s.group === null) { s.group = s.name.trim(); s.name = 'Day 1'; }
-        R.routines.save(s.id, { group: s.group.trim(), name: s.name.trim() || 'Day 1', groupOrder: R.routines.get(s.id).groupOrder ?? 0 });
-        const next = R.routines.addDay(s.id);
-        location.hash = `#/routine/${next.id}?${stay}`;
+        if (s.group === null) { s.group = s.name.trim(); s.name = 'A'; }
+        R.routines.save(s.id, { group: s.group.trim(), name: s.name.trim() || 'A', groupOrder: R.routines.get(s.id).groupOrder ?? 0 });
+        const next = R.routines.addVariation(s.id);
+        location.hash = `#/routine/${next.id}?${stay}&rename=1`;
       },
-    }, s.group === null ? '+ Split into days' : '+ Day');
-    if (s.group === null) return h('div', { class: 'day-tabs' }, addDay);
+    }, s.group === null ? '+ Add a variation' : '+');
+    if (s.group === null) return h('div', { class: 'day-tabs' }, add);
+    const nameBox = h('input', {
+      type: 'text', class: 'chip day-tab on', value: s.name, size: Math.max(2, s.name.length), 'aria-label': 'Variation name', maxlength: 40,
+      oninput: e => { s.name = e.target.value; e.target.size = Math.max(2, e.target.value.length); },
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+    });
+    // A new variation opens with its name selected, ready to type over
+    if (ctx.params.get('rename')) setTimeout(() => { nameBox.focus(); nameBox.select(); }, 80);
     return h('div', { class: 'day-tabs', role: 'tablist' },
-      R.routines.group(R.routines.get(s.id)).map(d => d.id === s.id
-        ? h('input', {
-          type: 'text', class: 'chip day-tab on', value: s.name, size: Math.max(4, s.name.length), 'aria-label': 'Day name', maxlength: 40,
-          oninput: e => { s.name = e.target.value; e.target.size = Math.max(4, e.target.value.length); },
-          onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
-        })
+      R.routines.group(R.routines.get(s.id)).map(d => d.id === s.id ? nameBox
         : h('a', { class: 'chip glass day-tab', role: 'tab', href: `#/routine/${d.id}?${stay}` }, sessions.get(`${d.id}|${date}`)?.name ?? d.name)),
-      addDay);
+      add);
   }
 
   const list = h('div', { class: 'log-list' });
@@ -281,15 +287,25 @@ export function RoutineView(ctx) {
 
   // How hard you went: a three-stop slider, green to red
   const word = h('span', { class: 'effort-word' });
+  const field = h('div', { class: 'effort-field' });
   const effort = h('input', {
-    type: 'range', class: 'effort-range', min: 1, max: 3, step: 1, value: s.intensity, 'aria-label': 'How hard did you go?',
-    oninput: e => { s.intensity = Number(e.target.value); paintEffort(); vibrate(4); },
+    type: 'range', class: 'effort-range', min: 1, max: 3, step: 0.01, value: s.intensity, 'aria-label': 'How hard did you go?',
+    oninput: e => {
+      const before = effortWord(s.intensity);
+      s.intensity = Math.round(Number(e.target.value) * 10) / 10;
+      paintEffort(Number(e.target.value));
+      if (effortWord(s.intensity) !== before) vibrate(4); // a tick as the word changes, not on every pixel
+    },
   });
-  const paintEffort = () => {
-    word.textContent = EFFORT[s.intensity];
-    effort.dataset.level = s.intensity;
-    effort.style.setProperty('--pct', `${(s.intensity - 1) * 50}%`);
+  // The fill and colour follow the finger exactly; green through yellow to red
+  const paintEffort = (v = s.intensity) => {
+    const f = (v - 1) / 2;
+    word.textContent = effortWord(v);
+    effort.setAttribute('aria-valuetext', effortWord(v));
+    effort.style.setProperty('--pct', `${f * 100}%`);
+    field.style.setProperty('--h', String(Math.round(f < 0.5 ? 135 - 87 * f * 2 : 48 - 46 * (f - 0.5) * 2)));
   };
+  field.append(h('div', { class: 'row between' }, h('span', { class: 'field-label' }, 'How hard did you go?'), word), effort);
   paintEffort();
 
   // Reminders, as chips; + adds one
@@ -330,24 +346,22 @@ export function RoutineView(ctx) {
       h('div', { class: 'row tight' }, play,
         h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
     title,
-    dayTabs(),
+    variationTabs(),
     list,
     add,
-    h('div', { class: 'effort-field' },
-      h('div', { class: 'row between' }, h('span', { class: 'field-label' }, 'How hard did you go?'), word),
-      effort),
+    field,
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
     r ? h('button', {
       type: 'button', class: 'link-danger', onclick: async () => {
         if (await confirmSheet(`Delete ${R.routineLabel(r)}?`, 'Past sessions stay in your history.', 'Delete', { danger: true })) {
           sessions.delete(s.key);
           R.routines.archive(r.id);
-          // Deleting a day goes to the next one left in the group
+          // Deleting a variation goes to the next one left in the group
           const left = r.group ? R.routines.group(r) : [];
           location.hash = left.length ? `#/routine/${left[0].id}?${stay}` : '#/routines';
         }
       },
-    }, r.group ? 'Delete this day' : 'Delete routine') : null);
+    }, r.group ? 'Delete this variation' : 'Delete routine') : null);
 }
 
 const SCRUB_STEP = 14; // px of finger travel per step
@@ -403,19 +417,21 @@ export function RoutineRunView(ctx) {
   function render() {
     const it = moves[i];
     const last = i === moves.length - 1;
-    const amount = h('span', { class: 'dose-big' }, it.did || it.dose || '—');
-    const bump = by => { it.did = bumpLastNumber(it.did || it.dose || '0', by); amount.textContent = it.did; vibrate(4); };
+    // The same box as the routine page: swipe up or down to change it, or tap to type
+    const amount = h('input', {
+      type: 'text', class: 'did-input did-big', value: it.did || it.dose || '', placeholder: 'Reps', enterkeyhint: 'done',
+      'aria-label': `What you did: ${it.name}`,
+      oninput: e => { it.did = e.target.value; },
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+    });
+    scrubNumber(amount, () => it.dose || '0');
     root.replaceChildren(
-      h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, r.name), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),
+      h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, R.routineLabel(r)), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),
       h('div', { class: 'progress' }, moves.map((m, k) => h('i', { class: m.done ? 'done' : k === i ? 'now' : '' }))),
       h('div', { class: 'flow-body move-stage' },
         MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)),
         h('h1', { tabindex: -1 }, it.name),
-        h('div', { class: 'stepper' },
-          h('button', { type: 'button', class: 'icon-btn glass', 'aria-label': 'One less', onclick: () => bump(-1) }, '−'),
-          amount,
-          h('button', { type: 'button', class: 'icon-btn glass', 'aria-label': 'One more', onclick: () => bump(1) }, '+')),
-        moves[i + 1] ? h('p', { class: 'hint' }, `Next: ${moves[i + 1].name}`) : null),
+        amount),
       h('div', { class: 'flow-footer' },
         i > 0 ? iconButton('‹', 'Previous move', () => { i--; render(); }) : h('span'),
         h('button', {

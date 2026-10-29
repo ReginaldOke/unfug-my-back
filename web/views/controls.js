@@ -220,7 +220,7 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
     hint.textContent = on ? (f.measureType === 'yesno' && !swipeEffort ? 'Yes' : '') : f.measureType === 'yesno' && !swipeEffort ? 'Tap' : 'Tap or swipe →';
     el.setAttribute('aria-label', `${f.name}, ${on ? fmtAmount(f, v) : 'not selected'}${f.measureType === 'yesno' ? '' : '. Use arrow keys to change the amount.'}`);
     if (effort) {
-      const lvl = intensities.get(f.id) ?? 0;
+      const lvl = Math.round(intensities.get(f.id) ?? 0); // a routine's effort can sit between levels
       effort.hidden = !on;
       effort.dataset.level = lvl;
       effort.lastChild.textContent = INTENSITY[lvl];

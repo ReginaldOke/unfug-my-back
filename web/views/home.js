@@ -5,14 +5,13 @@ import * as reminders from '../lib/reminders.js';
 import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { notificationStatus } from '../lib/notify.js';
-import { rankInsights, quickSummary, painSentence, MIN_DAYS } from '../lib/analysis.js';
-import { localDate, addDays, fmtTime, fmtMinutes, minutesSince } from '../lib/dates.js';
+import { rankInsights, quickSummary } from '../lib/analysis.js';
+import { localDate, addDays, fmtTime, minutesSince } from '../lib/dates.js';
 import { ROLE_ICON, fmtAmount } from '../lib/labels.js';
 import { TrendChart, PALETTES, EXTRA_PALETTES } from './chart.js';
 import { PainCalendar } from './calendar.js';
 import { Ruler, SelectCard, PENCIL } from './controls.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
-import { insightSentence } from './factor.js';
 import { justFinished } from './routines.js';
 import { dragHandles } from './sortable.js';
 import { ScratchPad, seedNotes } from './pad.js';
@@ -236,7 +235,7 @@ function trendCard(today) {
 
   const changes = R.routines.changesByDate();
   const marks = dates.flatMap((d, i) => (d <= today && changes.has(d)
-    ? [{ i, text: changes.get(d).map(c => `${c.name}: ${c.summary}`).join(' · ') }] : []));
+    ? [{ i, texts: changes.get(d).map(c => c.text) }] : []));
 
   return h('section', { class: 'card glass trend-card' },
     h('div', { class: 'row between' }, h('h2', {}, 'Trends'),
@@ -280,48 +279,34 @@ function openLinePicker(autoIds) {
 
 function patternsCard(today) {
   const data = R.snapshot();
-  const factors = R.factors.all();
-  const { ready } = rankInsights(data, factors, today);
-  const quick = quickSummary(data, factors, today);
-  const checkins = data.dailyEntries.length;
+  const { ready } = rankInsights(data, R.factors.all(), today);
+  const rows = ready.slice(0, 5);
+  const head = h('h2', {}, 'Patterns');
 
-  if (!checkins) {
-    return h('section', { class: 'card glass' }, h('h2', {}, 'Patterns'),
-      h('p', { class: 'muted' }, 'Check in tonight. After a few days you’ll see which activities line up with worse pain.'));
+  // Not enough days yet: the shape of what's coming, faint, with one line
+  if (!rows.length) {
+    return h('section', { class: 'card glass patterns' }, head,
+      h('div', { class: 'pat-list ghost', 'aria-hidden': 'true' },
+        [0.55, -0.35, 0.2].map(w => patRow(null, w))),
+      h('p', { class: 'hint' }, 'A few more check-ins and the things that move your pain show up here.'));
   }
 
-  const span = Math.min(quick.days, checkins);
-  const summaryCol = (label, s, palette) => h('div', { class: 'sum-col' },
-    h('span', { class: 'sum-label' }, h('i', { style: `background:linear-gradient(90deg,${palette[0]},${palette[1]})` }), label),
-    s ? h('a', { class: 'sum-name', href: `#/factor/${s.factor.id}` }, s.factor.name) : h('span', { class: 'sum-name muted' }, 'Nothing yet'),
-    s ? h('span', { class: 'hint' }, [
-      s.days === span ? (span === 1 ? 'Today' : 'Every day') : `${s.days} of ${span} days`,
-      s.factor.measureType === 'minutes' ? `avg ${fmtMinutes(s.avg)}` : null,
-    ].filter(Boolean).join(' · ')) : null);
+  // Each bar: how much higher (right, coral) or lower (left, teal) pain is on days with it
+  const scale = Math.max(2, ...rows.map(a => Math.abs(a.best.delta)));
+  return h('section', { class: 'card glass patterns' }, head,
+    h('div', { class: 'pat-list' }, rows.map(a => patRow(a, a.best.delta / scale))),
+    h('div', { class: 'pat-axis', 'aria-hidden': 'true' }, h('span'), h('span', {}, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))));
+}
 
-  // The headline: what goes with higher and lower pain, in one plain sentence
-  const said = painSentence(data, factors, today);
-  const sentence = said && h('div', { class: 'pattern-sentence' },
-    h('p', {}, said.parts.map(p => (typeof p === 'string' ? p : h('strong', {}, p.b)))),
-    h('p', { class: 'hint' }, said.basis));
-
-  const list = ready.slice(0, 4).map(a => h('li', {},
-    h('a', { class: 'list-row insight', href: `#/factor/${a.factor.id}` },
-      h('span', { class: `role-dot role-${a.factor.role}`, 'aria-hidden': 'true' }, ROLE_ICON[a.factor.role]),
-      h('span', { class: 'grow' },
-        h('strong', {}, a.factor.name), a.early ? h('span', { class: 'tag' }, 'Early sign') : null,
-        h('span', { class: 'hint block' }, insightSentence(a))),
-      h('span', { class: `delta ${a.best.delta > 0 ? 'up' : 'down'}` }, `${a.best.delta > 0 ? '+' : ''}${a.best.delta.toFixed(1)}`),
-      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))));
-
-  return h('section', { class: 'card glass' },
-    h('div', { class: 'row between' }, h('h2', {}, 'Patterns'), h('span', { class: 'hint' }, `${checkins} check-in${checkins === 1 ? '' : 's'}`)),
-    h('div', { class: 'sum-row' },
-      summaryCol('Main stressor', quick.mainStressor, PALETTES.stressor),
-      summaryCol('Top helper', quick.topHelper, PALETTES.helper)),
-    sentence,
-    list.length ? h('ul', { class: 'list' }, list) : null,
-    ready.some(a => a.early) ? h('p', { class: 'hint' }, `Early signs come from only a few days, so they may change. They’re more reliable after ${MIN_DAYS} days with and ${MIN_DAYS} without.`) : null);
+/** One factor: its name, then a bar growing out from the centre line. w is -1..1 of the half width. */
+function patRow(a, w) {
+  const up = w > 0;
+  const bar = h('span', { class: `pat-bar ${up ? 'up' : 'down'}${a?.early ? ' early' : ''}`, style: `--w:${Math.abs(w) * 100}%` },
+    a ? h('b', {}, `${up ? '+' : '−'}${Math.abs(a.best.delta).toFixed(1)}`) : null);
+  const inner = [h('span', { class: 'pat-name' }, a ? a.factor.name : ''), h('span', { class: 'pat-track' }, bar)];
+  if (!a) return h('div', { class: 'pat-row' }, inner);
+  const label = `${a.factor.name}: pain ${Math.abs(a.best.delta).toFixed(1)} ${up ? 'higher' : 'lower'} on days with it${a.early ? ', early sign' : ''}`;
+  return h('a', { class: 'pat-row', href: `#/factor/${a.factor.id}`, 'aria-label': label }, inner);
 }
 
 function movementTile() {
@@ -339,7 +324,7 @@ function movementTile() {
   else if (later) { eyebrow = 'Next nudge'; big = fmtTime(pending.scheduledFor); unit = ''; }
 
   return h('button', { type: 'button', class: 'tile static move-tile', 'aria-label': `${eyebrow} ${big} ${unit}. Reminder settings`, onclick: openReminderSheet },
-    h('div', { class: 'tile-top' }, h('span', { class: 'eyebrow' }, eyebrow), h('span', { class: 'well action', 'aria-hidden': 'true' }, PENCIL())),
+    h('div', { class: 'tile-top' }, h('h2', {}, eyebrow), h('span', { class: 'well action', 'aria-hidden': 'true' }, PENCIL())),
     h('div', {}, h('span', { class: `num${big.length > 4 ? ' small' : ''}` }, big), unit ? h('span', { class: 'unit' }, unit) : null),
     Ruler({ value: s.reminder.enabled && !paused && !later ? Math.min(sinceMove, s.reminder.intervalMin) : 0, max: s.reminder.intervalMin }),
     h('span', { class: 'hint' }, hint));
@@ -348,7 +333,7 @@ function movementTile() {
 
 function routineTile(today) {
   const r = R.routines.all()[0];
-  if (!r) return h('a', { class: 'tile static', href: '#/routine/new' }, h('span', { class: 'eyebrow' }, 'Routine'), h('span', { class: 'tile-title' }, '+ Create a movement routine'));
+  if (!r) return h('a', { class: 'tile static', href: '#/routine/new' }, h('h2', {}, 'Routine'), h('span', { class: 'tile-title' }, '+ Create a movement routine'));
   const done = R.routines.completionsOn(today, r.id).length;
   const target = Math.max(1, r.schedule.length);
   const allDone = done >= target;
@@ -357,7 +342,7 @@ function routineTile(today) {
   const celebrate = justFinished.id === r.id;
   if (celebrate) setTimeout(() => { justFinished.id = null; }, 1600);
   return h('a', { class: `tile static routine-tile${allDone ? ' all-done' : ''}${celebrate ? ' celebrate' : ''}`, href: `#/routine/${r.id}`, 'aria-label': `${R.routineLabel(r)}, ${done} of ${target} today. Open` },
-    h('div', { class: 'tile-top' }, h('span', { class: 'eyebrow' }, 'Routine'),
+    h('div', { class: 'tile-top' }, h('h2', {}, 'Routine'),
       h('span', { class: `well action${allDone ? ' done-mark' : ''}`, 'aria-hidden': 'true' }, allDone ? '✓' : '▶')),
     allDone
       ? h('div', {}, h('span', { class: 'done-title' }, 'Done for today'))
@@ -370,8 +355,10 @@ function routineTile(today) {
 
 function aiTile() {
   return h('button', { type: 'button', class: 'tile static ai-tile', onclick: openAIShare },
-    h('div', { class: 'tile-top' }, h('span', { class: 'tile-title' }, 'Analyse your data with AI'), h('span', { class: 'well action', 'aria-hidden': 'true' }, '✳︎')),
-    h('span', { class: 'hint' }, 'Export your diary to an AI chat to spot trends and see what lines up with your pain.'));
+    h('div', { class: 'ai-text' },
+      h('h2', {}, 'Analyse your data with AI'),
+      h('span', { class: 'hint' }, 'Export your diary to an AI chat to spot trends and see what lines up with your pain.')),
+    h('span', { class: 'well action', 'aria-hidden': 'true' }, '✳︎'));
 }
 
 /** Share sheet with the diary file (it carries its own instructions), or copy it as text to paste. */

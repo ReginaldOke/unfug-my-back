@@ -3,8 +3,14 @@ import { h } from '../lib/ui.js';
 import { localDate, parseDate, pad } from '../lib/dates.js';
 import * as R from '../lib/repos.js';
 
-// Pain colour: muted green at 0, through yellow at 5, to red at 10, soft enough for white numbers on top
-export const painColour = p => `hsla(${Math.round(p <= 5 ? 135 - p * 17 : 50 - (p - 5) * 9.6)}, 60%, ${p >= 3 && p <= 6 ? 50 : 46}%, 0.88)`;
+// Pain colour from the chart's own palettes, in three clean bands rather than blends (teal into amber
+// goes muddy): teal when it's low (0-3), amber in the middle (4-6), coral when it's high (7-10).
+const BANDS = [[3, '#74d4c0', '#3f9f92'], [6, '#f3b46e', '#d9824f'], [10, '#f4908a', '#d85f78']];
+export function painColour(p) {
+  const [, light, deep] = BANDS.find(([upTo]) => p <= upTo);
+  return { light, deep };
+}
+const dotStyle = p => { const c = painColour(p); return `--dot:${c.light};--dot2:${c.deep}`; };
 
 /** month: 'YYYY-MM'. onMonth(month) moves; selected/onSelect: the day shown under the grid. */
 export function PainCalendar({ month, onMonth, selected = null, onSelect }) {
@@ -29,7 +35,7 @@ export function PainCalendar({ month, onMonth, selected = null, onSelect }) {
     const cls = ['cal-cell', e ? 'logged' : '', change ? 'changed' : '', date === today ? 'today' : '', date > today ? 'future' : '', date === selected ? 'sel' : ''].filter(Boolean).join(' ');
     cells.push(h('button', {
       type: 'button', class: cls, disabled: date > today,
-      style: e?.painScore != null ? `--dot:${painColour(e.painScore)}` : null,
+      style: e?.painScore != null ? dotStyle(e.painScore) : null,
       'aria-label': `${parseDate(date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}${e ? `, pain ${e.painScore}` : ', no check-in'}${change ? ', routine changed' : ''}`,
       'aria-pressed': String(date === selected),
       onclick: () => onSelect(date === selected ? null : date),
@@ -48,7 +54,7 @@ export function PainCalendar({ month, onMonth, selected = null, onSelect }) {
     selected ? dayDetail(selected, changes.get(selected)) : h('div', { class: 'cal-foot' },
       h('span', { class: 'hint' }, avg ? `${logged.length} check-in${logged.length === 1 ? '' : 's'} · avg pain ${avg}` : 'No check-ins this month',
         [...changes.keys()].some(d => d.startsWith(month)) ? h('span', { class: 'cal-key-change' }, 'Routine change') : null),
-      h('span', { class: 'cal-scale', 'aria-hidden': 'true' }, h('small', {}, 'Low'), [0, 3, 5, 7, 10].map(p => h('i', { style: `background:${painColour(p)}` })), h('small', {}, 'High'))));
+      h('span', { class: 'cal-scale', 'aria-hidden': 'true' }, h('small', {}, 'Low'), [0, 3, 5, 7, 10].map(p => h('i', { style: dotStyle(p) })), h('small', {}, 'High'))));
 }
 
 function dayDetail(date, change) {
@@ -60,6 +66,6 @@ function dayDetail(date, change) {
   if (steps != null) bits.push(`${steps.toLocaleString()} steps`);
   return h('div', { class: 'cal-foot' },
     h('span', {}, h('strong', {}, label), h('span', { class: 'hint' }, ` · ${bits.filter(Boolean).join(' · ')}`),
-      change ? h('span', { class: 'cal-change-note' }, change.map(c => `${c.name}: ${c.summary}`).join(' · ')) : null),
+      change ? h('span', { class: 'cal-change-note' }, change.map(c => c.text).join(' · ')) : null),
     date >= localDate(new Date(Date.now() - 3 * 86_400_000)) ? h('a', { class: 'chip glass', href: `#/checkin?date=${date}` }, e ? 'Edit' : 'Check in') : null);
 }
