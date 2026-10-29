@@ -89,7 +89,8 @@ body.in-flow { padding-bottom: 0; }
   animation: aura-drift 24s ease-in-out infinite alternate;
 }
 .aura::after {
-  content: ''; position: absolute; inset: 0; opacity: 0.4; mix-blend-mode: soft-light;
+  /* Kept light: at full strength this grain lifts the black to a flat grey */
+  content: ''; position: absolute; inset: 0; opacity: 0.18; mix-blend-mode: soft-light;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 @keyframes aura-drift { to { transform: translate3d(-4%, 1%, 0) rotate(-7deg) scale(1.06); } }
@@ -1601,3 +1602,14 @@ body:not(.on-home) .ambient::after {
 .checkin-when { display: flex; align-items: baseline; gap: 10px; font-size: 15px; }
 .checkin-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; margin-top: 2px; }
 .checkin-row .grow { min-width: 0; }
+
+/* Notifications (e.g. Time to move): clear glass over the page, not a dark slab */
+#banners .banner {
+  background: radial-gradient(90% 120% at 15% 0%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 60%), rgba(30, 30, 34, 0.42);
+  -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 20px 44px -20px rgba(0, 0, 0, 0.7);
+}
+[data-theme="light"] #banners .banner {
+  background: radial-gradient(90% 120% at 15% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 60%), rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 20px 44px -20px rgba(90, 60, 45, 0.35);
+}
