@@ -1068,7 +1068,6 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 /* ---------- Notes ---------- */
 .pad { gap: 6px; }
 .pad-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.pad-list li + li { border-top: 1px solid var(--line); }
 .pad-note, .pad-add, .pad-input {
   display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--ink-2);
   font: 300 15px/1.45 var(--font); padding: 10px 0; margin: 0;
@@ -1405,7 +1404,7 @@ body:not(.on-home) .ambient::after {
    left (teal) less. Its length is the size of the difference; early signs are fainter. */
 .patterns { gap: 12px; }
 .pat-list { display: flex; flex-direction: column; }
-.pat-row, .pat-axis { display: grid; grid-template-columns: minmax(0, 38%) 1fr; align-items: center; column-gap: 12px; }
+.pat-row, .pat-head { display: grid; grid-template-columns: minmax(0, 38%) 1fr; align-items: center; column-gap: 12px; }
 .pat-row { min-height: 38px; text-decoration: none; color: inherit; border-radius: 12px; -webkit-tap-highlight-color: transparent; transition: background .2s; }
 .pat-row:active { background: rgba(255, 255, 255, 0.05); }
 .pat-name { font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1426,7 +1425,7 @@ body:not(.on-home) .ambient::after {
 .pat-row:nth-child(4) .pat-bar { animation-delay: 180ms; }
 .pat-row:nth-child(5) .pat-bar { animation-delay: 240ms; }
 @keyframes pat-grow { from { transform: scaleX(0); } }
-.pat-axis > span:last-child { display: flex; justify-content: space-between; }
+.pat-head .pat-axis { display: flex; justify-content: space-between; }
 .pat-axis small { font-size: 11px; color: var(--ink-3); }
 /* Before there's enough data: faint placeholder bars */
 [data-theme="light"] .pat-track::before { background: rgba(0, 0, 0, 0.12); }
@@ -1509,3 +1508,10 @@ body:not(.on-home) .ambient::after {
 .change-item strong { font-weight: 500; }
 .change-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #fbfbfd; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
 [data-theme="light"] .change-dot { background: #fff; box-shadow: 0 0 0 1px rgba(29, 28, 31, 0.3); }
+
+/* Notes: a plain list with small dots, no dividers */
+.pad-note, .pad-add, .pad-input { font-size: 14px; padding: 7px 0; }
+.pad-item { align-items: baseline; gap: 10px; }
+.pad-item::before { content: ''; flex: none; width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3); transform: translateY(-3px); }
+.pad-item.lifted { padding-inline: 8px; }
+.pad-add { margin-top: 4px; font-size: 13px; }

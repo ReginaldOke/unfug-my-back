@@ -320,12 +320,20 @@ function patternsCard(today) {
       h('p', { class: 'hint' }, 'Log a stressor or helper in your check-in to see it here.'));
   }
 
-  const scale = Math.max(2, ...rows.map(a => Math.abs(a.delta ?? 0)));
+  // While it's all early reads, keep it to two: a stressor and a helper if there are both
   const allEarly = rows.every(a => a.early);
-  return h('section', { class: 'card glass patterns' }, head,
-    h('div', { class: 'pat-list' }, rows.map(a => patRow(a, (a.delta ?? 0) / scale))),
-    h('div', { class: 'pat-axis', 'aria-hidden': 'true' }, h('span'), h('span', {}, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
-    allEarly ? h('p', { class: 'hint pat-note' }, 'Early days. Sharper with every check-in.') : null);
+  const shown = allEarly ? pickTwo(rows) : rows;
+  const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta ?? 0)));
+  return h('section', { class: 'card glass patterns' },
+    h('div', { class: 'pat-head' }, head,
+      h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
+    h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
+    allEarly ? h('p', { class: 'hint pat-note' }, 'Check in again to see patterns emerge here') : null);
+}
+
+function pickTwo(rows) {
+  const stressor = rows.find(a => a.factor.role !== 'helper'), helper = rows.find(a => a.factor.role === 'helper');
+  return stressor && helper ? [stressor, helper] : rows.slice(0, 2);
 }
 
 /**
