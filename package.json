@@ -17,6 +17,7 @@
     "@capacitor/ios": "^8.6.0",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/motion": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.4",
     "@capgo/capacitor-health": "^8.11.13",
     "three": "^0.186.1"
   },

@@ -181,8 +181,8 @@ export function CheckinView(ctx) {
     const list = R.routines.all();
     const back = encodeURIComponent(date);
     const tiles = list.map(r => FactorTile({
-      factor: R.routines.factorFor(r), title: r.name, selections: draft.selections, intensities: draft.intensity,
-      action: h('a', { class: 'well action tile-action', href: `#/routine/${r.id}?date=${back}&from=checkin`, 'aria-label': `Edit ${r.name} for this day`, title: 'Edit' }, PENCIL()),
+      factor: R.routines.factorFor(r), title: R.routineLabel(r), selections: draft.selections, intensities: draft.intensity,
+      action: h('a', { class: 'well action tile-action', href: `#/routine/${r.id}?date=${back}&from=checkin`, 'aria-label': `Edit ${R.routineLabel(r)} for this day`, title: 'Edit' }, PENCIL()),
     }));
     return h('div', { class: 'stack tight' },
       h('h3', { class: 'section-label' }, 'Routines'),

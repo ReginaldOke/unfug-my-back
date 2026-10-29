@@ -17,7 +17,36 @@ export function RoutinesView() {
   return h('div', { class: 'view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Routines')),
     list.length ? null : h('p', { class: 'muted' }, 'Keep your gym, stretching or calisthenics routines here. Tick one off in your check-in, or open it to log your sets.'),
-    list.map(r => {
+    groupsOf(list).map(days => days.length > 1 || days[0].group ? groupCard(days, today) : routineCard(days[0], today)),
+    h('a', { class: 'add-card', href: '#/routine/new' }, '+ New routine'));
+}
+
+/** Routines in list order, the days of a group kept together where the group first appears. */
+function groupsOf(list) {
+  const out = [], seen = new Map();
+  for (const r of list) {
+    if (!r.group) { out.push([r]); continue; }
+    if (!seen.has(r.group)) { seen.set(r.group, []); out.push(seen.get(r.group)); }
+    seen.get(r.group).push(r);
+  }
+  for (const days of seen.values()) days.sort((a, b) => (a.groupOrder ?? 0) - (b.groupOrder ?? 0));
+  return out;
+}
+
+/** One card for the group; each day opens on its own and shows a tick when it's done today. */
+function groupCard(days, today) {
+  const last = days.map(r => lastDone(r.id)).filter(Boolean).sort().at(-1);
+  return h('section', { class: 'card glass routine-card group-card' },
+    h('div', {}, h('h2', {}, days[0].group),
+      h('p', { class: 'hint' }, [`${days.length} days`, last ? `last done ${dayLabel(last).toLowerCase()}` : null].filter(Boolean).join(' · '))),
+    h('div', { class: 'routine-days' }, days.map(r => {
+      const done = R.routines.completionsOn(today, r.id).length > 0;
+      return h('a', { class: `chip glass routine-day${done ? ' done' : ''}`, href: `#/routine/${r.id}`, 'aria-label': `${R.routineLabel(r)}, ${r.items.length} moves${done ? ', done today' : ''}` },
+        done ? h('span', { class: 'day-tick', 'aria-hidden': 'true' }, '✓') : null, r.name);
+    })));
+}
+
+function routineCard(r, today) {
       const done = R.routines.completionsOn(today, r.id).length > 0;
       const last = lastDone(r.id);
       return h('a', { class: 'card glass routine-card', href: `#/routine/${r.id}`, 'aria-label': `${r.name}, ${r.items.length} moves${done ? ', done today' : ''}. Open` },
@@ -27,8 +56,6 @@ export function RoutinesView() {
           // The whole card opens it; the corner only says when it's done today
           done ? h('span', { class: 'well action done-mark', 'aria-hidden': 'true' }, '✓') : null),
         h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, it.dose)))));
-    }),
-    h('a', { class: 'add-card', href: '#/routine/new' }, '+ New routine'));
 }
 
 const lastDone = id => R.routines.lastDoneDate(id);
@@ -47,7 +74,7 @@ function sessionFor(r, date, fromCheckin) {
   const draft = fromCheckin && r ? checkinDraft(date) : null;
   // Each box starts with what you did today if logged, else last time, else the target
   const s = {
-    key, id: r?.id ?? null, date, name: r?.name ?? '', schedule: [...(r?.schedule ?? [])],
+    key, id: r?.id ?? null, date, name: r?.name ?? '', group: r?.group ?? null, schedule: [...(r?.schedule ?? [])],
     items: (r?.items ?? []).map(it => {
       const now = didNow.get(it.name);
       return { name: it.name, dose: it.dose, did: now || before.get(it.name) || it.dose || '', done: !!now };
@@ -63,15 +90,32 @@ function sessionFor(r, date, fromCheckin) {
  * Returns the routine, or null if it can't be saved yet.
  */
 function saveSession(s, { fromCheckin }) {
+  // Other days of the group edited in this visit save too, so switching tabs never loses anything
+  const others = s.group ? [...sessions.values()].filter(x => x !== s && x.date === s.date && x.group === s.group && x.id) : [];
+  const r = saveOne(s);
+  if (!r) return null;
+  const logged = [s, ...others].filter(x => x === s || saveOne(x)).some(x => x.logged);
+  toast(logged ? `${R.routineLabel(r)} logged` : 'Routine saved');
+  if (fromCheckin) location.hash = `#/checkin?date=${s.date}`;
+  else if (logged && s.date === localDate()) { justFinished.id = r.id; location.hash = '#/'; }
+  else location.hash = '#/routines';
+  return r;
+}
+
+/** Saves one day's routine and, if any move is ticked, its session. Returns the routine, or null. */
+function saveOne(s) {
   const name = s.name.trim();
   const items = s.items.filter(it => it.name.trim());
-  if (!name) { toast('Give the routine a name'); return null; }
-  if (!items.length) { toast('Add at least one move'); return null; }
+  if (s.group !== null && !s.group.trim()) { toast('Give the routine a name'); return null; }
+  if (!name) { toast(s.group ? 'Give the day a name' : 'Give the routine a name'); return null; }
+  if (!items.length) { toast(s.group ? `Add a move to ${name}` : 'Add at least one move'); return null; }
   const moves = items.map(it => ({ name: it.name.trim(), dose: it.dose || it.did.trim() }));
   const existing = s.id ? R.routines.get(s.id) : null;
-  const changed = !existing || existing.name !== name || JSON.stringify(existing.items) !== JSON.stringify(moves)
+  const group = s.group?.trim() || null;
+  if (existing?.group && group && existing.group !== group) R.routines.renameGroup(existing.group, group);
+  const changed = !existing || existing.name !== name || (existing.group ?? null) !== group || JSON.stringify(existing.items) !== JSON.stringify(moves)
     || existing.schedule.join() !== [...new Set(s.schedule)].sort().join();
-  const r = changed ? R.routines.save(s.id, { name, items: moves, schedule: [...new Set(s.schedule)].sort() }) : existing;
+  const r = changed ? R.routines.save(s.id, { name, group, items: moves, schedule: [...new Set(s.schedule)].sort() }) : R.routines.get(s.id);
   const done = items.filter(it => it.done);
   if (done.length) {
     const log = items.map(it => ({ name: it.name.trim(), did: it.done ? it.did.trim() || '✓' : '' }));
@@ -81,10 +125,7 @@ function saveSession(s, { fromCheckin }) {
     if (live) { live.selections.set(r.linkedFactorId, 1); live.intensity.set(r.linkedFactorId, s.intensity); }
   }
   sessions.delete(s.key);
-  toast(done.length ? `${name} logged` : 'Routine saved');
-  if (fromCheckin) location.hash = `#/checkin?date=${s.date}`;
-  else if (done.length && s.date === localDate()) { justFinished.id = r.id; location.hash = '#/'; }
-  else location.hash = '#/routines';
+  s.logged = done.length > 0;
   return r;
 }
 
@@ -101,13 +142,38 @@ export function RoutineView(ctx) {
   const date = ctx.params.get('date') || localDate();
   const fromCheckin = ctx.params.get('from') === 'checkin';
   const s = sessionFor(r, date, fromCheckin);
-  if (!r && !s.items.length) s.items.push({ name: '', dose: '', did: '', done: false });
+  if (!s.items.length) s.items.push({ name: '', dose: '', did: '', done: false });
+  const stay = `date=${date}${fromCheckin ? '&from=checkin' : ''}`;
 
+  // The title is the routine's name, or the group's when it has days
   const title = h('input', {
-    type: 'text', class: 'title-input routine-title', value: s.name, placeholder: 'Routine name', 'aria-label': 'Routine name', maxlength: 60,
-    oninput: e => { s.name = e.target.value; },
+    type: 'text', class: 'title-input routine-title', value: s.group ?? s.name, placeholder: 'Routine name', 'aria-label': 'Routine name', maxlength: 60,
+    oninput: e => { if (s.group !== null) s.group = e.target.value; else s.name = e.target.value; },
     onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
   });
+
+  // Days: a tab per day (this one's name is editable), and + to add one
+  function dayTabs() {
+    const addDay = h('button', {
+      type: 'button', class: 'chip day-add', onclick: () => {
+        if (!s.id && !saveDraftRoutine()) return;
+        if (s.group === null) { s.group = s.name.trim(); s.name = 'Day 1'; }
+        R.routines.save(s.id, { group: s.group.trim(), name: s.name.trim() || 'Day 1', groupOrder: R.routines.get(s.id).groupOrder ?? 0 });
+        const next = R.routines.addDay(s.id);
+        location.hash = `#/routine/${next.id}?${stay}`;
+      },
+    }, s.group === null ? '+ Split into days' : '+ Day');
+    if (s.group === null) return h('div', { class: 'day-tabs' }, addDay);
+    return h('div', { class: 'day-tabs', role: 'tablist' },
+      R.routines.group(R.routines.get(s.id)).map(d => d.id === s.id
+        ? h('input', {
+          type: 'text', class: 'chip day-tab on', value: s.name, size: Math.max(4, s.name.length), 'aria-label': 'Day name', maxlength: 40,
+          oninput: e => { s.name = e.target.value; e.target.size = Math.max(4, e.target.value.length); },
+          onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+        })
+        : h('a', { class: 'chip glass day-tab', role: 'tab', href: `#/routine/${d.id}?${stay}` }, sessions.get(`${d.id}|${date}`)?.name ?? d.name)),
+      addDay);
+  }
 
   const list = h('div', { class: 'log-list' });
   const rowItem = new Map();
@@ -262,8 +328,9 @@ export function RoutineView(ctx) {
       iconButton('‹', 'Back', () => history.back()),
       h('span', { class: 'eyebrow' }, dayLabel(date)),
       h('div', { class: 'row tight' }, play,
-        h('button', { type: 'button', class: 'btn primary small', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
+        h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
     title,
+    dayTabs(),
     list,
     add,
     h('div', { class: 'effort-field' },
@@ -272,13 +339,15 @@ export function RoutineView(ctx) {
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
     r ? h('button', {
       type: 'button', class: 'link-danger', onclick: async () => {
-        if (await confirmSheet(`Delete ${r.name}?`, 'Past sessions stay in your history.', 'Delete', { danger: true })) {
+        if (await confirmSheet(`Delete ${R.routineLabel(r)}?`, 'Past sessions stay in your history.', 'Delete', { danger: true })) {
           sessions.delete(s.key);
           R.routines.archive(r.id);
-          location.hash = '#/routines';
+          // Deleting a day goes to the next one left in the group
+          const left = r.group ? R.routines.group(r) : [];
+          location.hash = left.length ? `#/routine/${left[0].id}?${stay}` : '#/routines';
         }
       },
-    }, 'Delete routine') : null);
+    }, r.group ? 'Delete this day' : 'Delete routine') : null);
 }
 
 const SCRUB_STEP = 14; // px of finger travel per step

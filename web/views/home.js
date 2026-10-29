@@ -356,7 +356,7 @@ function routineTile(today) {
   // Play the celebration once, on the first render after finishing a routine
   const celebrate = justFinished.id === r.id;
   if (celebrate) setTimeout(() => { justFinished.id = null; }, 1600);
-  return h('a', { class: `tile static routine-tile${allDone ? ' all-done' : ''}${celebrate ? ' celebrate' : ''}`, href: `#/routine/${r.id}`, 'aria-label': `${r.name}, ${done} of ${target} today. Open` },
+  return h('a', { class: `tile static routine-tile${allDone ? ' all-done' : ''}${celebrate ? ' celebrate' : ''}`, href: `#/routine/${r.id}`, 'aria-label': `${R.routineLabel(r)}, ${done} of ${target} today. Open` },
     h('div', { class: 'tile-top' }, h('span', { class: 'eyebrow' }, 'Routine'),
       h('span', { class: `well action${allDone ? ' done-mark' : ''}`, 'aria-hidden': 'true' }, allDone ? '✓' : '▶')),
     allDone
@@ -364,15 +364,14 @@ function routineTile(today) {
       : h('div', {}, h('span', { class: 'num' }, String(done)), h('span', { class: 'unit' }, `/${target} today`)),
     h('div', { class: 'seg-dots', 'aria-hidden': 'true' },
       Array.from({ length: target }, (_, i) => h('i', { class: `${i < done ? 'on' : ''}${celebrate && i === done - 1 ? ' fresh' : ''}` }))),
-    h('span', { class: 'tile-title link' }, `${r.name} · ${week} this week`),
-    celebrate ? h('span', { class: 'sr-only', role: 'status' }, `${r.name} done. Logged as a helper.`) : null);
+    h('span', { class: 'tile-title link' }, `${R.routineLabel(r)} · ${week} this week`),
+    celebrate ? h('span', { class: 'sr-only', role: 'status' }, `${R.routineLabel(r)} done. Logged as a helper.`) : null);
 }
 
 function aiTile() {
   return h('button', { type: 'button', class: 'tile static ai-tile', onclick: openAIShare },
-    h('div', { class: 'tile-top' }, h('span', { class: 'eyebrow' }, 'Analyse with AI'), h('span', { class: 'well action', 'aria-hidden': 'true' }, '✳︎')),
-    h('span', { class: 'tile-title' }, 'Find your patterns'),
-    h('span', { class: 'hint' }, 'Spot trends in your data with AI'));
+    h('div', { class: 'tile-top' }, h('span', { class: 'tile-title' }, 'Analyse your data with AI'), h('span', { class: 'well action', 'aria-hidden': 'true' }, '✳︎')),
+    h('span', { class: 'hint' }, 'Export your diary to an AI chat to spot trends and see what lines up with your pain.'));
 }
 
 /** Share sheet with the diary file (it carries its own instructions), or copy it as text to paste. */

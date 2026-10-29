@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: dark;
-  --bg: #141416;
+  --bg: #0d0d0f;
   --ink: #f5f5f7;
   --ink-2: rgba(235, 235, 245, 0.62);
   --ink-3: rgba(235, 235, 245, 0.34);
@@ -14,11 +14,11 @@
   --red-deep: #7a2a24;
   --red-glow: rgba(240, 128, 110, 0.32);
   --helper: #f2f2f2;
-  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.035) 45%, rgba(255, 255, 255, 0.055) 100%);
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.085) 0%, rgba(255, 255, 255, 0.025) 45%, rgba(255, 255, 255, 0.045) 100%);
   --glass-solid: rgba(22, 22, 24, 0.78);
   --glass-edge: rgba(255, 255, 255, 0.06);
   --glass-shadow: inset 0 0 28px rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.18), 0 22px 44px -22px rgba(0, 0, 0, 0.6);
-  --glass-blur: blur(30px) saturate(190%) brightness(1.06);
+  --glass-blur: blur(14px) saturate(170%) brightness(1.04);
   /* Specular rim: bright top-left, fading round the edge, a softer catch bottom-right */
   --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 22%, rgba(255, 255, 255, 0.02) 48%, rgba(255, 255, 255, 0.05) 72%, rgba(255, 255, 255, 0.26) 100%);
   --ease-out: cubic-bezier(.2, .8, .2, 1);
@@ -55,7 +55,7 @@ body.in-flow { padding-bottom: 0; }
     radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.16), transparent 70%),
     radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.14), transparent 72%),
     radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.08), transparent 70%),
-    linear-gradient(180deg, #1a1a1d 0%, #131315 60%, #101012 100%);
+    linear-gradient(180deg, #131315 0%, #0d0d0f 60%, #0a0a0b 100%);
   filter: blur(24px);
   animation: drift 48s ease-in-out infinite alternate;
 }
@@ -79,7 +79,7 @@ body.in-flow { padding-bottom: 0; }
     radial-gradient(40% 6% at 20% 19%, rgba(120, 30, 52, 0.75), transparent 72%),
     radial-gradient(30% 6% at 88% 25%, rgba(242, 150, 128, 0.55), transparent 72%),
     /* then a soft lift so the grain reads as grey-black rather than vanishing into the charcoal */
-    linear-gradient(180deg, transparent 22%, rgba(58, 58, 64, 0.55) 34%, rgba(46, 46, 52, 0.5) 70%, rgba(36, 36, 40, 0.3) 100%);
+    linear-gradient(180deg, transparent 22%, rgba(44, 44, 50, 0.45) 34%, rgba(34, 34, 40, 0.38) 70%, rgba(26, 26, 30, 0.2) 100%);
   transform: rotate(-10deg);
   filter: blur(22px) saturate(120%);
   animation: aura-drift 24s ease-in-out infinite alternate;
@@ -667,8 +667,9 @@ details.more[open] summary { margin-bottom: 10px; }
 .giant, .vs-num, .tile.static .num, .streak .num, .big-num, .stat .num, .mini-stat .num { font-weight: 200; letter-spacing: -0.03em; }
 
 /* Sheets: deeper frosted glass */
-.sheet { background: rgba(32, 32, 36, 0.66); -webkit-backdrop-filter: blur(40px) saturate(190%); backdrop-filter: blur(40px) saturate(190%); }
-.sheet::backdrop { background: rgba(10, 10, 12, 0.4); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+/* Liquid glass: what's behind only just shows through, and the text stays easy to read */
+.sheet { background: rgba(30, 30, 34, 0.62); -webkit-backdrop-filter: blur(12px) saturate(170%); backdrop-filter: blur(12px) saturate(170%); }
+.sheet::backdrop { background: rgba(8, 8, 10, 0.3); -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* Vertical slider: thicker frosted capsule */
 .vslider { background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06)); box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.04), 0 26px 50px -26px rgba(0, 0, 0, 0.75); }
@@ -1067,7 +1068,7 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .pad-list li + li { border-top: 1px solid var(--line); }
 .pad-note, .pad-add, .pad-input {
   display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--ink-2);
-  font: italic 300 15px/1.45 var(--font); padding: 10px 0; margin: 0;
+  font: 300 15px/1.45 var(--font); padding: 10px 0; margin: 0;
 }
 .pad-note { cursor: text; }
 .pad-add { color: var(--ink-3); font-style: normal; font-size: 14px; cursor: pointer; }
@@ -1138,7 +1139,9 @@ a.routine-card:active { transform: scale(0.98); background: rgba(255, 255, 255, 
 .routine-page .top-bar .eyebrow { flex: 1; text-align: center; }
 .routine-title { font-size: 30px; border-bottom-color: transparent; margin: 4px 0 8px; transition: border-color .2s; }
 .routine-title:hover { border-bottom-color: var(--line); }
-.play-btn { width: 38px; height: 38px; display: grid; place-items: center; color: var(--ink); }
+/* Play and Done match the back button: same glass, same height */
+.play-btn { color: var(--ink); }
+.icon-btn.done-btn { width: auto; border-radius: 22px; padding: 0 18px; font-size: 16px; font-weight: 500; color: var(--ink); }
 .play-btn svg { transform: translateX(1px); }
 
 .routine-page .log-row { position: relative; display: block; padding: 0; overflow: hidden; border-radius: 0; transition: height .24s var(--ease-out), opacity .2s; }
@@ -1207,3 +1210,107 @@ input.log-name::placeholder { color: var(--ink-3); }
 .stepper { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 6px 0 4px; }
 .stepper .icon-btn { width: 46px; height: 46px; font-size: 22px; }
 .stepper .dose-big { min-width: 120px; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
+.routine-page { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+
+/* Routine days: a group card on the list, tabs on the routine page */
+.group-card { gap: 12px; }
+.routine-days { display: flex; flex-wrap: wrap; gap: 8px; }
+.routine-day { text-decoration: none; color: var(--ink); }
+.routine-day.done { color: #74d4c0; }
+.day-tick { font-size: 12px; }
+.day-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: -2px 0 10px; }
+.day-tab { text-decoration: none; color: var(--ink-2); }
+input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0; font: inherit; font-size: 14px; text-align: center; outline: none; width: auto; }
+.chip.day-add { background: none; border: 1px dashed rgba(255, 255, 255, 0.22); color: var(--ink-3); box-shadow: none; cursor: pointer; }
+.chip.day-add::before { display: none; }
+
+/* ======================================================================
+   Light mode: warm paper instead of charcoal, frosted white glass, the same red and navy glow at the
+   top, softened. Dark mode is the default; theme.js sets data-theme on <html>.
+   ====================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #efebe6;
+  --ink: #1d1c1f;
+  --ink-2: rgba(29, 28, 31, 0.64);
+  --ink-3: rgba(29, 28, 31, 0.4);
+  --line: rgba(0, 0, 0, 0.08);
+  --red: #d8604c;
+  --red-2: #c9533f;
+  --red-glow: rgba(216, 96, 76, 0.25);
+  --helper: #1d1c1f;
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.5) 45%, rgba(255, 255, 255, 0.6) 100%);
+  --glass-solid: rgba(255, 255, 255, 0.85);
+  --glass-edge: rgba(0, 0, 0, 0.05);
+  --glass-shadow: inset 0 0 24px rgba(255, 255, 255, 0.5), 0 1px 2px rgba(60, 40, 30, 0.06), 0 18px 40px -22px rgba(60, 40, 30, 0.28);
+  --glass-blur: blur(14px) saturate(160%);
+  --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.5) 30%, rgba(0, 0, 0, 0.04) 60%, rgba(255, 255, 255, 0.7) 100%);
+  --well: rgba(0, 0, 0, 0.05);
+}
+[data-theme="light"] .ambient {
+  background:
+    radial-gradient(34% 26% at 20% 16%, rgba(236, 200, 180, 0.45), transparent 70%),
+    radial-gradient(40% 32% at 88% 38%, rgba(178, 190, 220, 0.35), transparent 70%),
+    radial-gradient(44% 34% at 26% 82%, rgba(232, 180, 168, 0.3), transparent 72%),
+    linear-gradient(180deg, #f3efea 0%, #eeeae4 60%, #e9e4de 100%);
+}
+[data-theme="light"] .aura::before {
+  opacity: 0.55;
+  background:
+    radial-gradient(20% 5% at 70% 17%, rgba(255, 236, 226, 0.9), transparent 70%),
+    radial-gradient(52% 7% at 58% 20%, rgba(240, 110, 84, 0.85), transparent 72%),
+    radial-gradient(46% 6% at 38% 24%, rgba(222, 92, 80, 0.6), transparent 72%),
+    radial-gradient(60% 7% at 44% 13%, rgba(80, 100, 190, 0.7), transparent 72%),
+    radial-gradient(40% 6% at 20% 19%, rgba(190, 90, 120, 0.5), transparent 72%),
+    radial-gradient(30% 6% at 88% 25%, rgba(250, 170, 150, 0.6), transparent 72%);
+}
+[data-theme="light"] .aura::after { opacity: 0.25; }
+[data-theme="light"] body::after { opacity: 0.05; mix-blend-mode: multiply; }
+
+/* Surfaces that were dark glass */
+[data-theme="light"] .sheet { background: rgba(250, 248, 245, 0.72); }
+[data-theme="light"] .sheet::backdrop { background: rgba(40, 30, 25, 0.18); }
+[data-theme="light"] .banner { background: rgba(255, 255, 255, 0.94); }
+[data-theme="light"] #tabs { background: rgba(255, 255, 255, 0.55); box-shadow: 0 18px 40px -18px rgba(60, 40, 30, 0.35), inset 0 0 22px rgba(255, 255, 255, 0.5); }
+[data-theme="light"] #tabs a.active { color: var(--ink); background: rgba(255, 255, 255, 0.85); }
+[data-theme="light"] .drag-row.lifted, [data-theme="light"] .pad-item.lifted,
+[data-theme="light"] .log-row.lifted .log-inner { background: rgba(255, 255, 255, 0.96); box-shadow: 0 14px 34px -12px rgba(60, 40, 30, 0.35); }
+[data-theme="light"] .log-row.swiping .log-inner, [data-theme="light"] .log-row.open .log-inner { background: #fbfaf8; box-shadow: 6px 0 18px -8px rgba(60, 40, 30, 0.3); }
+[data-theme="light"] .body3d-label { background: rgba(255, 255, 255, 0.8); }
+[data-theme="light"] .frost { background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(250, 248, 245, 0.62)); }
+[data-theme="light"] .chart .axis-today { fill: #efebe6; }
+[data-theme="light"] .trend .mark circle { fill: #fbfaf8; stroke: rgba(29, 28, 31, 0.4); }
+[data-theme="light"] .effort-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, transparent var(--pct, 50%), rgba(239, 235, 230, 0.75) var(--pct, 50%)), linear-gradient(90deg, #6cc47c, #e6bb3c 50%, #ec6a5a);
+}
+[data-theme="light"] .effort-range::-webkit-slider-thumb { background: #fff; box-shadow: 0 2px 10px rgba(60, 40, 30, 0.3); }
+
+/* Text and controls that were white */
+[data-theme="light"] .btn.primary, [data-theme="light"] .btn.glass { color: var(--ink); background: radial-gradient(60% 120% at 14% 0%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 70%), rgba(255, 255, 255, 0.55); }
+[data-theme="light"] .chip.on, [data-theme="light"] .segmented button.on,
+[data-theme="light"] .select-card[aria-pressed="true"] .tick, [data-theme="light"] .week-dots span.on i,
+[data-theme="light"] input.day-tab.on, [data-theme="light"] .day-chip.on { background: #1d1c1f; color: #fff; border-color: #1d1c1f; }
+[data-theme="light"] input[type="range"] { accent-color: #1d1c1f; }
+[data-theme="light"] .vs-glyph { color: #1d1c1f; mix-blend-mode: normal; }
+[data-theme="light"] .btn.danger, [data-theme="light"] .tile.role-trigger .role-mark, [data-theme="light"] .delta.up,
+[data-theme="light"] .role-dot.role-trigger, [data-theme="light"] .link-danger { color: #c4402f; }
+[data-theme="light"] .pill-badge.up { color: #a8392a; }
+[data-theme="light"] .routine-day.done, [data-theme="light"] .routine-card .well.done-mark { color: #2a9a83; }
+[data-theme="light"] .effort-field:has(.effort-range[data-level="1"]) .effort-word { color: #3f9a52; }
+[data-theme="light"] .effort-field:has(.effort-range[data-level="2"]) .effort-word { color: #b08614; }
+[data-theme="light"] .effort-field:has(.effort-range[data-level="3"]) .effort-word { color: #c4402f; }
+[data-theme="light"] .did-input { border-color: rgba(0, 0, 0, 0.08); background: rgba(255, 255, 255, 0.6); }
+[data-theme="light"] .routine-page .log-check { border-color: rgba(0, 0, 0, 0.22); background: rgba(255, 255, 255, 0.6); }
+[data-theme="light"] .add-card, [data-theme="light"] .chip.day-add { border-color: rgba(0, 0, 0, 0.18); }
+[data-theme="light"] .sheet-grabber { background: rgba(0, 0, 0, 0.2); }
+
+/* Only Today has the colourful glow; other screens sit on the plain background */
+body:not(.on-home) .aura { display: none; }
+body:not(.on-home) .ambient { background: var(--bg); }
+[data-theme="light"] body:not(.on-home) .ambient { background: var(--bg); }
+[data-theme="light"] .ruler i, [data-theme="light"] .seg-dots i { background: rgba(0, 0, 0, 0.1); }
+[data-theme="light"] .ruler i.lit { background: rgba(29, 28, 31, 0.8); }
+[data-theme="light"] .seg-dots i.on { background: #1d1c1f; }
+[data-theme="light"] .pill-badge { background: rgba(0, 0, 0, 0.06); }
+[data-theme="light"] .vslider { background: linear-gradient(180deg, rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.04)); box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.06), 0 26px 50px -26px rgba(60, 40, 30, 0.3); }
+[data-theme="light"] .flow-footer { background: linear-gradient(180deg, rgba(239, 235, 230, 0), rgba(239, 235, 230, 0.9) 45%); }

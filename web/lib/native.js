@@ -70,7 +70,7 @@ async function plan() {
       r.schedule.forEach((t, i) => {
         const when = at(date, t);
         if (when <= now || R.routines.completionsOn(date, r.id).length > i) return;
-        list.push({ id: id++, title: r.name, body: `${r.items.length} moves. Tap to start.`, actionTypeId: 'ROUTINE', schedule: { at: when }, extra: { hash: `#/routine/${r.id}` } });
+        list.push({ id: id++, title: R.routineLabel(r), body: `${r.items.length} moves. Tap to start.`, actionTypeId: 'ROUTINE', schedule: { at: when }, extra: { hash: `#/routine/${r.id}` } });
       });
     }
   }

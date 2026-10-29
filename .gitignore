@@ -13,3 +13,6 @@ web/vendor/
 ios/App/App/public/
 ios/App/Pods/
 ios/DerivedData/
+
+# A blank Xcode project made by hand; the app lives in ios/
+/Untitled Project/

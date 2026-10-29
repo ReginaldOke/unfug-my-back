@@ -28,9 +28,12 @@ function giveRoutinesFactors() {
   const missing = S.table('routines').filter(r => !r.isArchived && !factors.get(r.linkedFactorId)?.routineId);
   if (missing.length) S.batch(() => { for (const r of missing) S.update('routines', r.id, { linkedFactorId: routineFactor(r).id }); });
 }
+/** "Calisthenics · Day 1" for a day in a group, otherwise just the name. */
+export const routineLabel = r => (r.group ? `${r.group} · ${r.name}` : r.name);
+
 function routineFactor(r) {
   return S.insert('factors', {
-    name: r.name, role: 'helper', measureType: 'yesno', unit: '', category: 'exercise', icon: '🏋️',
+    name: routineLabel(r), role: 'helper', measureType: 'yesno', unit: '', category: 'exercise', icon: '🏋️',
     status: 'suspected', isArchived: false, source: 'routine', routineId: r.id,
     sortWeight: Math.min(0, ...S.table('factors').map(f => f.sortWeight ?? 0)) - 1,
   });
@@ -268,12 +271,30 @@ export const routines = {
       const row = id ? S.update('routines', id, fields) : S.insert('routines', { isArchived: false, schedule: [], ...fields });
       const f = factors.get(row.linkedFactorId);
       if (!f?.routineId) S.update('routines', row.id, { linkedFactorId: routineFactor(row).id });
-      else if (f.name !== row.name) S.update('factors', f.id, { name: row.name });
-      const what = before ? describeRoutineChange(before, row.items) : `Started ${row.name}`;
+      else if (f.name !== routineLabel(row)) S.update('factors', f.id, { name: routineLabel(row) });
+      const what = before ? describeRoutineChange(before, row.items) : `Started ${routineLabel(row)}`;
       if (what) routines.logChange(row.id, what);
       return row;
     });
   },
+  /** The days of a group, in order (a routine on its own is a group of one). */
+  group: r => (r.group ? routines.all().filter(x => x.group === r.group).sort((a, b) => (a.groupOrder ?? 0) - (b.groupOrder ?? 0)) : [r]),
+
+  /** Adds a day after the last one. A routine on its own becomes "Name" with "Day 1" and "Day 2". */
+  addDay(id) {
+    return S.batch(() => {
+      let r = routines.get(id);
+      if (!r.group) r = routines.save(id, { group: r.name, name: 'Day 1', groupOrder: 0 });
+      const days = routines.group(r);
+      return routines.save(null, { group: r.group, name: `Day ${days.length + 1}`, groupOrder: days.length, items: [], schedule: [] });
+    });
+  },
+
+  /** Renames a group across all its days. */
+  renameGroup(from, to) {
+    S.batch(() => { for (const r of routines.all().filter(x => x.group === from)) routines.save(r.id, { group: to }); });
+  },
+
   archive(id) {
     S.batch(() => {
       const r = S.update('routines', id, { isArchived: true });

@@ -152,7 +152,7 @@ function checkDailyReminders(now) {
     r.schedule.forEach((t, i) => {
       if (!due(`routine:${r.id}:${t}`, t) || R.routines.completionsOn(today, r.id).length > i) return;
       notify({
-        key: `routine:${r.id}`, title: r.name, body: `${r.items.length} moves, about ${Math.max(5, Math.round(r.items.length * 1.5 / 5) * 5)} minutes.`,
+        key: `routine:${r.id}`, title: R.routineLabel(r), body: `${r.items.length} moves, about ${Math.max(5, Math.round(r.items.length * 1.5 / 5) * 5)} minutes.`,
         actions: [
           { label: 'Start', primary: true, run: () => { location.hash = `#/routine/${r.id}/run`; } },
           { label: 'Mark done', run: () => R.routines.complete(r.id, true) },

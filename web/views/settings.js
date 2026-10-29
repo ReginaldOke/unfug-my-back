@@ -6,6 +6,7 @@ import { REGIONS } from '../lib/regions.js';
 import { localDate } from '../lib/dates.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
+import { themeSetting, setTheme } from '../lib/theme.js';
 
 const row = (href, title, detail) => h('a', { class: 'list-row', href },
   h('span', { class: 'grow' }, title, detail ? h('span', { class: 'hint block' }, detail) : null),
@@ -26,9 +27,25 @@ export function SettingsView() {
         h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
       HEALTH_IMPORT ? row('#/health', 'Apple Health', R.health.all().length ? `Steps and sleep for ${R.health.all().length} days` : 'Bring in steps and sleep') : null),
 
+    appearanceSection(),
+
     dataSection(),
 
     h('section', { class: 'card glass' }, row('#/help', 'Help & safety')));
+}
+
+function appearanceSection() {
+  const opts = [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']];
+  const seg = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': 'Appearance' });
+  const paint = () => seg.replaceChildren(...opts.map(([v, label]) => h('button', {
+    type: 'button', role: 'radio', class: themeSetting() === v ? 'on' : '', 'aria-checked': String(themeSetting() === v),
+    onclick: () => { setTheme(v); paint(); },
+  }, label)));
+  paint();
+  return h('section', { class: 'card glass stack' },
+    h('h2', {}, 'Appearance'),
+    seg,
+    h('p', { class: 'hint' }, 'Auto is light from 6am and dark from 5pm.'));
 }
 
 function dataSection() {

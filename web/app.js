@@ -10,8 +10,10 @@ import { RoutinesView, RoutineView, RoutineRunView } from './views/routines.js';
 import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
 import { HealthView } from './views/health.js';
+import { startTheme } from './lib/theme.js';
 
 R.init();
+startTheme();
 
 // Full-screen flows hide the tab bar
 const routes = [
@@ -20,10 +22,10 @@ const routes = [
   [/^\/setup$/, SetupView, { flow: true }],
   [/^\/factor\/([\w-]+)$/, FactorDetailView],
   [/^\/routines$/, RoutinesView],
-  [/^\/routine\/(new)$/, RoutineView],
-  [/^\/routine\/([\w-]+)\/edit$/, RoutineView],
+  [/^\/routine\/(new)$/, RoutineView, { flow: true }],
+  [/^\/routine\/([\w-]+)\/edit$/, RoutineView, { flow: true }],
   [/^\/routine\/([\w-]+)\/run$/, RoutineRunView, { flow: true }],
-  [/^\/routine\/([\w-]+)$/, RoutineView],
+  [/^\/routine\/([\w-]+)$/, RoutineView, { flow: true }],
   [/^\/settings$/, SettingsView],
   [/^\/help$/, HelpView],
   [/^\/health$/, HealthView],
@@ -49,6 +51,8 @@ function render() {
   el.classList.add('enter');
   setTimeout(() => el.classList.remove('enter'), 1000);
   document.body.classList.toggle('in-flow', !!opts.flow);
+  // Only Today gets the colourful glow; every other screen is plain and darker
+  document.body.classList.toggle('on-home', view === HomeView);
   window.scrollTo(0, 0);
   for (const a of tabs.querySelectorAll('a')) {
     const p = a.dataset.path;
