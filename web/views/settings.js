@@ -42,10 +42,7 @@ function appearanceSection() {
     onclick: () => { setTheme(v); paint(); },
   }, label)));
   paint();
-  return h('section', { class: 'card glass stack' },
-    h('h2', {}, 'Appearance'),
-    seg,
-    h('p', { class: 'hint' }, 'Auto is light from 6am and dark from 5pm.'));
+  return h('section', { class: 'card glass row between appearance' }, h('h2', {}, 'Appearance'), seg);
 }
 
 function dataSection() {
