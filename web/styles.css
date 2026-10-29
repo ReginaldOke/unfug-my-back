@@ -54,11 +54,11 @@ body.in-flow { padding-bottom: 0; }
 .ambient {
   position: fixed; inset: -20%; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(34% 26% at 20% 16%, rgba(190, 172, 160, 0.07), transparent 70%),
-    radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.05), transparent 70%),
-    radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.05), transparent 72%),
-    radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.03), transparent 70%),
-    linear-gradient(180deg, #131315 0%, #0d0d0f 60%, #0a0a0b 100%);
+    radial-gradient(34% 26% at 20% 16%, rgba(190, 172, 160, 0.04), transparent 70%),
+    radial-gradient(40% 32% at 88% 38%, rgba(128, 138, 158, 0.03), transparent 70%),
+    radial-gradient(44% 34% at 26% 82%, rgba(150, 104, 98, 0.03), transparent 72%),
+    radial-gradient(30% 22% at 78% 94%, rgba(214, 200, 186, 0.02), transparent 70%),
+    linear-gradient(180deg, #0f0f11 0%, #0b0b0d 60%, #09090a 100%);
   filter: blur(24px);
   animation: drift 48s ease-in-out infinite alternate;
 }
@@ -83,7 +83,7 @@ body.in-flow { padding-bottom: 0; }
     radial-gradient(40% 3.75% at 20% 11.88%, rgba(120, 30, 52, 0.75), transparent 72%),
     radial-gradient(30% 3.75% at 88% 15.62%, rgba(242, 150, 128, 0.55), transparent 72%),
     /* then a soft lift so the grain reads as grey-black rather than vanishing into the charcoal */
-    linear-gradient(180deg, transparent 14%, rgba(26, 26, 30, 0.16) 24%, rgba(22, 22, 26, 0.13) 45%, rgba(18, 18, 22, 0.08) 70%, rgba(14, 14, 18, 0.03) 100%);
+    linear-gradient(180deg, transparent 14%, rgba(24, 24, 28, 0.09) 24%, rgba(20, 20, 24, 0.07) 45%, rgba(16, 16, 20, 0.04) 70%, transparent 100%);
   transform: rotate(-10deg);
   filter: blur(22px) saturate(120%);
   animation: aura-drift 24s ease-in-out infinite alternate;
