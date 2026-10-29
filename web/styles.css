@@ -1581,10 +1581,10 @@ body:not(.on-home) .ambient::after {
 
 /* The check-in button on Home: clear glass like the tiles under it */
 .btn.primary.hero-cta { background: radial-gradient(60% 120% at 14% 0%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 70%), var(--glass-bg); }
-/* Settings cards look like Home's small tiles: no shiny rim, just a faint edge */
-#app .settings-view .card::before { display: none; }
-#app .settings-view .card { border-color: rgba(255, 255, 255, 0.07); }
-[data-theme="light"] #app .settings-view .card { border-color: rgba(0, 0, 0, 0.06); }
+/* Settings cards, Patterns and Notes look like Home's small tiles: no shiny rim, just a faint edge */
+#app .settings-view .card::before, #app .card.patterns::before, #app .card.pad::before { display: none; }
+#app .settings-view .card, #app .card.patterns, #app .card.pad { border-color: rgba(255, 255, 255, 0.07); }
+[data-theme="light"] #app .settings-view .card, [data-theme="light"] #app .card.patterns, [data-theme="light"] #app .card.pad { border-color: rgba(0, 0, 0, 0.06); }
 
 /* Check-ins: today's button, then the list by month */
 .checkin-cta { margin: 4px 0 8px; }

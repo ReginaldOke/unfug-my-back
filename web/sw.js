@@ -3,7 +3,7 @@
 //  - App files: network first (so every new deploy shows up on the next open), cached copy when offline.
 //  - Google Fonts: cached copy first, refreshed in the background.
 //  - api/*: never cached (it needs the live server).
-const CACHE = 'unfug-my-back-v40';
+const CACHE = 'unfug-my-back-v41';
 
 // Everything the app needs to start offline. test/sw.test.js checks this list against web/.
 const ASSETS = [
