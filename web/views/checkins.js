@@ -11,6 +11,8 @@ import { PENCIL, INTENSITY } from './controls.js';
 export function CheckinsView() {
   const today = localDate();
   const entries = R.checkins.all().reverse();
+  // Nothing to list yet: the tab goes straight to the first check-in
+  if (!entries.length) { location.replace('#/checkin'); return h('div'); }
   const doneToday = entries[0]?.date === today;
 
   // Grouped by month, the month named once above its days
@@ -23,7 +25,6 @@ export function CheckinsView() {
 
   return h('div', { class: `view checkins-view${doneToday ? '' : ' has-dock'}` },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Check-ins')),
-    entries.length ? null : h('p', { class: 'hint center' }, 'Each check-in you do is kept here.'),
     [...groups].map(([month, list]) => h('section', { class: 'checkin-group' },
       h('h2', { class: 'section-label' }, month),
       h('div', { class: 'card glass checkin-list' }, list.map(e => checkinRow(e, today))))),
@@ -113,14 +114,14 @@ export function CheckinDetailView(ctx) {
       factorRows(exercise),
       sessions.map(({ r, s }) => h('div', { class: 'detail-session' },
         lineRow(R.routineIcon(r), R.routineLabel(r), s.times > 1 ? `${s.times}×` : null, s.intensity ? INTENSITY[Math.round(s.intensity)] : null),
-        s.log?.length ? h('ul', { class: 'detail-moves' }, s.log.map(x => h('li', {}, h('span', {}, x.name), h('span', { class: 'hint' }, x.did === '✓' ? '' : x.did)))) : null))) : null,
+        s.log?.length ? h('ul', { class: 'detail-moves' }, s.log.map(x => h('li', {}, h('span', {}, x.name), h('span', { class: 'hint' }, [x.did === '✓' ? '' : x.did, x.extra].filter(Boolean).join(' · '))))) : null))) : null,
 
     block('Stressors', date, 'stressors', stressors.length ? factorRows(stressors) : h('p', { class: 'hint' }, 'None logged')),
     block('Helpers', date, 'helpers', helpers.length ? factorRows(helpers) : h('p', { class: 'hint' }, 'None logged')),
 
     health && (health.steps != null || health.sleepHours != null) ? block('Apple Health', date, null,
       health.steps != null ? lineRow('👟', 'Steps', health.steps.toLocaleString()) : null,
-      health.sleepHours != null ? lineRow('🛌', 'Asleep', fmtMinutes(health.sleepHours * 60)) : null) : null,
+      health.sleepHours != null ? lineRow('🛌', health.inBed ? 'In bed' : 'Asleep', fmtMinutes(health.sleepHours * 60)) : null) : null,
 
     flares.length ? block('Flares', date, null, flares.map(f => lineRow('⚡', fmtTime(f.timestamp), f.intensity != null ? `${f.intensity}/10` : null, f.notes || null))) : null,
 

@@ -120,13 +120,15 @@ function sessionFor(r, date, fromCheckin) {
   const logged = r ? R.routines.sessionOn(r.id, date) : null;
   const before = r ? R.routines.lastDid(r.id, date) : new Map();
   const didNow = new Map((logged?.log ?? []).map(x => [x.name, x.did]));
+  const extraNow = new Map((logged?.log ?? []).filter(x => x.extra).map(x => [x.name, x.extra]));
+  const extraBefore = r ? R.routines.lastExtra(r.id, date) : new Map();
   const draft = fromCheckin && r ? checkinDraft(date) : null;
   // Each box starts with what you did today if logged, else last time, else the target
   const s = {
     key, id: r?.id ?? null, date, name: r?.name ?? '', group: r?.group ?? null, schedule: [...(r?.schedule ?? [])],
     items: (r?.items ?? []).map(it => {
       const now = didNow.get(it.name);
-      return { name: it.name, dose: it.dose, did: now || before.get(it.name) || it.dose || '', done: !!now };
+      return { name: it.name, dose: it.dose, did: now || before.get(it.name) || it.dose || '', done: !!now, extra: extraNow.get(it.name) ?? extraBefore.get(it.name) ?? it.extra ?? '' };
     }),
     intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
     measure: r?.measure ?? defaultMeasure(`${r?.group ?? ''} ${r?.name ?? ''}`),
@@ -143,7 +145,7 @@ function sessionFor(r, date, fromCheckin) {
 function saveSession(s, { fromCheckin }) {
   // Other variations edited in this visit save too, so switching tabs never loses anything
   const others = s.group ? [...sessions.values()].filter(x => x !== s && x.date === s.date && x.group === s.group && x.id) : [];
-  const r = saveOne(s);
+  const r = saveOne(s, { markDone: true });
   if (!r) return null;
   const logged = [s, ...others].filter(x => x === s || saveOne(x)).some(x => x.logged);
   toast(logged ? `${R.routineLabel(r)} logged` : 'Routine saved');
@@ -154,7 +156,8 @@ function saveSession(s, { fromCheckin }) {
 }
 
 /** Saves one routine (or variation) and, if any move is ticked, its session. Returns the routine, or null. */
-function saveOne(s) {
+/** markDone: Done on an existing routine's own page logs it as done today, whatever was entered. */
+function saveOne(s, { markDone = false } = {}) {
   const name = s.name.trim();
   const items = s.items.filter(it => it.name.trim());
   if (s.group !== null && !s.group.trim()) { toast('Give the routine a name'); return null; }
@@ -167,25 +170,27 @@ function saveOne(s) {
   const changed = !existing || existing.name !== name || (existing.group ?? null) !== group || (existing.measure ?? defaultMeasure(`${existing.group ?? ''} ${existing.name}`)) !== s.measure || JSON.stringify(existing.items) !== JSON.stringify(moves)
     || existing.schedule.join() !== [...new Set(s.schedule)].sort().join();
   const r = changed ? R.routines.save(s.id, { name, group, measure: s.measure, items: moves, schedule: [...new Set(s.schedule)].sort() }) : R.routines.get(s.id);
-  const done = items.filter(it => it.done);
-  if (done.length) {
-    const log = items.map(it => ({ name: it.name.trim(), did: it.done ? it.did.trim() || '✓' : '' }));
+  // Done on a routine's page marks it done; a brand-new routine isn't (making it isn't doing it). Other
+  // variations edited on the way only log if something was entered for them.
+  const logIt = (markDone && !!s.id) || s.touched || items.some(it => it.done);
+  if (logIt) {
+    const log = items.map(it => ({ name: it.name.trim(), did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}) }));
     // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
     const live = checkinDraft(s.date);
     R.routines.logSession(r.id, s.date, s.measure === 'count' ? { log, times: s.times } : { log, intensity: s.intensity }, { writeLog: !live });
     if (live) { live.selections.set(r.linkedFactorId, 1); live.intensity.set(r.linkedFactorId, s.intensity); }
   }
   sessions.delete(s.key);
-  s.logged = done.length > 0;
+  s.logged = logIt;
   return r;
 }
 
 const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>';
 
 /**
- * One page per routine: tap the title to rename it, tick moves (the circle or the name), adjust what
- * you did by typing or swiping the box, hold a row to drag it, swipe a row left to delete it, set how
- * hard you went and the reminders, then Done. ▶ plays it one move at a time.
+ * One page per routine: tap the title to rename it, set reps by typing or swiping the box (+ adds a
+ * second box, for weight or a note), hold a row to drag it, swipe a row left to delete it, set how hard
+ * you went and the reminders, then Done (which logs the day if you entered anything). ▶ plays it one move at a time.
  */
 export function RoutineView(ctx) {
   const r = ctx.args[0] && ctx.args[0] !== 'new' ? R.routines.get(ctx.args[0]) : null;
@@ -234,33 +239,40 @@ export function RoutineView(ctx) {
   const closeOpen = () => { if (openRow) { openRow.slide(0); openRow = null; } };
 
   function moveRow(it) {
-    const check = h('button', { type: 'button', class: 'log-check', 'aria-label': `Done: ${it.name || 'move'}` });
-    const tick = on => { it.done = on; row.classList.toggle('done', on); check.setAttribute('aria-pressed', String(on)); };
     const name = h('input', {
       type: 'text', class: 'log-name', value: it.name, placeholder: 'Move', 'aria-label': 'Move name', enterkeyhint: 'next',
       oninput: e => { it.name = e.target.value; },
       onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
     });
-    // Tapping the name ticks it; it's only for typing once you're already in it, or while it's empty
+    // Touching the name doesn't open the keyboard straight away, so a hold can still lift the row
     name.addEventListener('pointerdown', e => {
       if (document.activeElement === name || !it.name) return;
       e.preventDefault();
     });
-    name.addEventListener('click', () => { if (document.activeElement !== name && it.name) tick(!it.done); });
-    name.addEventListener('dblclick', () => { name.focus(); });
+    name.addEventListener('click', () => { if (document.activeElement !== name) name.focus(); });
     const did = h('input', {
-      type: 'text', class: 'did-input', value: it.did, inputmode: 'text', enterkeyhint: 'next', placeholder: 'Done',
-      'aria-label': `What you did: ${it.name}`,
-      oninput: e => { it.did = e.target.value; }, // editing the amount isn't doing the move: tick it yourself
+      type: 'text', class: 'did-input', value: it.did, inputmode: 'text', enterkeyhint: 'next', placeholder: 'Reps',
+      'aria-label': `Reps: ${it.name}`,
+      oninput: e => { it.did = e.target.value; s.touched = true; fitWidth(did); },
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); const next = row.nextElementSibling?.querySelector('.did-input'); next ? next.focus() : e.target.blur(); } },
     });
-    scrubNumber(did, () => it.dose || '0');
-    check.addEventListener('click', () => tick(!it.done));
+    scrubNumber(did, () => it.dose || '0', () => { s.touched = true; fitWidth(did); });
+    // A second box for anything else (weight, a note…): + adds it, emptying it takes it away again
+    const extra = h('input', {
+      type: 'text', class: 'did-input extra-input', value: it.extra ?? '', placeholder: '…', enterkeyhint: 'done',
+      'aria-label': `Extra for ${it.name}, like weight or a note`,
+      oninput: e => { it.extra = e.target.value; s.touched = true; fitWidth(extra); },
+      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
+      onblur: () => { if (!extra.value.trim()) { it.extra = ''; showExtra(false); } },
+    });
+    const plus = h('button', { type: 'button', class: 'extra-add', 'aria-label': `Add another box for ${it.name || 'this move'}`, onclick: () => { showExtra(true); extra.focus(); } }, '+');
+    const showExtra = on => { extra.hidden = !on; plus.hidden = on; };
+    showExtra(!!it.extra);
+    requestAnimationFrame(() => { fitWidth(did); fitWidth(extra); });
 
-    const inner = h('div', { class: 'log-inner' }, check, name, did);
+    const inner = h('div', { class: 'log-inner' }, name, plus, did, extra);
     const del = h('button', { type: 'button', class: 'log-del', 'aria-label': `Delete ${it.name || 'move'}`, onclick: () => remove() }, 'Delete');
-    const row = h('div', { class: `log-row drag-row${it.done ? ' done' : ''}` }, del, inner);
-    check.setAttribute('aria-pressed', String(it.done));
+    const row = h('div', { class: 'log-row drag-row' }, del, inner);
     rowItem.set(row, it);
 
     function remove() {
@@ -276,7 +288,7 @@ export function RoutineView(ctx) {
     row.slide = x => { inner.style.transform = x ? `translateX(${x}px)` : ''; row.classList.toggle('open', x < 0); };
     let swallowUntil = 0;
     inner.addEventListener('pointerdown', e => {
-      if (e.target.closest('.did-input') || e.button > 0) return;
+      if (e.target.closest('.did-input, .extra-add') || e.button > 0) return;
       sw = { x: e.clientX, y: e.clientY, base: openRow === row ? -84 : 0, on: false };
     });
     inner.addEventListener('pointermove', e => {
@@ -311,7 +323,7 @@ export function RoutineView(ctx) {
   paint();
   // Hold a row (its name or the space around it, not the box) to lift it, then drag
   dragHandles(list, {
-    hold: true, skip: '.did-input, .log-name:focus, .log-del', onLift: closeOpen,
+    hold: true, skip: '.did-input, .extra-add, .log-name:focus, .log-del', onLift: closeOpen,
     onReorder: rows => { s.items.splice(0, s.items.length, ...rows.map(x => rowItem.get(x))); },
   });
   const closeOnTapAway = e => { if (openRow && !openRow.contains(e.target)) closeOpen(); };
@@ -367,17 +379,20 @@ export function RoutineView(ctx) {
     field.classList.toggle('counted', counted());
     field.style.setProperty('--h', String(counted() ? 168 : Math.round(f < 0.5 ? 135 - 87 * f * 2 : 48 - 46 * (f - 0.5) * 2)));
   };
-  // The question the slider answers, its answer on the right; a quiet link underneath switches what's tracked
+  // What the slider measures, with a swap button beside it to switch between intensity and a count
   const question = h('span', { class: 'effort-question' });
-  const switcher = h('button', { type: 'button', class: 'measure-switch', onclick: () => { setMeasure(counted() ? 'effort' : 'count'); vibrate(4); } });
+  const switcher = h('button', { type: 'button', class: 'measure-swap', onclick: () => { setMeasure(counted() ? 'effort' : 'count'); vibrate(4); } });
+  switcher.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>';
   const setMeasure = m => {
     s.measure = m;
     range.min = 1; range.max = counted() ? MAX_TIMES : 3; range.value = value();
-    question.textContent = counted() ? 'How many times today?' : 'How hard was it?';
-    switcher.textContent = counted() ? 'Track how hard instead' : 'Track how many times instead';
+    question.textContent = counted() ? 'Times today' : 'Workout intensity';
+    const other = counted() ? 'workout intensity' : 'times today';
+    switcher.setAttribute('aria-label', `Track ${other} instead`);
+    switcher.title = `Track ${other} instead`;
     paintHow();
   };
-  field.append(h('div', { class: 'row between' }, question, word), range, switcher);
+  field.append(h('div', { class: 'row between' }, h('span', { class: 'row tight' }, question, switcher), word), range);
   setMeasure(s.measure);
 
   // Reminders, as chips; + adds one
@@ -453,7 +468,18 @@ const SCRUB_STEP = 14; // px of finger travel per step
  * Swipe up or down on a log box to change its number; a plain tap still opens the keyboard to type.
  * An empty box starts from seed() (last time's value, or the target).
  */
-function scrubNumber(input, seed) {
+// Boxes are as wide as their text (or placeholder), within limits, measured in the box's own font
+const measure = document.createElement('canvas').getContext('2d');
+function fitWidth(input) {
+  if (!input.isConnected) return;
+  const cs = getComputedStyle(input);
+  measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const text = input.value || input.placeholder || '';
+  const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2;
+  input.style.width = `${Math.min(190, Math.max(48, Math.ceil(measure.measureText(text).width + pad)))}px`;
+}
+
+function scrubNumber(input, seed, onChange = () => {}) {
   let start = null;
   input.addEventListener('pointerdown', e => {
     if (e.button > 0 || document.activeElement === input) return; // already typing: leave it alone

@@ -305,7 +305,7 @@ function trendCard(today) {
     } else if (x === 'sleepHours') {
       const hours = dates.map(d => R.health.day(d)?.sleepHours ?? null);
       series.push({
-        key: 'sleepHours', label: 'Hours slept', palette,
+        key: 'sleepHours', label: R.health.sleepWord() === 'In bed' ? 'Time in bed' : 'Hours slept', palette,
         values: hours.map(v => (v == null ? null : 0.04 + Math.min(1, v / 12) * 0.86)),
         format: i => (hours[i] == null ? '–' : `${hours[i]} h`),
       });
@@ -359,7 +359,7 @@ function openDataSheet(autoLines, autoIds) {
   const options = [
     { id: 'stress', title: 'Stress', detail: 'From your check-ins' },
     { id: 'sleep', title: 'Sleep', detail: 'How well, out of 10' },
-    ...(HEALTH_IMPORT && R.health.has('sleepHours') ? [{ id: 'sleepHours', title: 'Hours slept', detail: 'From Apple Health' }] : []),
+    ...(HEALTH_IMPORT && R.health.has('sleepHours') ? [{ id: 'sleepHours', title: R.health.sleepWord() === 'In bed' ? 'Time in bed' : 'Hours slept', detail: 'From Apple Health' }] : []),
     ...(HEALTH_IMPORT && R.health.has('steps') ? [{ id: 'steps', title: 'Steps', detail: 'From Apple Health' }] : []),
     ...R.factors.all().filter(f => !autoIds.includes(f.id)).map(f => ({
       id: f.id, title: f.name, detail: f.role === 'helper' ? 'Helper' : 'Stressor',

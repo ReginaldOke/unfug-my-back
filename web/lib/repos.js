@@ -1,10 +1,11 @@
 // Repositories: the domain API the views use. Views never touch store.js directly.
 import * as S from './store.js';
 import { localDate, addDays } from './dates.js';
-import { SEED_FACTORS, SEED_ROUTINE } from './seed.js';
+import { SEED_FACTORS, SEED_ROUTINE, SEED_GYM } from './seed.js';
 import { defaultUnit, emojiFor } from './labels.js';
 import { regionAt, H } from './regions3d.js';
 import { regionById } from './regions.js';
+import { planImport } from './import.js';
 
 export const settings = S.settings;
 export const setSettings = S.setSettings;
@@ -17,6 +18,8 @@ export function init() {
   if (!S.settings().seeded) seed();
   retireSeeds();
   addNewSeeds();
+  trimDefaultRoutine();
+  addGymRoutine();
   fixMarkerFrame();
   giveRoutinesFactors();
 }
@@ -60,10 +63,10 @@ function fixMarkerFrame() {
 }
 
 // Seeds that were renamed, applied once to existing diaries
-const RENAMED = { 'Extension breaks': 'Sitting breaks' };
+const RENAMED = { 'Extension breaks': 'Sitting breaks', 'Guitar (seated)': 'Guitar' };
 // Seed factors taken out of the app: deleted for people who never logged them, otherwise switched off
 // once (history kept, and they can switch them back on). Matched loosely, as people rename them.
-const RETIRED = [/^hunched over phone or laptop$/i, /^poor sleep$/i, /^heavy lifting or bending$/i, /^manual work/i, /^crossed-leg sitting$/i, /^training volume above plan$/i];
+const RETIRED = [/^hunched over phone or laptop$/i, /^poor sleep$/i, /^heavy lifting or bending$/i, /^manual work/i, /^crossed-leg sitting$/i, /^training volume above plan$/i, /^mobility routine$/i];
 function retireSeeds() {
   const done = S.settings().retiredSeeds ?? [];
   const hit = S.table('factors').filter(f => f.source === 'seed' && RETIRED.some(re => re.test(f.name)) && !done.includes(f.id));
@@ -72,16 +75,35 @@ function retireSeeds() {
   S.batch(() => {
     for (const f of renames) S.update('factors', f.id, { name: RENAMED[f.name] });
     for (const f of hit) {
-      if (S.table('factorLogs').some(l => l.factorId === f.id)) S.update('factors', f.id, { isArchived: true });
+      if (S.table('factorLogs').some(l => l.factorId === f.id)) S.update('factors', f.id, { isArchived: true, retired: true });
       else S.removeWhere('factors', x => x.id === f.id);
     }
     S.settings().retiredSeeds = [...done, ...hit.map(f => f.id)];
   });
 }
 
+// The starter routine used to have eight moves; any routine still holding exactly those, untouched,
+// gets the shorter four. Edited routines are left alone.
+const OLD_DEFAULT_MOVES = ['Half-kneeling hip flexor stretch', 'Single-leg hinge', 'Cat-cow', 'Open book', 'Cobra and downward dog', 'Bird dog', 'Hamstring stretch', 'Deep squat hold'];
+function trimDefaultRoutine() {
+  const old = S.table('routines').filter(r => r.items?.map(it => it.name).join('|') === OLD_DEFAULT_MOVES.join('|'));
+  if (old.length) S.batch(() => { for (const r of old) S.update('routines', r.id, { items: structuredClone(SEED_ROUTINE.items) }); });
+}
+
+// Everyone gets the Gym split once (new diaries and existing ones), unless they already have a Gym routine
+function addGymRoutine() {
+  if (S.settings().gymAdded) return;
+  S.batch(() => {
+    if (!S.table('routines').some(r => !r.isArchived && /^gym$/i.test(r.group ?? r.name))) {
+      for (const v of SEED_GYM) S.insert('routines', { ...structuredClone(v), measure: 'effort', schedule: [], linkedFactorId: null, isArchived: false });
+    }
+    S.settings().gymAdded = true;
+  });
+}
+
 // Seed factors added after launch reach existing diaries once (switched on if they're on for new
 // users), and never come back after being deleted
-const ADDED_SEEDS = ['Screen time', 'Yoga or pilates', 'Team sport', 'Meditation'];
+const ADDED_SEEDS = ['Screen time', 'Yoga or pilates', 'Team sport', 'Meditation', 'Standing for a long time', 'Lifting and bending', 'Slouching on the sofa', 'Housework or gardening', 'Long flight or train', 'Massage'];
 function addNewSeeds() {
   const done = S.settings().seedsAdded ?? [];
   const todo = ADDED_SEEDS.filter(n => !done.includes(n));
@@ -96,6 +118,15 @@ function addNewSeeds() {
     });
     S.settings().seedsAdded = [...done, ...todo];
   });
+}
+
+/** Merges an exported diary into this one (see import.js). Returns the plan's summary. */
+export function importDiary(data, plan = planImport(S.snapshot(), data)) {
+  S.batch(() => {
+    for (const [name, rows] of Object.entries(plan.add)) S.table(name)?.push(...rows);
+  });
+  giveRoutinesFactors();
+  return plan.summary;
 }
 
 export function wipeEverything() {
@@ -318,6 +349,13 @@ export const routines = {
 
   /** That day's logged session, if any: { log: [{ name, did }], intensity }. */
   sessionOn: (id, date) => S.table('routineCompletions').find(c => c.routineId === id && c.completed && (c.date ?? localDate(new Date(c.timestamp))) === date),
+  /** The extra box (weight, a note…) for each move last time (before `date`), by move name. */
+  lastExtra(id, date = localDate()) {
+    const past = S.table('routineCompletions')
+      .filter(c => c.routineId === id && c.log?.some(x => x.extra) && (c.date ?? localDate(new Date(c.timestamp))) < date)
+      .sort((a, b) => (b.date ?? b.timestamp).localeCompare(a.date ?? a.timestamp))[0];
+    return new Map((past?.log ?? []).filter(x => x.extra).map(x => [x.name, x.extra]));
+  },
   /** What you did for each move last time (before `date`), by move name. */
   lastDid(id, date = localDate()) {
     const past = S.table('routineCompletions')
@@ -403,6 +441,22 @@ export const health = {
   day: date => S.table('healthDays').find(d => d.date === date),
   all: () => [...S.table('healthDays')].sort((a, b) => a.date.localeCompare(b.date)),
   has: key => S.table('healthDays').some(d => d[key] != null),
+  /**
+   * How a day compares with your usual: percent above (+) or below (−) the average of the seven days
+   * before it that have the number. Null with fewer than three days to compare against.
+   */
+  vsUsual(date, key) {
+    const v = health.day(date)?.[key];
+    const before = health.all().filter(d => d.date < date && d[key] != null).slice(-7);
+    if (v == null || before.length < 3) return null;
+    const avg = before.reduce((a, d) => a + d[key], 0) / before.length;
+    return avg ? Math.round(((v - avg) / avg) * 100) : null;
+  },
+  /** "In bed" when the sleep we have is mostly time in bed (an iPhone without a Watch), else "Asleep". */
+  sleepWord: () => {
+    const nights = S.table('healthDays').filter(d => d.sleepHours != null);
+    return nights.filter(d => d.inBed).length > nights.length / 2 ? 'In bed' : 'Asleep';
+  },
 
   /** Merges rows of { date, steps?, sleepHours? } into what's stored. Returns how many days changed. */
   merge(rows, source) {

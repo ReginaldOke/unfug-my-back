@@ -3,14 +3,14 @@
 //  - App files: network first (so every new deploy shows up on the next open), cached copy when offline.
 //  - Google Fonts: cached copy first, refreshed in the background.
 //  - api/*: never cached (it needs the live server).
-const CACHE = 'unfug-my-back-v44';
+const CACHE = 'unfug-my-back-v73';
 
 // Everything the app needs to start offline. test/sw.test.js checks this list against web/.
 const ASSETS = [
   './', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
-  'assets/body.obj',
+  'assets/body.obj', 'nudge.wav',
   'icons/apple-touch-icon.png', 'icons/favicon-32.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  'lib/ai.js', 'lib/analysis.js', 'lib/dates.js', 'lib/export.js', 'lib/health.js', 'lib/labels.js', 'lib/markdown.js',
+  'lib/ai.js', 'lib/analysis.js', 'lib/dates.js', 'lib/export.js', 'lib/health.js', 'lib/import.js', 'lib/interpret.js', 'lib/labels.js',
   'lib/motion.js', 'lib/notify.js', 'lib/native.js', 'lib/theme.js', 'views/checkins.js', 'privacy.html', 'lib/regions.js', 'lib/regions3d.js', 'lib/reminders-core.js',
   'lib/reminders.js', 'lib/repos.js', 'lib/seed.js', 'lib/store.js', 'lib/ui.js', 'lib/voice.js',
   'views/body3d.js', 'views/calendar.js', 'views/chart.js', 'views/checkin.js', 'views/controls.js',

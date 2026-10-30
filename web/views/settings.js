@@ -1,7 +1,10 @@
 // Settings: what you track, reminders, your data, help.
-import { h, shareOrDownload, sheet, vibrate } from '../lib/ui.js';
+import { h, shareOrDownload, sheet, vibrate, toast } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { buildExport } from '../lib/export.js';
+import { planImport, isDiaryExport } from '../lib/import.js';
+import { readWorkoutText, readCSV } from '../lib/interpret.js';
+import { readHealthExport } from '../lib/health.js';
 import { REGIONS } from '../lib/regions.js';
 import { localDate } from '../lib/dates.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
@@ -20,14 +23,14 @@ export function SettingsView() {
   return h('div', { class: 'view settings-view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Settings')),
 
+    appearanceSection(),
+
     h('section', { class: 'card glass' },
       row('#/setup?step=stressors&edit=1', 'Stressors & helpers', `${nStress} stressors · ${nHelp} helpers`),
       h('button', { type: 'button', class: 'list-row', onclick: openReminderSheet },
         h('span', { class: 'grow' }, 'Reminders', h('span', { class: 'hint block' }, rem.enabled ? `Move every ${rem.intervalMin} min · ${hoursSummary(rem)}` : 'Move nudges off')),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
       HEALTH_IMPORT ? row('#/health', 'Apple Health', R.health.all().length ? `Steps and sleep for ${R.health.all().length} days` : 'Bring in steps and sleep') : null),
-
-    appearanceSection(),
 
     dataSection(),
 
@@ -56,9 +59,97 @@ function dataSection() {
     h('h2', { class: 'row-title' }, 'Your data'),
     h('p', { class: 'hint' }, 'Saves your diary as one file. It includes instructions for AI, so you can attach it to any AI chat as is.'),
     h('div', { class: 'row' }, from, h('span', { class: 'hint' }, 'to'), to),
-    h('button', { type: 'button', class: 'btn primary', onclick: () => shareOrDownload(`unfug-my-back-${from.value}-to-${to.value}.json`, JSON.stringify(exportData(), null, 2), 'application/json') }, 'Export'),
+    h('div', { class: 'row data-actions' },
+      h('button', { type: 'button', class: 'btn glass', onclick: () => shareOrDownload(`unfug-my-back-${from.value}-to-${to.value}.json`, JSON.stringify(exportData(), null, 2), 'application/json') }, 'Export'),
+      h('button', { type: 'button', class: 'btn glass', onclick: openImportSheet }, 'Import')),
     h('button', { type: 'button', class: 'btn danger', onclick: () => openWipeSheet(exportAll) }, 'Delete all data'));
 }
+
+/**
+ * Import: a file (our export, a CSV from another app, a Health export, a note saved as text) or text
+ * pasted in (a workout from Notes). It's read on the phone, previewed, then merged in.
+ */
+function openImportSheet() {
+  sheet(close => {
+    const status = h('p', { class: 'hint', 'aria-live': 'polite' });
+    const input = h('input', {
+      type: 'file', hidden: true,
+      onchange: async e => {
+        const file = e.target.files[0];
+        input.value = '';
+        if (!file) return;
+        status.textContent = 'Reading…';
+        try {
+          const data = await readFile(file, f => { status.textContent = `Reading… ${Math.round(f * 100)}%`; });
+          status.textContent = '';
+          if (!data) { status.textContent = 'Couldn’t find anything to bring in from that file.'; return; }
+          close();
+          previewImport(data);
+        } catch (err) { status.textContent = err.message || 'Couldn’t read that file.'; }
+      },
+    });
+    const text = h('textarea', { class: 'notes glass import-text', rows: 6, placeholder: 'Or paste a workout, e.g.\nPush:\nBench press 3x8 60kg\nDips 3x10', 'aria-label': 'Paste a workout or a CSV' });
+    return h('div', { class: 'stack' },
+      h('h2', {}, 'Import'),
+      h('p', { class: 'muted' }, 'A backup from this app, a CSV from another app, an Apple Health export, or a workout written as a note.'),
+      input,
+      h('button', { type: 'button', class: 'btn primary', onclick: () => input.click() }, 'Choose a file'),
+      text,
+      h('button', {
+        type: 'button', class: 'btn glass', onclick: () => {
+          const data = readText(text.value);
+          if (!data) { status.textContent = 'Couldn’t find a workout or table in that text.'; return; }
+          close();
+          previewImport(data);
+        },
+      }, 'Read pasted text'),
+      status);
+  }, { tall: true });
+}
+
+/** Works out what a file is and reads it into the export's shape (or null). */
+async function readFile(file, onProgress) {
+  if (/\.(zip|xml)$/i.test(file.name)) {
+    const days = await readHealthExport(file, onProgress);
+    return days.length ? { factors: [], dailyEntries: [], healthDays: days.map(d => ({ id: R.uuid(), source: 'apple-health-export', ...d })) } : null;
+  }
+  const raw = await file.text();
+  if (/\.json$/i.test(file.name) || raw.trimStart().startsWith('{')) {
+    let data;
+    try { data = JSON.parse(raw); } catch { data = null; }
+    if (isDiaryExport(data)) return data;
+  }
+  return /\.(csv|tsv)$/i.test(file.name) ? readCSV(raw) : readText(raw);
+}
+
+/** Pasted or plain text: a table if it looks like one, otherwise a workout. */
+const readText = raw => (/^[^\n]*[,\t;][^\n]*\n[^\n]*[,\t;]/.test(raw.trim()) && readCSV(raw)) || readWorkoutText(raw);
+
+/** What an import would add, then merge it in on Import. */
+function previewImport(data) {
+  const plan = planImport(R.snapshot(), data);
+  const { checkins, skippedDays, factors, routines, sessions, healthDays } = plan.summary;
+  const n = (k, one, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
+  const adds = [checkins && n(checkins, 'check-in'), factors && n(factors, 'thing to track', 'things to track'),
+    routines && n(routines, 'routine'), sessions && n(sessions, 'past session'), healthDays && n(healthDays, 'day of steps and sleep', 'days of steps and sleep')].filter(Boolean);
+  if (!adds.length) return toast(skippedDays ? 'Nothing new: you already have those days' : 'Nothing new to add');
+  // Show the routines as they'll appear, so a note that was read oddly is caught before it's added
+  const newRoutines = plan.add.routines ?? [];
+  sheet(close => h('div', { class: 'stack' },
+    h('h2', {}, 'Bring this in?'),
+    h('p', { class: 'muted' }, `Adds ${adds.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`),
+    newRoutines.length ? h('div', { class: 'import-routines' }, newRoutines.map(routinePreview)) : null,
+    skippedDays ? h('p', { class: 'hint' }, `${n(skippedDays, 'day')} you’ve already checked in here keep${skippedDays === 1 ? 's' : ''} this phone’s version.`) : null,
+    h('p', { class: 'hint' }, 'Nothing here is changed or removed. You can edit or delete anything afterwards.'),
+    h('button', { type: 'button', class: 'btn primary', onclick: () => { R.importDiary(data, plan); close(); toast(`Added ${adds[0]}${adds.length > 1 ? ' and more' : ''}`); } }, 'Add'),
+    h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Cancel')), { tall: true });
+}
+
+const routinePreview = r => h('div', {},
+  h('strong', {}, r.group ? `${r.group} · ${r.name}` : r.name),
+  h('ul', {}, r.items.map(it => h('li', {},
+    h('span', {}, it.name),
+    h('span', { class: 'hint' }, [it.dose, it.extra].filter(Boolean).join(' · '))))));
 
 /** Deleting everything takes a deliberate press and hold, after saying exactly what goes. */
 function openWipeSheet(exportAll) {

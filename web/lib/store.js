@@ -9,7 +9,8 @@ export const TABLES = [
   'reminderEvents', 'routines', 'routineCompletions', 'aiSummaries', 'healthDays', 'routineChanges',
 ];
 
-const ACTIVE_HOURS = { on: true, start: '08:00', end: '22:00' };
+// Nudges default to working hours: 9 to 5, Monday to Friday
+const ACTIVE_HOURS = { on: true, start: '09:00', end: '17:00' };
 
 export const DEFAULT_SETTINGS = {
   onboarded: false,
@@ -22,7 +23,7 @@ export const DEFAULT_SETTINGS = {
     minWalkMin: 2,
     minSteps: 150,
     snoozeMin: 10,
-    activeHours: Array.from({ length: 7 }, () => ({ ...ACTIVE_HOURS })), // indexed by Date#getDay()
+    activeHours: Array.from({ length: 7 }, (_, d) => ({ ...ACTIVE_HOURS, on: d >= 1 && d <= 5 })), // indexed by Date#getDay()
   },
   pausedUntil: null,
   lastMovementAt: null,

@@ -158,7 +158,7 @@ export function CheckinView(ctx) {
       }
       case 'move': {
         const ids = [...R.routines.all().map(r => r.linkedFactorId), ...R.factors.forCheckin([], { exercise: true }).map(f => f.id)];
-        return h('div', { class: 'stack' }, sameAsYesterday(ids), healthStrip('steps'), routinesSection(), factorGrid([], { exercise: true, label: 'Other exercise', same: false }));
+        return h('div', { class: 'stack' }, sameAsYesterday(ids), routinesSection(), factorGrid([], { exercise: true, label: 'Other exercise', same: false, lead: healthStrip('steps') }));
       }
       case 'stressors': return factorGrid(['trigger', 'unsure'], { role: 'trigger' });
       case 'helpers': return factorGrid(['helper'], { role: 'helper' });
@@ -170,19 +170,33 @@ export function CheckinView(ctx) {
   function healthStrip(kind) {
     if (!HEALTH_IMPORT) return null;
     const [key, icon, fmt, ask] = kind === 'sleep'
-      ? ['sleepHours', '🛌', v => [h('strong', {}, `${v} h`), ' asleep'], 'Show your sleep here']
+      ? ['sleepHours', '🛌', v => [h('strong', {}, `${v} h`), R.health.day(date)?.inBed ? ' in bed' : ' asleep'], 'Show your sleep here']
       : ['steps', '👟', v => [h('strong', {}, v.toLocaleString()), ' steps'], 'Show your steps here'];
     const v = R.health.day(date)?.[key];
     if (v != null) {
+      // Compared with your usual (the week before): ↑ 12% or ↓ 8%, or "about usual" within 5%
+      const pct = R.health.vsUsual(date, key);
+      const vs = pct == null ? null : Math.abs(pct) < 5 ? 'about usual' : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% on usual`;
       return h('div', { class: 'steps-strip glass' },
         h('span', { class: 'well', 'aria-hidden': 'true' }, icon),
-        h('span', { class: 'grow' }, fmt(v)),
+        h('span', { class: 'grow' }, fmt(v), vs ? h('span', { class: 'hint block' }, vs) : null),
         h('span', { class: 'hint' }, 'Apple Health'));
     }
-    return R.health.has(key) ? null : h('a', { class: 'steps-strip link', href: '#/health' },
-      h('span', { class: 'well', 'aria-hidden': 'true' }, icon),
-      h('span', { class: 'grow' }, ask),
-      h('span', { class: 'hint' }, 'Apple Health ›'));
+    // No data yet: a prompt to connect Apple Health, until it's dismissed with ✕
+    const dismissed = R.settings().healthNudgeDismissed ?? [];
+    if (R.health.has(key) || dismissed.includes(kind)) return null;
+    const strip = h('div', { class: 'steps-strip link' },
+      h('a', { class: 'strip-link', href: '#/health' },
+        h('span', { class: 'well', 'aria-hidden': 'true' }, icon),
+        h('span', { class: 'grow' }, ask),
+        h('span', { class: 'hint' }, 'Apple Health ›')),
+      h('button', {
+        type: 'button', class: 'strip-x', 'aria-label': 'Dismiss', onclick: () => {
+          R.setSettings({ healthNudgeDismissed: [...dismissed, kind] });
+          strip.remove();
+        },
+      }, '✕'));
+    return strip;
   }
 
   /** Your routines first: tick the one you did, swipe for how hard, Edit to log that day's session. */
@@ -220,11 +234,12 @@ export function CheckinView(ctx) {
     }, '↺ Same as yesterday');
   }
 
-  function factorGrid(roles, { role = 'helper', exercise = false, label = null, same = true }) {
+  /** lead: anything that sits just under the label, above the tiles (the day's steps, for exercise). */
+  function factorGrid(roles, { role = 'helper', exercise = false, label = null, same = true, lead = null }) {
     const grid = h('div', { class: 'tile-grid' });
     const intensities = exercise ? draft.intensity : null;
     const fill = () => grid.replaceChildren(
-      ...R.factors.forCheckin(roles, { exercise }).map(f => FactorTile({ factor: f, selections: draft.selections, intensities })),
+      ...R.factors.forCheckin(roles, { exercise }).map(f => FactorTile({ factor: f, selections: draft.selections, intensities, onHold: () => editList(f) })),
       h('button', {
         type: 'button', class: 'tile add', onclick: async () => {
           const added = await quickAddFactor({ role, exercise });
@@ -235,8 +250,15 @@ export function CheckinView(ctx) {
     fill();
     return h('div', { class: label ? 'stack tight' : '' },
       label ? h('h3', { class: 'section-label' }, label) : null,
+      lead,
       same ? sameAsYesterday(R.factors.forCheckin(roles, { exercise }).map(f => f.id)) : null,
       grid);
+  }
+
+  /** Hold a tile: open the stressors or helpers list in edit mode (move, rename, delete), then come back here. */
+  function editList(f) {
+    const step = f.role === 'helper' ? 'helpers' : 'stressors';
+    location.hash = `#/setup?step=${step}&edit=1&hold=1&back=${encodeURIComponent(location.hash.slice(1))}`;
   }
 
   function notesStep() {

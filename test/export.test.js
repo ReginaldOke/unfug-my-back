@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildExport, toCSV, ANALYSIS_PROMPT } from '../web/lib/export.js';
-import { renderMarkdown } from '../web/lib/markdown.js';
 
 const data = {
   schemaVersion: 1,
@@ -30,12 +29,4 @@ test('CSV escapes quotes, commas and newlines, and serialises objects', () => {
   const csv = toCSV([{ a: 'x, y', b: 'say "hi"' }, { a: 'line\nbreak', c: { k: 1 } }]);
   assert.equal(csv, 'a,b,c\n"x, y","say ""hi""",\n"line\nbreak",,"{""k"":1}"');
   assert.equal(toCSV([]), '');
-});
-
-test('markdown renderer escapes HTML before formatting', () => {
-  const html = renderMarkdown('## Hi\n- **bold** <script>x</script>\n1. one');
-  assert.match(html, /<h3>Hi<\/h3>/);
-  assert.match(html, /<strong>bold<\/strong> &lt;script&gt;/);
-  assert.match(html, /<ol><li>one<\/li><\/ol>/);
-  assert.doesNotMatch(html, /<script>/);
 });

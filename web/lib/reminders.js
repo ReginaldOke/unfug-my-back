@@ -77,7 +77,6 @@ function showMovementBanner(ev) {
     body: `You've been still for ${stillFor(ev.stationaryMinutesBefore ?? R.settings().reminder.intervalMin)}.${idea}`,
     actions: [
       { label: 'Moving now', primary: true, run: () => respond(ev.id, 'moved') },
-      { label: 'Already moved', run: () => respond(ev.id, 'already_moved') },
       { label: 'Snooze 10 min', run: () => respond(ev.id, 'snoozed') },
     ],
   });

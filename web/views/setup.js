@@ -12,12 +12,14 @@ const STEPS = ['stressors', 'helpers', 'reminders'];
 
 export function SetupView(ctx) {
   const editing = ctx.params.get('edit') === '1';
+  // Opened by holding a tile in the check-in: start in edit mode, and go back there when done
+  const back = ctx.params.get('back'), startEditing = ctx.params.get('hold') === '1';
   let step = Math.max(0, STEPS.indexOf(ctx.params.get('step') || 'stressors'));
   const root = h('div', { class: 'flow setup' });
 
   function go(n) {
     // Editing from Settings walks stressors then helpers; reminders live in Settings already
-    if (n < 0 || n >= STEPS.length || (editing && STEPS[n] === 'reminders')) return finish();
+    if (n < 0 || n >= STEPS.length || (editing && STEPS[n] === 'reminders') || (back && n !== step)) return finish();
     step = n;
     render();
   }
@@ -28,7 +30,7 @@ export function SetupView(ctx) {
       reminders.reschedule();
       toast('Saved');
     }
-    location.hash = editing ? '#/settings' : '#/';
+    location.hash = back ? `#${back}` : editing ? '#/settings' : '#/';
   }
 
   function render() {
@@ -41,7 +43,7 @@ export function SetupView(ctx) {
       h('div', { class: 'flow-body' }, content(id)),
       h('div', { class: 'flow-footer single' },
         h('button', { type: 'button', class: 'btn primary wide', onclick: () => go(step + 1) },
-          editing ? (id === 'helpers' ? 'Done' : 'Next') : id === 'reminders' ? 'Finish' : 'Next')));
+          back || (editing && id === 'helpers') ? 'Done' : editing ? 'Next' : id === 'reminders' ? 'Finish' : 'Next')));
     root.querySelector('h1')?.focus({ preventScroll: true });
   }
 
@@ -83,6 +85,7 @@ export function SetupView(ctx) {
         onTap: (item, e) => renameInline(item, R.factors.get(item.dataset.id), e.target.closest('.well') ? 'icon' : 'name'),
       });
       fill();
+      if (startEditing) setTimeout(() => sort.setEditing(true), 0);
       return h('div', { class: 'stack' },
         h('div', { class: 'row between' }, h('h1', { tabindex: -1 }, id === 'stressors' ? 'What tends to set it off?' : 'What tends to help?'), done),
         h('p', { class: 'muted' }, id === 'stressors'
@@ -105,12 +108,12 @@ export function SetupView(ctx) {
         h('h2', {}, 'Nudge after sitting still for'),
         segmented([[30, '30 min'], [45, '45 min'], [60, '60 min']], s.reminder.intervalMin,
           v => { R.setSettings({ reminder: { ...R.settings().reminder, intervalMin: v } }); }, 'Nudge interval'),
-        h('p', { class: 'hint' }, 'Only between 8am and 10pm. Change hours in Settings.')),
+        h('p', { class: 'hint' }, 'Weekdays, 9am to 5pm. Change this in Settings.')),
       h('section', { class: 'card glass stack' },
         h('h2', {}, 'Evening check-in at'),
         h('input', { type: 'time', class: 'glass-input', value: s.checkinTime, 'aria-label': 'Check-in reminder time', onchange: e => R.setSettings({ checkinTime: e.target.value }) })),
-      permBtn,
-      h('p', { class: 'hint' }, 'In this web prototype, reminders appear while the page is open in a tab.'));
+      // The iOS app asks for notifications itself; a browser that can't show them says nothing
+      perm === 'unsupported' ? null : permBtn);
   }
 
   render();

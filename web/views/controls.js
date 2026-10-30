@@ -204,7 +204,7 @@ const lastIntensity = f => R.factors.logs(f.id).find(l => l.intensity)?.intensit
  * tile the effort isn't a button: it's set by the swipe and shown as bars and a word under the name,
  * with the fill tinted green, yellow or red.
  */
-export function FactorTile({ factor: f, selections, intensities = null, onChange = () => {}, title = f.name, action = null }) {
+export function FactorTile({ factor: f, selections, intensities = null, onChange = () => {}, title = f.name, action = null, onHold = null }) {
   const scale = scaleFor(f);
   const swipeEffort = !!intensities && f.measureType === 'yesno';
   const bars = () => h('span', { class: 'bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
@@ -237,8 +237,12 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
       const lvl = Math.round(intensities.get(f.id) ?? 0); // a routine's effort can sit between levels
       effort.hidden = !on;
       effort.dataset.level = lvl;
-      effort.lastChild.textContent = INTENSITY[lvl];
-      if (swipeEffort) el.dataset.effort = on ? lvl : '';
+      effort.lastChild.textContent = swipeEffort ? effortWord(intensities.get(f.id) ?? 2) : INTENSITY[lvl];
+      if (swipeEffort) {
+        el.dataset.effort = on ? lvl : '';
+        // The fill's colour follows the effort continuously: green when easy, through amber, to coral when hard
+        if (on) el.style.setProperty('--eh', String(effortHue(intensities.get(f.id) ?? 2)));
+      }
       else effort.setAttribute('aria-label', `${f.name} intensity: ${INTENSITY[lvl]}. Tap to change.`);
     }
   }
@@ -273,16 +277,22 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
     onChange();
   }
 
-  let start = null, dragging = false;
+  // Holding still (no swipe) for a moment runs onHold: the check-in opens the editor for these tiles
+  let start = null, dragging = false, holdTimer = 0;
+  const HOLD_MS = 480;
   el.addEventListener('pointerdown', e => {
     if (e.target === valueBtn || e.target.closest('input, .tile-intensity, .tile-action-wrap')) return;
     const lvl = selections.has(f.id) ? intensities?.get(f.id) ?? 2 : 0;
     start = { x: e.clientX, y: e.clientY, v: selections.get(f.id) ?? 0, lvl, w: el.getBoundingClientRect().width };
     dragging = false;
+    clearTimeout(holdTimer);
+    if (onHold) holdTimer = setTimeout(() => { if (start && !dragging) { start = null; vibrate(12); onHold(); } }, HOLD_MS);
   });
+  el.addEventListener('contextmenu', e => { if (onHold) e.preventDefault(); });
   el.addEventListener('pointermove', e => {
     if (!start || (f.measureType === 'yesno' && !swipeEffort)) return;
     const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (Math.hypot(dx, dy) > 8) clearTimeout(holdTimer); // moving: a swipe or a scroll, not a hold
     if (!dragging) {
       if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
       dragging = true;
@@ -290,21 +300,25 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
       el.classList.add('dragging');
     }
     if (swipeEffort) {
-      // Thirds of the tile: easy, moderate, hard; all the way left un-ticks it
-      const lvl = Math.ceil(clamp(start.lvl / 3 + dx / start.w, 0, 1) * 3);
-      const now = selections.has(f.id) ? intensities.get(f.id) : 0;
-      if (lvl !== now) { vibrate(3); setEffort(lvl); }
+      // The fill follows the finger smoothly from easy (a third) to hard (full); back past a sixth un-ticks it.
+      // A light tick each time the word changes, not on every pixel.
+      const raw = clamp(start.lvl / 3 + dx / start.w, 0, 1) * 3;
+      const lvl = raw < 0.5 ? 0 : Math.round(clamp(raw, 1, 3) * 20) / 20;
+      const before = selections.has(f.id) ? effortWord(intensities.get(f.id)) : '';
+      setEffort(lvl);
+      if ((lvl ? effortWord(lvl) : '') !== before) vibrate(3);
       return;
     }
     const next = scale.fromFraction(clamp(scale.fraction(start.v) + dx / start.w, 0, 1));
     if (next !== (selections.get(f.id) ?? 0)) { vibrate(3); setValue(next); }
   });
   el.addEventListener('pointerup', () => {
+    clearTimeout(holdTimer);
     if (start && !dragging) toggle();
     start = null; dragging = false;
     el.classList.remove('dragging');
   });
-  el.addEventListener('pointercancel', () => { start = null; dragging = false; el.classList.remove('dragging'); });
+  el.addEventListener('pointercancel', () => { clearTimeout(holdTimer); start = null; dragging = false; el.classList.remove('dragging'); });
   el.addEventListener('keydown', e => {
     if (e.target !== el) return;
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
@@ -339,6 +353,15 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
   el.refresh = paint;
   return el;
 }
+
+// Five words across the effort range (1 easy to 3 hard), matching the routine page
+const EFFORT_WORDS = ['Easy', 'Light', 'Moderate', 'Tough', 'Hard'];
+const effortWord = v => EFFORT_WORDS[clamp(Math.round((v - 1) * 2), 0, 4)];
+/** Hue for an effort: 135 (green) at easy, 48 (amber) at moderate, 6 (coral) at hard. */
+const effortHue = v => {
+  const f = clamp((v - 1) / 2, 0, 1);
+  return Math.round(f < 0.5 ? 135 - 87 * f * 2 : 48 - 42 * (f - 0.5) * 2);
+};
 
 /** Pill toggle (Label 2×1): symbol well, title, detail. */
 export function PillToggle({ icon, title, detail, on, onToggle, tone = 'red' }) {

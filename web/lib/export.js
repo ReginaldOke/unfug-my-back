@@ -1,4 +1,4 @@
-// Export for analysis in an AI chat (SPEC.md › Export to Claude). Pure, unit-tested in test/export.test.js.
+// Export for analysis in an AI chat (SPEC.md › Export). Pure, unit-tested in test/export.test.js.
 import { localDate } from './dates.js';
 
 export const ANALYSIS_PROMPT = `You are analysing a personal back pain diary exported as JSON.
@@ -25,7 +25,7 @@ export function buildExport(data, { from, to, regions = [] }) {
   const flareIds = new Set(flares.map(f => f.id));
   const factorName = Object.fromEntries(data.factors.map(f => [f.id, f.name]));
   return {
-    app: 'Unfug My Back (web prototype)',
+    app: 'Unfug My Back',
     exportedAt: new Date().toISOString(),
     schemaVersion: data.schemaVersion,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,

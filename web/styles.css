@@ -3,6 +3,8 @@
    tiles 30px, controls and sliders are pills, symbol wells are circles, "on" state is a bright fill. */
 
 :root {
+  /* The tab bar floats just above the home indicator, like iOS's own (about 20 pt from the bottom on Face ID phones) */
+  --tab-bottom: max(12px, calc(env(safe-area-inset-bottom) - 12px));
   color-scheme: dark;
   --bg: #0d0d0f;
   --ink: #f5f5f7;
@@ -44,7 +46,7 @@ body {
   font: 400 16px/1.45 var(--font);
   letter-spacing: 0.002em;
   -webkit-font-smoothing: antialiased;
-  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--tab-bottom) + 96px);
   overflow-x: hidden;
 }
 body.in-flow { padding-bottom: 0; }
@@ -225,7 +227,7 @@ input[type="range"] { accent-color: #fff; }
 
 /* ---------- Tab bar (floating glass pill) ---------- */
 #tabs {
-  position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: var(--tab-bottom); transform: translateX(-50%);
   display: flex; gap: 4px; padding: 6px; border-radius: var(--r-pill); z-index: 20;
   background: rgba(28, 28, 30, 0.6);
 }
@@ -248,17 +250,12 @@ body.in-flow #tabs { display: none; }
   font-size: 14px; opacity: 0; transition: .25s; pointer-events: none; z-index: 60; max-width: calc(100% - 32px); text-align: center;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
-#banners { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(540px, calc(100% - 20px)); z-index: 50; display: flex; flex-direction: column; gap: 8px; }
-.banner { border-radius: 26px; padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 10px; background: rgba(28, 28, 30, 0.96); border-color: var(--glass-edge); animation: drop .35s cubic-bezier(.2, .9, .3, 1.2); }
 @keyframes drop { from { transform: translateY(-20px); opacity: 0; } }
-.banner p { color: var(--ink-2); font-size: 14px; margin-top: 2px; }
-.banner-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.banner-actions .icon-btn { margin-left: auto; }
 
 /* ---------- Sheets ---------- */
 .sheet {
   /* Edge to edge, flush with the bottom of the screen */
-  margin: auto 0 0; width: 100%; max-width: 100%; max-height: 88dvh; overflow: auto; overscroll-behavior: contain;
+  margin: auto 0 0; width: 100%; max-width: 100%; max-height: 88dvh; overflow: hidden auto; overscroll-behavior: contain;
   border-radius: 32px 32px 0 0; padding: 10px 22px calc(26px + env(safe-area-inset-bottom));
   background: rgba(20, 20, 22, 0.86); color: var(--ink); border-bottom: 0; border-inline: 0;
   animation: rise .5s cubic-bezier(.32, .72, 0, 1);
@@ -288,7 +285,6 @@ body.in-flow #tabs { display: none; }
 .step-head { margin: 8px 0 22px; display: flex; flex-direction: column; gap: 6px; }
 .timer { font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 15px; min-width: 44px; text-align: right; }
 .timer.over { color: var(--red-2); }
-.date-pill { border-radius: var(--r-pill); padding: 8px 16px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--glass-edge); font-size: 14px; appearance: none; text-align: center; color-scheme: dark; }
 .progress { display: flex; gap: 6px; padding: 4px var(--gutter) 0; }
 .progress.inline { padding: 0; flex: 1; max-width: 200px; }
 .progress i { flex: 1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); transition: background .3s; }
@@ -937,12 +933,10 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 @media (prefers-reduced-motion: reduce) { .sortable.editing .sortable-item > .select-card { animation: none; } }
 .done-edit { flex: none; }
 
-/* ---------- Check-in: 3D body fits above the footer, with its spot chips inside it ---------- */
+/* ---------- Check-in: 3D body fits above the footer, its spot chips in a row underneath ---------- */
 .head-spacer { width: 44px; flex: none; }
-.body3d { height: clamp(300px, calc(100dvh - 350px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 480px); }
+.body3d { height: clamp(280px, calc(100dvh - 400px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 460px); }
 .body3d-wrap { position: relative; }
-.body3d-chips { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; pointer-events: none; }
-.body3d-chips .chip { pointer-events: auto; }
 .segmented { overflow-y: hidden; scrollbar-width: none; }
 .field > .segmented { display: flex; }
 .field > .segmented button { flex: 1; }
@@ -1099,18 +1093,12 @@ a.routine-card { text-decoration: none; color: inherit; display: flex; }
 .log-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-top: 1px solid var(--line); border-radius: 14px; }
 .log-row:first-child { border-top: 0; }
 .log-name { font-size: 16px; }
-.log-tick { display: flex; align-items: center; gap: 10px; min-height: 42px; }
-.log-check { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.28); display: grid; place-items: center; transition: background .2s, border-color .2s, transform .25s var(--spring); }
-.log-row.done .log-check { background: #74d4c0; border-color: #74d4c0; transform: scale(1.05); }
-.log-row.done .log-check::after { content: ''; width: 9px; height: 5px; border: 2px solid #10261f; border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
-.log-row:not(.done) .did-input { color: var(--ink-2); }
 .did-input {
   flex: none; width: 40%; max-width: 168px; min-height: 42px; padding: 0 12px; border-radius: 14px; text-align: right; font-size: 15px;
   border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums;
 }
 .did-input::placeholder { color: var(--ink-3); }
 .did-input:focus { outline: none; border-color: rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.1); }
-.log-row.done .did-input { border-color: rgba(116, 212, 192, 0.45); }
 .log-add { padding-top: 10px; border-top: 1px solid var(--line); }
 .choice { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px; border-radius: 22px; text-align: left; text-decoration: none; color: inherit; border: 0; font: inherit; }
 .choice .well { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; flex: none; }
@@ -1118,7 +1106,6 @@ a.routine-card { text-decoration: none; color: inherit; display: flex; }
 .tile.routine-add { text-decoration: none; color: inherit; }
 .tile.routine-add .tile-hint { color: var(--ink-3); font-size: 12px; }
 
-.log-tick { text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
 .pad-item { display: flex; align-items: center; gap: 4px; }
 .pad-item .pad-note { flex: 1; min-width: 0; }
 .pad-note { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -1165,14 +1152,6 @@ a.routine-card:active { transform: scale(0.98); background: rgba(255, 255, 255, 
 }
 .log-row.open .log-del, .log-row.swiping .log-del { opacity: 1; }
 
-/* A quiet checkbox: a hairline ring that fills softly when ticked */
-.routine-page .log-check {
-  width: 18px; height: 18px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.03);
-  padding: 0; cursor: pointer; position: relative;
-}
-.routine-page .log-check::before { content: ''; position: absolute; inset: -12px; } /* a bigger target than it looks */
-.routine-page .log-row.done .log-check { background: rgba(116, 212, 192, 0.85); border-color: transparent; transform: none; }
-.routine-page .log-row.done .log-check::after { width: 7px; height: 4px; border-width: 1.6px; border-color: #0f2620; }
 
 input.log-name {
   flex: 1; min-width: 0; background: none; border: 0; padding: 6px 0; color: var(--ink); font: inherit; font-size: 16px;
@@ -1180,7 +1159,6 @@ input.log-name {
 }
 input.log-name:focus { outline: none; cursor: text; -webkit-user-select: text; user-select: text; }
 input.log-name::placeholder { color: var(--ink-3); }
-.routine-page .log-row.done input.log-name:not(:focus) { color: var(--ink-2); }
 .log-list:not(:empty) + .log-add-input { margin-top: 4px; }
 .log-add-input { width: 100%; background: none; border: 0; border-top: 1px solid var(--line); padding: 16px 2px; color: var(--ink); font: inherit; }
 .log-add-input::placeholder { color: var(--ink-3); }
@@ -1266,7 +1244,6 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
 /* Surfaces that were dark glass */
 [data-theme="light"] .sheet { background: rgba(250, 248, 245, 0.72); }
 [data-theme="light"] .sheet::backdrop { background: rgba(40, 30, 25, 0.18); }
-[data-theme="light"] .banner { background: rgba(255, 255, 255, 0.94); }
 [data-theme="light"] #tabs { background: rgba(255, 255, 255, 0.55); box-shadow: 0 18px 40px -18px rgba(40, 42, 52, 0.35), inset 0 0 22px rgba(255, 255, 255, 0.5); }
 [data-theme="light"] #tabs a.active { color: var(--ink); background: rgba(255, 255, 255, 0.85); }
 [data-theme="light"] .drag-row.lifted, [data-theme="light"] .pad-item.lifted,
@@ -1292,7 +1269,6 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
 [data-theme="light"] .pill-badge.up { color: #a8392a; }
 [data-theme="light"] .routine-day.done, [data-theme="light"] .routine-card .well.done-mark { color: #2a9a83; }
 [data-theme="light"] .did-input { border-color: rgba(0, 0, 0, 0.08); background: rgba(255, 255, 255, 0.6); }
-[data-theme="light"] .routine-page .log-check { border-color: rgba(0, 0, 0, 0.22); background: rgba(255, 255, 255, 0.6); }
 [data-theme="light"] .add-card, [data-theme="light"] .chip.day-add { border-color: rgba(0, 0, 0, 0.18); }
 [data-theme="light"] .sheet-grabber { background: rgba(0, 0, 0, 0.2); }
 
@@ -1310,7 +1286,7 @@ body:not(.on-home) .ambient { background: var(--bg); }
 .appearance .segmented { flex: none; width: auto; }
 .appearance .segmented button { padding: 0 14px; }
 
-#tabs, .banner { -webkit-backdrop-filter: var(--float-blur); backdrop-filter: var(--float-blur); }
+#tabs { -webkit-backdrop-filter: var(--float-blur); backdrop-filter: var(--float-blur); }
 [data-theme="light"] .routine-tile .seg-dots i.on { background: linear-gradient(90deg, #4fbfae, #74d4c0); }
 
 /* Charts and calendar in light mode: dark ink where dark mode uses white */
@@ -1607,17 +1583,7 @@ body:not(.on-home) .ambient::after {
 .checkin-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; margin-top: 2px; }
 .checkin-row .grow { min-width: 0; }
 
-/* Notifications (e.g. Time to move): clear glass over the page, not a dark slab */
-#banners .banner {
-  background: radial-gradient(90% 120% at 15% 0%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 60%), rgba(30, 30, 34, 0.42);
-  -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 20px 44px -20px rgba(0, 0, 0, 0.7);
-}
-[data-theme="light"] #banners .banner {
-  background: radial-gradient(90% 120% at 15% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 60%), rgba(255, 255, 255, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 20px 44px -20px rgba(40, 42, 52, 0.35);
-}
-
+[data-theme="light"] 
 /* Delete all: press and hold, the bar fills, and only a full hold deletes */
 .wipe-sheet .btn { width: 100%; }
 .hold-btn { position: relative; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
@@ -1682,7 +1648,7 @@ body:not(.on-home) .ambient::after {
 .checkins-view.has-dock { padding-bottom: 112px; }
 .checkin-dock {
   position: fixed; left: 0; right: 0; margin: 0 auto; z-index: 15;
-  bottom: calc(100px + env(safe-area-inset-bottom)); width: min(520px, calc(100% - 2 * var(--gutter)));
+  bottom: calc(var(--tab-bottom) + 84px); width: min(520px, calc(100% - 2 * var(--gutter)));
 }
 .checkin-dock::before {
   content: ''; position: absolute; left: -40px; right: -40px; top: -28px; bottom: -110px; z-index: -1; pointer-events: none;
@@ -1774,3 +1740,53 @@ body:not(.on-home) .ambient::after {
 .cal-scale { gap: 8px; }
 .cal-scale .cal-strip { width: 64px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #74d4c0 0%, #74d4c0 25%, #f3b46e 50%, #f4908a 75%, #f4908a 100%); }
 .cal-scale small { margin: 0; }
+
+/* Apple Health summary: last night and latest steps, side by side */
+.health-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.health-stat { display: flex; flex-direction: column; gap: 4px; }
+.health-stat .num { font-size: 34px; font-weight: 300; letter-spacing: -0.02em; }
+.health-stat .unit { margin-left: 3px; color: var(--ink-3); }
+.health-stat .hint:first-child::first-letter { text-transform: uppercase; }
+
+/* Apple Health prompt in the check-in: the row links to Apple Health; ✕ at the end dismisses it */
+.steps-strip.link { padding-right: 4px; }
+.strip-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+.strip-x { flex: none; width: 36px; height: 36px; border: 0; background: none; border-radius: 50%; color: var(--ink-3); font-size: 13px; cursor: pointer; }
+.strip-x:active { background: var(--well); }
+[data-theme="light"] .steps-strip.link { border-color: rgba(0, 0, 0, 0.14); }
+
+/* Effort swipe on a tile: the fill's colour shifts smoothly with how hard (--eh is a hue set as you swipe) */
+.tile.factor[data-effort]:not([data-effort=""]) .tile-fill { background: linear-gradient(90deg, hsl(var(--eh, 48) 72% 64% / 0.34), hsl(var(--eh, 48) 72% 64% / 0.14)); transition: transform .16s ease-out, background .2s; }
+.tile.factor.dragging .tile-fill { transition: none; }
+
+/* Sheets only scroll up and down (and swipe down to close); nothing inside can push them wider */
+.sheet { touch-action: pan-y; }
+.sheet > :not(.sheet-grabber) { max-width: 100%; min-width: 0; }
+html, body { overflow-x: clip; }
+.sheet .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Routine moves: no tick box. Name, then a small + and the reps box; + opens a second box beside it */
+.routine-page .log-row .did-input { color: var(--ink); width: auto; max-width: none; flex: none; text-align: center; padding: 0 12px; }
+.routine-page .log-inner { gap: 8px; }
+.routine-page .log-name { flex: 1; min-width: 0; }
+.extra-add {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; padding: 0; display: grid; place-items: center;
+  border: 1px dashed rgba(255, 255, 255, 0.22); background: none; color: var(--ink-3); font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.extra-add:active { background: var(--well); }
+.extra-add[hidden], .extra-input[hidden] { display: none; }
+.extra-input::placeholder { letter-spacing: 1px; }
+[data-theme="light"] .extra-add { border-color: rgba(0, 0, 0, 0.2); }
+.measure-swap { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; padding: 0; border: 0; background: var(--well); color: var(--ink-2); cursor: pointer; }
+.measure-swap:active { transform: scale(0.92); }
+/* Settings cards: rows are separated by space alone, no lines */
+.settings-view .card > .list-row { border-top: 0; }
+
+/* Your data: Export and Import side by side */
+.data-actions { gap: 10px; }
+.data-actions .btn { flex: 1; }
+.import-text { min-height: 120px; font-size: 15px; }
+.import-routines { display: flex; flex-direction: column; gap: 14px; }
+.import-routines strong { font-weight: 500; }
+.import-routines ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--ink-2); }
+.import-routines li { display: flex; justify-content: space-between; gap: 12px; }

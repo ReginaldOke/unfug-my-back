@@ -32,7 +32,7 @@ export function quickAddFactor({ role = 'trigger', status = 'suspected', title, 
       field('Track it as', segmented([['minutes', 'Time'], ['count', 'Count'], ['yesno', 'Yes / no']], measure, v => { measure = v; }, 'Track it as')),
       h('button', { type: 'submit', class: 'btn primary' }, 'Add'));
 
-      const suggestions = R.factors.all({ archived: true }).filter(f => f.isArchived && !f.routineId && (exercise ? R.isExercise(f) : roles.includes(f.role) && !R.isExercise(f)));
+      const suggestions = R.factors.all({ archived: true }).filter(f => f.isArchived && !f.routineId && !f.retired && (exercise ? R.isExercise(f) : roles.includes(f.role) && !R.isExercise(f)));
       // Typing focuses the field straight away on desktop; on phones the keyboard would cover the suggestions
       if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => name.focus({ preventScroll: true }), 50);
       return h('div', { class: 'stack' },

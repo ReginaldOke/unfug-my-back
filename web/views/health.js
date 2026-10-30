@@ -2,7 +2,7 @@
 import { h, iconButton, toast, copyText } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { readHealthExport, parseShortcut } from '../lib/health.js';
-import { dayLabel } from '../lib/dates.js';
+import { dayLabel, localDate } from '../lib/dates.js';
 import { isNative, connectHealth } from '../lib/native.js';
 
 export function HealthView(ctx) {
@@ -20,12 +20,27 @@ export function HealthView(ctx) {
     h('header', { class: 'top-bar' }, iconButton('‹', 'Back', () => history.back()), h('h1', {}, 'Apple Health'), h('span')),
     status(),
     // The app reads Health directly; the browser has to make do with an export or a Shortcut
-    ...(isNative ? [nativeCard(render)] : [importCard(render), shortcutCard()]),
-    h('section', { class: 'card glass stack' },
-      h('h2', {}, 'Screen time'),
-      h('p', { class: 'hint' }, 'Screen time isn’t in Apple Health, and iPhone doesn’t share it with apps like this one. Log it on the Screen time stressor instead: Settings › Screen Time shows each day’s total.')));
+    ...(isNative ? [nativeCard(render), syncReport()] : [importCard(render), shortcutCard()]));
   render();
   return root;
+}
+
+/** What the last sync found, so a missing number can be traced: nothing in Health, no permission, or an error. */
+function syncReport() {
+  const r = R.settings().healthReport;
+  if (!r) return null;
+  const lines = [
+    `Steps: ${r.stepDays} days`,
+    `Sleep: ${r.sleepSamples} records${r.sleepSamples ? ` (${r.sleepStates.join(', ')}), ${r.sleepNights} nights of an hour or more` : ''}`,
+    ...r.errors,
+  ];
+  const help = !r.errors.length && !r.sleepSamples
+    ? 'No sleep came through. Check Settings › Health › Data Access & Devices › Unfug My Back has Sleep turned on, and that the Health app shows sleep under Browse › Sleep.'
+    : null;
+  return h('section', { class: 'card glass stack tight sync-report' },
+    h('h2', {}, `Last sync · ${new Date(r.at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`),
+    lines.map(t => h('p', { class: 'hint' }, t)),
+    help ? h('p', { class: 'hint' }, help) : null);
 }
 
 function nativeCard(render) {
@@ -45,14 +60,33 @@ function nativeCard(render) {
     }, on ? 'Sync now' : 'Connect'));
 }
 
+const vsText = (date, key) => {
+  const pct = R.health.vsUsual(date, key);
+  return pct == null ? null : Math.abs(pct) < 5 ? 'About usual' : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% on usual`;
+};
+
+/** What's come in: last night's sleep and the latest day's steps, each with its weekly average. */
 function status() {
   const days = R.health.all();
   if (!days.length) return h('p', { class: 'muted' }, 'See how your steps and sleep line up with your pain. Everything stays on this phone.');
-  const steps = days.filter(d => d.steps != null).length, sleep = days.filter(d => d.sleepHours != null).length;
-  return h('section', { class: 'card glass health-status' },
-    h('div', {}, h('span', { class: 'num' }, String(days.length)), h('span', { class: 'unit' }, 'days')),
-    h('p', { class: 'hint' }, `${steps} with steps, ${sleep} with sleep. Latest: ${dayLabel(days.at(-1).date)}.`),
-    h('p', { class: 'hint' }, 'Add them to the chart on Today with the + under it.'));
+  const latest = key => days.filter(d => d[key] != null).at(-1);
+  const weekAvg = key => {
+    const last = days.filter(d => d[key] != null).slice(-7);
+    return last.length ? last.reduce((a, d) => a + d[key], 0) / last.length : null;
+  };
+  const night = latest('sleepHours'), walk = latest('steps');
+  const sleepAvg = weekAvg('sleepHours'), stepsAvg = weekAvg('steps');
+  const stat = (label, big, unit, sub) => h('div', { class: 'health-stat' },
+    h('span', { class: 'hint' }, label),
+    h('div', {}, h('span', { class: 'num' }, big), unit ? h('span', { class: 'unit' }, unit) : null),
+    sub ? h('span', { class: 'hint' }, sub) : null);
+  return h('section', { class: 'card glass health-summary' },
+    h('div', { class: 'health-stats' },
+      night ? stat(`${R.health.sleepWord()} · ${night.date === localDate() ? 'last night' : dayLabel(night.date).toLowerCase()}`, String(night.sleepHours), 'h', [vsText(night.date, 'sleepHours'), sleepAvg != null ? `Week average ${sleepAvg.toFixed(1)} h` : null].filter(Boolean).join(' · '))
+        : stat('Sleep', '–', '', 'None recorded yet'),
+      walk ? stat(`Steps · ${dayLabel(walk.date).toLowerCase()}`, walk.steps.toLocaleString(), '', [vsText(walk.date, 'steps'), stepsAvg != null ? `Week average ${Math.round(stepsAvg).toLocaleString()}` : null].filter(Boolean).join(' · '))
+        : stat('Steps', '–', '', 'None recorded yet')),
+    h('p', { class: 'hint' }, `${days.length} days brought in. They show on Home's chart and in each check-in.`));
 }
 
 function importCard(rerender) {

@@ -62,7 +62,7 @@ function dayDetail(date, change) {
   const sleep = R.checkins.sleepFor(date), hours = R.health.day(date)?.sleepHours, steps = R.health.day(date)?.steps;
   const label = parseDate(date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   const bits = e ? [`Pain ${e.painScore}`, e.stressScore != null ? `Stress ${e.stressScore}` : null] : ['No check-in'];
-  if (sleep != null || hours != null) bits.push(`Sleep ${[sleep != null ? `${sleep}/10` : null, hours != null ? `${hours} h` : null].filter(Boolean).join(', ')}`);
+  if (sleep != null || hours != null) bits.push(`Sleep ${[sleep != null ? `${sleep}/10` : null, hours != null ? `${hours} h${R.health.day(date)?.inBed ? ' in bed' : ''}` : null].filter(Boolean).join(', ')}`);
   if (steps != null) bits.push(`${steps.toLocaleString()} steps`);
   return h('div', { class: 'cal-foot' },
     h('span', {}, h('strong', {}, label), h('span', { class: 'hint' }, ` · ${bits.filter(Boolean).join(' · ')}`),

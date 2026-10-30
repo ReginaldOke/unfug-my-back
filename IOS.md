@@ -13,7 +13,7 @@ The iOS app is the web app inside a [Capacitor](https://capacitorjs.com) shell (
 ## Build and run
 
 1. Install **Xcode** from the Mac App Store (about 10 GB). Open it once to accept the licence, then:
-   `sudo xcode-select -s /Applications/Xcode.app`
+   `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
 2. `npm run ios`: builds `dist/`, copies it into the Xcode project and opens Xcode.
 3. In Xcode: select the **App** target › Signing & Capabilities › pick your Team. Add the **HealthKit** capability if it
    isn't listed (the entitlements file is already there).
@@ -47,6 +47,16 @@ Needs the Apple Developer Program ($99/yr, approval usually 1–2 days).
   and haptics, works offline and has no website login. Mention these in the review notes.
 - **HealthKit (5.1.3):** usage strings explain why; data isn't used for ads or stored in iCloud; the privacy policy says so.
 - **Medical claims (1.4.1):** the app tracks patterns and makes no diagnostic claims; the privacy policy and Help say so.
+
+## Releasing an update
+
+1. `npm run build:app && npx cap sync ios`
+2. Xcode › App target › General: raise **Build** by 1 (and **Version** for a visible release, e.g. 1.1).
+3. Destination **Any iOS Device (arm64)** › Product › Archive › Distribute App › App Store Connect › Upload.
+4. App Store Connect: add the build to TestFlight, or to a new App Store version and submit.
+
+Your data survives updates (same bundle ID). Deleting the app deletes it: export a backup first
+(Settings › Your data › Export; Import brings it back).
 
 ## Next
 
