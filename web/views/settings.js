@@ -12,10 +12,6 @@ const row = (href, title, detail) => h('a', { class: 'list-row', href },
   h('span', { class: 'grow' }, title, detail ? h('span', { class: 'hint block' }, detail) : null),
   h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
 
-/** A labelled group of rows on the page itself (no card): label, then hairline-separated rows. */
-const group = (label, ...rows) => h('section', { class: 'settings-group' },
-  label ? h('h2', { class: 'section-label' }, label) : null, h('div', { class: 'settings-rows' }, ...rows));
-
 export function SettingsView() {
   const active = R.factors.all().filter(f => !f.routineId);
   const nStress = active.filter(f => f.role !== 'helper').length, nHelp = active.length - nStress;
@@ -24,26 +20,21 @@ export function SettingsView() {
   return h('div', { class: 'view settings-view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Settings')),
 
-    group('Tracking',
+    h('section', { class: 'card glass' },
       row('#/setup?step=stressors&edit=1', 'Stressors & helpers', `${nStress} stressors · ${nHelp} helpers`),
       h('button', { type: 'button', class: 'list-row', onclick: openReminderSheet },
         h('span', { class: 'grow' }, 'Reminders', h('span', { class: 'hint block' }, rem.enabled ? `Move every ${rem.intervalMin} min · ${hoursSummary(rem)}` : 'Move nudges off')),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
       HEALTH_IMPORT ? row('#/health', 'Apple Health', R.health.all().length ? `Steps and sleep for ${R.health.all().length} days` : 'Bring in steps and sleep') : null),
 
-    group('Appearance', appearanceRow()),
+    appearanceSection(),
 
     dataSection(),
 
-    group('Help', row('#/help', 'Help & safety')),
-
-    // Last on the page, on its own, so it's never hit by accident
-    h('button', { type: 'button', class: 'list-row danger-row', onclick: () => openWipeSheet(exportAll) }, 'Delete all data'));
+    h('section', { class: 'card glass' }, row('#/help', 'Help & safety')));
 }
 
-const exportAll = () => shareOrDownload(`unfug-my-back-${R.firstDataDate()}-to-${localDate()}.json`, JSON.stringify(buildExport(R.snapshot(), { from: R.firstDataDate(), to: localDate(), regions: REGIONS }), null, 2), 'application/json');
-
-function appearanceRow() {
+function appearanceSection() {
   const opts = [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']];
   const seg = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': 'Appearance' });
   const paint = () => seg.replaceChildren(...opts.map(([v, label]) => h('button', {
@@ -51,20 +42,22 @@ function appearanceRow() {
     onclick: () => { setTheme(v); paint(); },
   }, label)));
   paint();
-  return h('div', { class: 'list-row appearance' }, h('span', { class: 'grow' }, 'Theme'), seg);
+  return h('section', { class: 'card glass row between appearance' }, h('h2', { class: 'row-title' }, 'Appearance'), seg);
 }
 
+const exportAll = () => shareOrDownload(`unfug-my-back-${R.firstDataDate()}-to-${localDate()}.json`, JSON.stringify(buildExport(R.snapshot(), { from: R.firstDataDate(), to: localDate(), regions: REGIONS }), null, 2), 'application/json');
+
 function dataSection() {
-  const from = h('input', { type: 'date', class: 'plain-date', value: R.firstDataDate(), 'aria-label': 'Export from' });
-  const to = h('input', { type: 'date', class: 'plain-date', value: localDate(), 'aria-label': 'Export to' });
+  const from = h('input', { type: 'date', class: 'glass-input', value: R.firstDataDate(), 'aria-label': 'Export from' });
+  const to = h('input', { type: 'date', class: 'glass-input', value: localDate(), 'aria-label': 'Export to' });
   const exportData = () => buildExport(R.snapshot(), { from: from.value, to: to.value, regions: REGIONS });
 
-  return h('div', { class: 'settings-stack' },
-    group('Your data',
-      h('div', { class: 'list-row' }, h('span', { class: 'grow' }, 'From'), from),
-      h('div', { class: 'list-row' }, h('span', { class: 'grow' }, 'To'), to)),
-    h('button', { type: 'button', class: 'btn primary wide', onclick: () => shareOrDownload(`unfug-my-back-${from.value}-to-${to.value}.json`, JSON.stringify(exportData(), null, 2), 'application/json') }, 'Export'),
-    h('p', { class: 'hint' }, 'Saves your diary as one file. It includes instructions for AI, so you can attach it to any AI chat as is.'));
+  return h('section', { class: 'card glass stack' },
+    h('h2', { class: 'row-title' }, 'Your data'),
+    h('p', { class: 'hint' }, 'Saves your diary as one file. It includes instructions for AI, so you can attach it to any AI chat as is.'),
+    h('div', { class: 'row' }, from, h('span', { class: 'hint' }, 'to'), to),
+    h('button', { type: 'button', class: 'btn primary', onclick: () => shareOrDownload(`unfug-my-back-${from.value}-to-${to.value}.json`, JSON.stringify(exportData(), null, 2), 'application/json') }, 'Export'),
+    h('button', { type: 'button', class: 'btn danger', onclick: () => openWipeSheet(exportAll) }, 'Delete all data'));
 }
 
 /** Deleting everything takes a deliberate press and hold, after saying exactly what goes. */
