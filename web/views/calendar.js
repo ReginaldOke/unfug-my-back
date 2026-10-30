@@ -51,10 +51,10 @@ export function PainCalendar({ month, onMonth, selected = null, onSelect }) {
     h('div', { class: 'cal-grid', role: 'group', 'aria-label': 'Pain by day' },
       ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(l => h('span', { class: 'cal-dow', 'aria-hidden': 'true' }, l)),
       cells),
+    // One quiet line: the month in a number, and the colour scale as a single strip
     selected ? dayDetail(selected, changes.get(selected)) : h('div', { class: 'cal-foot' },
-      h('span', { class: 'hint' }, avg ? `${logged.length} check-in${logged.length === 1 ? '' : 's'} · avg pain ${avg}` : 'No check-ins this month',
-        [...changes.keys()].some(d => d.startsWith(month)) ? h('span', { class: 'cal-key-change' }, 'Routine change') : null),
-      h('span', { class: 'cal-scale', 'aria-hidden': 'true' }, h('small', {}, 'Low'), [0, 3, 5, 7, 10].map(p => h('i', { style: dotStyle(p) })), h('small', {}, 'High'))));
+      h('span', { class: 'hint' }, avg ? `Average pain ${avg} · ${logged.length} check-in${logged.length === 1 ? '' : 's'}` : 'No check-ins this month'),
+      h('span', { class: 'cal-scale', 'aria-hidden': 'true' }, h('small', {}, '0'), h('i', { class: 'cal-strip' }), h('small', {}, '10'))));
 }
 
 function dayDetail(date, change) {

@@ -1768,3 +1768,9 @@ body:not(.on-home) .ambient::after {
 /* The fade behind the dock stays put; only the button rises in, like the rest of the page */
 .enter > .checkin-dock { animation: none; }
 .enter > .checkin-dock .btn { animation: rise-in .65s var(--ease-out) 180ms both; }
+
+/* Calendar footer: one calm line with room above it; the scale is a single teal-to-coral strip */
+.cal-foot { margin-top: 14px; min-height: 28px; }
+.cal-scale { gap: 8px; }
+.cal-scale .cal-strip { width: 64px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #74d4c0 0%, #74d4c0 25%, #f3b46e 50%, #f4908a 75%, #f4908a 100%); }
+.cal-scale small { margin: 0; }
