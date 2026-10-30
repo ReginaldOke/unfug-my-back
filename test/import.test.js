@@ -55,3 +55,33 @@ test('only diary exports are accepted', () => {
   assert.equal(isDiaryExport({ hello: 1 }), false);
   assert.equal(isDiaryExport(null), false);
 });
+
+test('a doctored file is cleaned: bad rows dropped, values bounded, unknown fields ignored', () => {
+  const evil = {
+    ...empty(),
+    factors: [
+      { id: 'x1', name: '<img src=x onerror=alert(1)>'.repeat(20), role: 'admin', measureType: 'script', icon: '💥', __proto__: { polluted: true } },
+      { id: '../../etc', name: 'Bad id' },
+      { id: 'x2', name: '' },
+    ],
+    routines: [{ id: 'r1', name: 'R', items: 'not a list', schedule: ['09:00', 'javascript:alert(1)', '25:99@9'] }],
+    dailyEntries: [
+      { id: 'e1', date: '2026-10-01', painScore: '99', notes: 'n'.repeat(5000), html: '<script>' },
+      { id: 'e2', date: 'yesterday', painScore: 3 },
+      { id: 'e3', date: '2026-10-02', painScore: 'lots' },
+    ],
+    painMarkers: [{ id: 'm1', dailyEntryId: 'e1', regionId: 'not_a_region' }],
+    factorLogs: [{ id: 'l1', factorId: 'x1', date: '2026-10-01', value: 1e12 }],
+  };
+  const { add } = planImport(empty(), evil);
+  assert.equal(add.factors.length, 1);
+  assert.equal(add.factors[0].name.length, 80);
+  assert.equal(add.factors[0].role, 'unsure');
+  assert.equal(add.factors[0].measureType, 'count');
+  assert.equal({}.polluted, undefined);
+  assert.deepEqual(add.routines[0].items, []);
+  assert.deepEqual(add.routines[0].schedule, ['09:00']);
+  assert.deepEqual(add.dailyEntries.map(e => [e.id, e.painScore, e.notes.length, 'html' in e]), [['e1', 10, 2000, false]]);
+  assert.equal(add.painMarkers, undefined);
+  assert.equal(add.factorLogs[0].value, 100000);
+});

@@ -234,6 +234,17 @@ export const checkins = {
     return n;
   },
 
+  /** Deletes a day's check-in with its body map spots and what was logged in it. Routine sessions stay. */
+  remove(date) {
+    const e = checkins.entryFor(date);
+    if (!e) return;
+    S.batch(() => {
+      S.removeWhere('painMarkers', m => m.dailyEntryId === e.id);
+      S.removeWhere('factorLogs', l => l.dailyEntryId === e.id);
+      S.removeWhere('dailyEntries', x => x.id === e.id);
+    });
+  },
+
   save(date, draft) {
     return S.batch(() => {
       const existing = checkins.entryFor(date);

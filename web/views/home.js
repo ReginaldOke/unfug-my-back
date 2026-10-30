@@ -106,7 +106,8 @@ function hero(entry, today) {
   const streak = R.checkins.streak(today);
   const last7 = R.checkins.all().filter(e => e.date < today && e.date >= addDays(today, -7) && e.painScore != null);
   const avg = last7.length ? last7.reduce((a, e) => a + e.painScore, 0) / last7.length : null;
-  const delta = entry?.painScore != null && avg != null ? entry.painScore - avg : null;
+  // Within a twentieth of a point of the average it's the same, so no ↑ or ↓
+  const delta = entry?.painScore != null && avg != null && Math.abs(entry.painScore - avg) >= 0.05 ? entry.painScore - avg : null;
 
   return h('section', { class: 'hero' },
     h('div', { class: 'hero-num' },

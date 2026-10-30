@@ -12,6 +12,12 @@ import { HealthView } from './views/health.js';
 import { CheckinsView, CheckinDetailView } from './views/checkins.js';
 import { startTheme } from './lib/theme.js';
 
+// Inside another site's frame, show nothing: a framed copy would see this site's stored diary
+if (window.top !== window.self) {
+  document.body.textContent = 'Open Unfug My Back directly.';
+  throw new Error('Framed');
+}
+
 R.init();
 startTheme();
 

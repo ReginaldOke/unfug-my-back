@@ -1,6 +1,6 @@
 // Check-ins: every past check-in, newest first, with today's button by the thumb until it's done;
 // and a page per check-in that sets out everything logged that day (all of it goes into the export).
-import { h, iconButton } from '../lib/ui.js';
+import { h, iconButton, confirmSheet, toast } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate, dayLabel, parseDate, fmtTime, fmtMinutes } from '../lib/dates.js';
 import { fmtAmount, sleepWord, ROLE_ICON } from '../lib/labels.js';
@@ -127,5 +127,15 @@ export function CheckinDetailView(ctx) {
 
     changes.length ? block('Routine changes', date, null, changes.map(ch => lineRow(null, ch.name, null, ch.summary))) : null,
 
-    block('Notes', date, 'notes', e.notes ? h('p', { class: 'detail-notes' }, e.notes) : h('p', { class: 'hint' }, 'No notes')));
+    block('Notes', date, 'notes', e.notes ? h('p', { class: 'detail-notes' }, e.notes) : h('p', { class: 'hint' }, 'No notes')),
+
+    h('button', {
+      type: 'button', class: 'detail-delete', onclick: async () => {
+        const ok = await confirmSheet(`Delete ${title}’s check-in?`, 'Its pain, stress, sleep, body map and what you logged that day are removed. Routine sessions stay.', 'Delete', { danger: true });
+        if (!ok) return;
+        R.checkins.remove(date);
+        toast('Check-in deleted');
+        location.hash = '#/checkins';
+      },
+    }, 'Delete check-in'));
 }

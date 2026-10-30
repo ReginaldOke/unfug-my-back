@@ -113,6 +113,8 @@ async function readFile(file, onProgress) {
     const days = await readHealthExport(file, onProgress);
     return days.length ? { factors: [], dailyEntries: [], healthDays: days.map(d => ({ id: R.uuid(), source: 'apple-health-export', ...d })) } : null;
   }
+  // Backups, notes and CSVs are small; anything this big is a mistake (or meant to jam the app)
+  if (file.size > 25 * 1024 * 1024) throw new Error('That file is too big to import.');
   const raw = await file.text();
   if (/\.json$/i.test(file.name) || raw.trimStart().startsWith('{')) {
     let data;

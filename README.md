@@ -1,6 +1,6 @@
 # Unfug My Back
 
-A back pain tracker. `SPEC.md` is the source of truth for the native iOS app; this repo currently holds a **web prototype** of the phase 1 flows (plus on-device insights and Claude analysis pulled forward), built to try the flows and design before the Swift build.
+A back pain tracker for iPhone (a Capacitor app, see `IOS.md`) that also runs as a website. Everything is stored on the device; nothing is sent to a server.
 
 ## Run it
 
@@ -9,23 +9,15 @@ npm install
 npm start
 ```
 
-Open http://localhost:4321. On your phone (same Wi‑Fi), open `http://<your-mac's-IP>:4321`.
+Open http://localhost:4321. The server only answers this Mac. To try it from a phone on the same Wi-Fi, start it with `HOST=0.0.0.0 npm start` (on a network you trust) and open `http://<your-mac's-IP>:4321`.
 
-### Connect Claude (for one-tap analysis)
-
-The API key stays on the server, never in the browser:
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-... npm start
-```
-
-Without a key, "Analyse my data" copies your diary and the analysis prompt and opens claude.ai so you can paste them in.
+"Analyse with AI" shares the diary file with whichever chat app you pick; the app never sends it anywhere itself.
 
 ## Use it on your phone
 
 Live site: https://reginaldoke.github.io/unfug-my-back/ (redeploys on every push to `main`).
 
-On iPhone, open it in **Safari → Share → Add to Home Screen**. It then opens full screen, works offline, and its data isn't cleared the way website data can be after 7 days unused. Data lives on the phone; use Settings → Export now and then as a backup. Claude analysis on the live site uses copy and paste (there's no server there to hold an API key).
+On iPhone, open it in **Safari → Share → Add to Home Screen**. It then opens full screen, works offline, and its data isn't cleared the way website data can be after 7 days unused. Data lives on the phone; use Settings → Export now and then as a backup.
 
 ## Tests
 
@@ -33,13 +25,13 @@ On iPhone, open it in **Safari → Share → Add to Home Screen**. It then opens
 npm test
 ```
 
-Covers the analysis maths (lag 0/1/2, thresholds, dose response, flare association), the movement reminder rules (active hours, thresholds, driving, pause), CSV/JSON export and the markdown renderer.
+Covers the analysis maths (lag 0/1/2, thresholds, dose response, flare association), the movement reminder rules (active hours, thresholds, driving, pause), export, import (including doctored files) and reading other apps' data.
 
 ## What's where
 
 | Path | What |
 | --- | --- |
-| `server.js` | Static server + `/api/analyse` (Claude API via the official SDK, model `claude-opus-5-5`) |
+| `server.js` | Local development server (this Mac only) |
 | `web/lib/store.js` | Storage: one JSON document in localStorage, UUIDs, UTC timestamps, schema version |
 | `web/lib/repos.js` | Repositories: the only API the views use |
 | `web/lib/analysis.js` | Per-factor with/without comparisons at lag 0–2, dose response, confidence |
