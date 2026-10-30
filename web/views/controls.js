@@ -144,6 +144,20 @@ export function defaultAmount(f) {
 // Average colour of an emoji, sampled from its rendered pixels (saturated pixels count more), cached.
 // Used for a very faint tint on each tile, so custom factors get one too.
 const tintCache = new Map();
+/** An emoji's average colour is often muddy (browns, olives): keep its hue, make it clear and light. */
+function cleanTint(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let hue = 0;
+  if (d) hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  hue = (hue * 60 + 360) % 360;
+  // Near-grey emoji stay a soft neutral; the rest get a gentle, even saturation
+  const sat = d < 0.08 ? 0.08 : 0.62, light = 0.66;
+  const k = n => (n + hue / 30) % 12, a = sat * Math.min(light, 1 - light);
+  const f = n => Math.round(255 * (light - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+  return `${f(0)}, ${f(8)}, ${f(4)}`;
+}
+
 export function emojiTint(emoji) {
   if (!emoji) return null;
   if (tintCache.has(emoji)) return tintCache.get(emoji);
@@ -164,7 +178,7 @@ export function emojiTint(emoji) {
       const weight = 0.15 + (max - min) / 255; // favour the colourful parts over outlines and greys
       r += px[i] * weight; g += px[i + 1] * weight; b += px[i + 2] * weight; w += weight;
     }
-    if (w) tint = `${Math.round(r / w)}, ${Math.round(g / w)}, ${Math.round(b / w)}`;
+    if (w) tint = cleanTint(r / w, g / w, b / w);
   } catch { /* canvas unavailable: no tint */ }
   tintCache.set(emoji, tint);
   return tint;

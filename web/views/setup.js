@@ -78,15 +78,16 @@ export function SetupView(ctx) {
           },
         }, h('span', { class: 'well', 'aria-hidden': 'true' }, '+'), h('span', { class: 'card-title' }, 'Add your own')));
       const sort = makeSortable(list, {
-        onEditChange: on => { done.hidden = !on; },
+        onEditChange: on => { done.hidden = !on; if (!on) list.querySelector('.rename-input')?.blur(); },
         onReorder: ids => R.factors.reorder(ids),
+        onTap: (item, e) => renameInline(item, R.factors.get(item.dataset.id), e.target.closest('.well') ? 'icon' : 'name'),
       });
       fill();
       return h('div', { class: 'stack' },
         h('div', { class: 'row between' }, h('h1', { tabindex: -1 }, id === 'stressors' ? 'What tends to set it off?' : 'What tends to help?'), done),
         h('p', { class: 'muted' }, id === 'stressors'
-          ? 'Pick the ones you want to track. Hold a card to move or delete it.'
-          : 'Pick the ones you do. Hold a card to move or delete it.'),
+          ? 'Pick the ones you want to track. Hold a card to move, rename or delete it.'
+          : 'Pick the ones you do. Hold a card to move, rename or delete it.'),
         list,
         id === 'stressors' && !editing ? h('a', { class: 'hint safety-link', href: '#/help' }, 'This app tracks patterns; it doesn’t diagnose. See warning signs that need a doctor ›') : null);
     }
@@ -114,4 +115,48 @@ export function SetupView(ctx) {
 
   render();
   return root;
+}
+
+// Just the last character typed (an emoji can be several code points), so a new one replaces the old
+const lastGlyph = text => {
+  const parts = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text.trim())];
+  return parts.at(-1)?.segment ?? '';
+};
+
+/**
+ * While editing the list, a card's emoji and name are fields: type over either, and it saves as you
+ * leave them. The card (a button) is swapped for a plain look-alike while typing, as fields can't sit in a button.
+ */
+function renameInline(item, f, focus) {
+  const open = item.querySelector('.rename-card');
+  if (!f || open) { open?.querySelector(focus === 'icon' ? '.icon-input' : '.name-input')?.focus(); return; }
+  const btn = item.querySelector('.select-card');
+  const icon = h('input', { class: 'rename-input icon-input', value: f.icon || '', 'aria-label': `Emoji for ${f.name}`, autocomplete: 'off' });
+  const name = h('input', { class: 'rename-input name-input', value: f.name, maxlength: 40, enterkeyhint: 'done', 'aria-label': 'Name', autocomplete: 'off' });
+  const card = h('div', { class: 'select-card rename-card', 'aria-pressed': btn.getAttribute('aria-pressed') },
+    h('span', { class: 'card-top' }, icon, h('span', { class: 'tick', 'aria-hidden': 'true' }, '✓')),
+    h('span', { class: 'card-text' }, name, btn.querySelector('.card-detail')?.cloneNode(true)));
+  item.classList.add('renaming');
+  icon.addEventListener('input', () => { icon.value = lastGlyph(icon.value); if (icon.value) name.focus(); });
+  const save = () => {
+    // Wait a moment: focus may just be moving between the two fields
+    setTimeout(() => {
+      if (card.contains(document.activeElement) || !card.isConnected) return;
+      const patch = { name: name.value.replace(/\s+/g, ' ').trim() || f.name, icon: icon.value || f.icon };
+      if (patch.name !== f.name || patch.icon !== f.icon) R.factors.save(f.id, patch);
+      Object.assign(f, patch);
+      btn.querySelector('.well').textContent = patch.icon;
+      btn.querySelector('.card-title').textContent = patch.name;
+      card.replaceWith(btn);
+      item.classList.remove('renaming');
+    }, 0);
+  };
+  for (const el of [icon, name]) {
+    el.addEventListener('blur', save);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+  }
+  btn.replaceWith(card);
+  const first = focus === 'icon' ? icon : name;
+  first.focus();
+  first.select();
 }

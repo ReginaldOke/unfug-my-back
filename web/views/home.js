@@ -4,10 +4,10 @@ import * as R from '../lib/repos.js';
 import * as reminders from '../lib/reminders.js';
 import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
-import { notificationStatus } from '../lib/notify.js';
-import { rankInsights, quickSummary } from '../lib/analysis.js';
-import { localDate, addDays, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
-import { ROLE_ICON, fmtAmount, reminderOn } from '../lib/labels.js';
+import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
+import { rankInsights, quickSummary, trendFindings } from '../lib/analysis.js';
+import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
+import { fmtAmount, reminderOn } from '../lib/labels.js';
 import { TrendChart, PALETTES, EXTRA_PALETTES } from './chart.js';
 import { PainCalendar } from './calendar.js';
 import { Ruler, SelectCard, PENCIL } from './controls.js';
@@ -23,7 +23,19 @@ const hiddenLines = () => (ui.hidden ??= new Set(R.settings().chartHidden ?? [])
 let rerender = () => {};
 
 // Sections the user can rearrange by holding and dragging, in the default order
-const SECTIONS = ['hero', 'trend', 'tiles', 'patterns', 'pad', 'ai'];
+const SECTIONS = ['hero', 'tiles', 'trend', 'patterns', 'pad', 'ai'];
+
+/** The tiles moved above Trends by default; saved orders get the same move once. */
+function moveTilesUp() {
+  const order = R.settings().homeOrder;
+  if (R.settings().tilesFirst) return;
+  if (Array.isArray(order) && order.includes('tiles') && order.includes('trend')) {
+    const rest = order.filter(k => k !== 'tiles');
+    rest.splice(rest.indexOf('trend'), 0, 'tiles');
+    R.setSettings({ homeOrder: rest });
+  }
+  R.setSettings({ tilesFirst: true });
+}
 
 /** The saved order. Sections added since go in after the one they follow by default. */
 function sectionOrder() {
@@ -37,9 +49,14 @@ function sectionOrder() {
 }
 
 export function HomeView(ctx) {
-  const root = h('div', { class: 'view home' });
+  // Header, notices and sections are built once and filled on each render, so a notice that's
+  // sliding in isn't restarted by the periodic redraw
+  const head = h('div', { class: 'home-head' });
+  const notices = NoticeSlot(ctx);
   // One container for the sections, so the drag listeners survive re-renders
   const sections = h('div', { class: 'home-sections' });
+  const root = h('div', { class: 'view home' }, head, notices.el, sections);
+  moveTilesUp();
   let dragging = false;
   dragHandles(sections, {
     hold: true,
@@ -53,8 +70,9 @@ export function HomeView(ctx) {
     // Never rebuild under the finger, or while a note is being typed
     if (dragging || sections.querySelector('.pad-input')) return;
     const { top, parts } = build();
+    head.replaceChildren(...top.filter(Boolean));
     sections.replaceChildren(...sectionOrder().map(k => parts[k]));
-    root.replaceChildren(...[...top, sections].filter(Boolean));
+    notices.update();
   };
   rerender = render;
   render();
@@ -99,6 +117,70 @@ function hero(entry, today) {
       h('div', { class: 'streak' }, h('span', { class: 'num' }, String(streak)), h('span', { class: 'hint' }, 'day streak')),
       // Before the first check-in, the big button over the sample chart is the call to action
       R.checkins.all().length ? h('a', { class: 'btn primary hero-cta', href: '#/checkin' }, entry ? 'Edit check-in' : 'Check in') : null));
+}
+
+// ---------- Notices at the top of Home ----------
+// Reminders and the odd key finding slide in above the sections, pushing them down, and slide away
+// when dismissed. Each clears itself after a while or a few visits (see notify.js).
+
+const FINDING_VISITS = 3;
+
+/** The strongest finding worth putting at the top of Home, if one hasn't been seen enough. */
+function topFinding() {
+  const seen = R.settings().findingSeen ?? {};
+  return trendFindings(R.snapshot(), R.factors.all(), localDate()).find(f => f.strong && (seen[f.key] ?? 0) < FINDING_VISITS) ?? null;
+}
+const markFinding = (key, n) => R.setSettings({ findingSeen: { ...(R.settings().findingSeen ?? {}), [key]: n } });
+
+function NoticeSlot(ctx) {
+  const el = h('div', { class: 'notices', 'aria-live': 'polite' });
+  const shown = new Map(); // key -> wrapper element
+  let banners = [];
+  // Opening Home counts as a visit for each notice
+  countVisit();
+  const first = topFinding();
+  if (first) markFinding(first.key, (R.settings().findingSeen?.[first.key] ?? 0) + 1);
+
+  const notice = (key, { title, body, href, actions = [], onClose }) => {
+    const text = h(href ? 'a' : 'div', { class: 'notice-text', href }, h('strong', {}, title), body ? h('span', {}, body) : null);
+    const card = h('div', { class: 'notice glass', role: 'status' },
+      h('div', { class: 'notice-main' }, text,
+        h('button', { type: 'button', class: 'notice-x', 'aria-label': 'Dismiss', onclick: onClose }, '✕')),
+      actions.length ? h('div', { class: 'notice-actions' }, actions.map(a => h('button', {
+        type: 'button', class: `btn small ${a.primary ? 'primary' : 'glass'}`, onclick: () => { onClose(); a.run?.(); },
+      }, a.label))) : null);
+    return h('div', { class: 'notice-wrap', 'data-key': key }, h('div', { class: 'notice-inner' }, card));
+  };
+
+  function update() {
+    const want = new Map();
+    for (const b of banners) want.set(`b${b.id}`, () => notice(`b${b.id}`, { ...b, onClose: () => dismiss(b.id) }));
+    const f = topFinding();
+    if (f && (R.settings().findingSeen?.[f.key] ?? 0) > 0) {
+      want.set(`f${f.key}`, () => notice(`f${f.key}`, {
+        title: f.title, body: f.body, href: `#/factor/${f.factor.id}`,
+        onClose: () => { markFinding(f.key, FINDING_VISITS); update(); },
+      }));
+    }
+    // Gone: fold away, then remove
+    for (const [key, w] of shown) {
+      if (want.has(key)) continue;
+      shown.delete(key);
+      w.classList.add('out');
+      setTimeout(() => w.remove(), 420);
+    }
+    // New: unfold into place
+    for (const [key, make] of want) {
+      if (shown.has(key)) continue;
+      const w = make();
+      w.classList.add('out');
+      el.append(w);
+      shown.set(key, w);
+      requestAnimationFrame(() => requestAnimationFrame(() => w.classList.remove('out')));
+    }
+  }
+  ctx.onCleanup(onBanners(list => { banners = list; update(); }));
+  return { el, update };
 }
 
 const BELL = () => {
@@ -162,9 +244,13 @@ function trendCard(today) {
   const all = R.checkins.all();
   if (!all.length) return sampleTrendCard(today);
   if (ui.view === 'calendar') return calendarCard();
+  // Ranges appear as there's enough history for them: a week, a month, two months for 3M, a year
+  const first = all[0].date;
+  const span = daysBetween(first, today) + 1;
+  const ranges = [[7, '1W', 7], [30, '1M', 30], [90, '3M', 60], [365, '1Y', 365]].filter(([, , need]) => span >= need);
+  if (!ranges.some(([v]) => v === ui.range)) ui.range = ranges.at(-1)?.[0] ?? 7;
   // Until there's a full range of history, the range starts at the first check-in, so early data sits
   // on the left with the coming days still empty on the right
-  const first = all[0].date;
   const start = [addDays(today, 1 - ui.range), first].sort()[1];
   const dates = Array.from({ length: ui.range }, (_, i) => addDays(start, i));
   const entries = dates.map(d => (d <= today ? R.checkins.entryFor(d) : null));
@@ -243,7 +329,7 @@ function trendCard(today) {
     h('div', { class: 'row between' }, h('h2', {}, 'Trends'),
       h('div', { class: 'row tight' },
         viewToggle(),
-        segmented([[7, '1W'], [30, '1M'], [90, '3M']], ui.range, v => { ui.range = v; rerender(); }, 'Range'))),
+        ranges.length ? segmented(ranges.map(([v, label]) => [v, label]), ui.range, v => { ui.range = v; rerender(); }, 'Range') : null)),
     TrendChart({
       days, series, hidden: hiddenLines(),
       focus: dates.indexOf(today), fadeLeft: start > first, marks,
@@ -271,25 +357,37 @@ function toggleHidden(key) {
 function openDataSheet(autoLines, autoIds) {
   const chosen = new Set(R.settings().chartExtras ?? []);
   const options = [
-    { id: 'stress', icon: '🌀', title: 'Stress', detail: 'From your check-ins' },
-    { id: 'sleep', icon: '🌙', title: 'Sleep', detail: 'How well, out of 10' },
-    ...(HEALTH_IMPORT && R.health.has('sleepHours') ? [{ id: 'sleepHours', icon: '🛌', title: 'Hours slept', detail: 'From Apple Health' }] : []),
-    ...(HEALTH_IMPORT && R.health.has('steps') ? [{ id: 'steps', icon: '👟', title: 'Steps', detail: 'From Apple Health' }] : []),
+    { id: 'stress', title: 'Stress', detail: 'From your check-ins' },
+    { id: 'sleep', title: 'Sleep', detail: 'How well, out of 10' },
+    ...(HEALTH_IMPORT && R.health.has('sleepHours') ? [{ id: 'sleepHours', title: 'Hours slept', detail: 'From Apple Health' }] : []),
+    ...(HEALTH_IMPORT && R.health.has('steps') ? [{ id: 'steps', title: 'Steps', detail: 'From Apple Health' }] : []),
     ...R.factors.all().filter(f => !autoIds.includes(f.id)).map(f => ({
-      id: f.id, icon: f.icon || ROLE_ICON[f.role], title: f.name, detail: f.role === 'helper' ? 'Helper' : 'Stressor',
+      id: f.id, title: f.name, detail: f.role === 'helper' ? 'Helper' : 'Stressor',
     })),
   ];
   const AUTO_DETAIL = { pain: 'From your check-ins', stressor: 'Main stressor', helper: 'Top helper' };
+  const swatch = c => h('i', { class: `data-swatch${c ? '' : ' off'}`, style: c ? `--c:${c}` : null, 'aria-hidden': 'true' });
+  // Each added line shows the colour it has on the chart (colours go in the order lines were added)
+  const swatches = new Map(options.map(o => [o.id, swatch(null)]));
+  const paintSwatches = () => {
+    const order = [...chosen].filter(id => swatches.has(id));
+    for (const [id, el] of swatches) {
+      const i = order.indexOf(id);
+      el.replaceWith(swatches.set(id, swatch(i < 0 ? null : EXTRA_PALETTES[i % EXTRA_PALETTES.length][0])).get(id));
+    }
+  };
   const row = (lead, title, detail, on, onChange) => h('label', { class: 'data-row' },
     lead, h('span', { class: 'grow' }, title, h('span', { class: 'hint block' }, detail)),
     h('input', { type: 'checkbox', class: 'switch', checked: on, 'aria-label': `Show ${title}`, onchange: e => onChange(e.target.checked) }));
-  sheet(() => h('div', { class: 'stack data-sheet' },
+  const body = h('div', { class: 'stack data-sheet' },
     h('h2', {}, 'Chart data'),
     h('div', { class: 'data-list' },
-      autoLines.map(sr => row(h('i', { class: 'data-swatch', style: `--c:${sr.palette[0]}`, 'aria-hidden': 'true' }), sr.label, AUTO_DETAIL[sr.key],
+      autoLines.map(sr => row(swatch(sr.palette[0]), sr.label, AUTO_DETAIL[sr.key],
         !hiddenLines().has(sr.key), () => toggleHidden(sr.key))),
-      options.map(o => row(h('span', { class: 'data-icon', 'aria-hidden': 'true' }, o.icon), o.title, o.detail,
-        chosen.has(o.id), on => { on ? chosen.add(o.id) : chosen.delete(o.id); R.setSettings({ chartExtras: [...chosen] }); })))),
+      options.map(o => row(swatches.get(o.id), o.title, o.detail,
+        chosen.has(o.id), on => { on ? chosen.add(o.id) : chosen.delete(o.id); R.setSettings({ chartExtras: [...chosen] }); paintSwatches(); }))));
+  paintSwatches();
+  sheet(() => body,
   { onClose: () => rerender(), tall: true });
 }
 
@@ -344,11 +442,22 @@ function patternsCard(today) {
   const allEarly = rows.every(a => a.early);
   const shown = allEarly ? pickTwo(rows) : rows;
   const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta ?? 0)));
+  // Over a couple of weeks, what to try: up to two, the clearest first
+  const findings = trendFindings(data, factors, today).slice(0, 2);
   return h('section', { class: 'card glass patterns' },
-    h('div', { class: 'pat-head' }, head,
+    findings.length ? h('div', { class: 'findings' }, head, findings.map(findingRow)) : null,
+    h('div', { class: 'pat-head' }, findings.length ? h('span', {}) : head,
       h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
     h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
     allEarly ? h('p', { class: 'hint pat-note' }, 'Check in again to see patterns emerge here') : null);
+}
+
+/** "Try cutting back on desk sitting…": a dot for which way it points, the finding, then what to do. */
+function findingRow(f) {
+  const good = f.kind === 'keep' || f.kind === 'not-stressor';
+  return h('a', { class: 'finding', href: `#/factor/${f.factor.id}` },
+    h('i', { class: `finding-dot ${good ? 'good' : 'bad'}`, 'aria-hidden': 'true' }),
+    h('span', { class: 'grow' }, h('span', { class: 'finding-title' }, f.title), h('span', { class: 'hint block' }, f.body)));
 }
 
 function pickTwo(rows) {

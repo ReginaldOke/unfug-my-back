@@ -130,3 +130,31 @@ test('early signs show from a few check-ins and are labelled early', async () =>
   assert.equal(q.mainStressor.avg, 60);
   assert.equal(q.topHelper, null);
 });
+
+test('trend findings turn two weeks of links into something to try', async () => {
+  const { trendFindings } = await import('../web/lib/analysis.js');
+  const today = addDays(START, 13);
+  const dailyEntries = [], factorLogs = [];
+  for (let i = 0; i < 14; i++) {
+    const date = addDays(START, i);
+    const sit = (i * 37) % 5 * 60; // 0–240 minutes, mixed
+    const walk = i % 3 === 0 ? 1 : 0;
+    dailyEntries.push({ date, painScore: 2 + sit / 60 });
+    if (sit) factorLogs.push({ factorId: 'sit', date, value: sit });
+    if (walk) factorLogs.push({ factorId: 'coffee', date, value: 1 });
+    // A "stressor" that comes with lower pain
+    if (sit <= 60) factorLogs.push({ factorId: 'tv', date, value: 30 + i });
+  }
+  const factors = [
+    { id: 'sit', name: 'Desk sitting', role: 'trigger', measureType: 'minutes' },
+    { id: 'tv', name: 'TV time', role: 'trigger', measureType: 'minutes' },
+    { id: 'coffee', name: 'Coffee', role: 'trigger', measureType: 'yesno' },
+  ];
+  const found = trendFindings({ dailyEntries, factorLogs }, factors, today);
+  const byId = Object.fromEntries(found.map(f => [f.factor.id, f]));
+  assert.equal(byId.sit.kind, 'avoid');
+  assert.match(byId.sit.body, /cutting back on desk sitting/);
+  assert.equal(byId.tv.kind, 'not-stressor');
+  // Too few check-ins: nothing yet
+  assert.deepEqual(trendFindings({ dailyEntries: dailyEntries.slice(0, 5), factorLogs }, factors, today), []);
+});

@@ -1,5 +1,5 @@
-// In-app banners, plus a system notification when the page is in the background and permission is granted.
-// Stands in for UserNotifications actionable notifications.
+// In-app notices, shown at the top of Home, plus a system notification when the page is in the background
+// and permission is granted. Each one clears itself after a while, or after a few visits to Home.
 
 let banners = [];
 const listeners = new Set();
@@ -13,10 +13,13 @@ export function onBanners(fn) {
   return () => listeners.delete(fn);
 }
 
-/** actions: [{ label, primary?, run }] */
-export function notify({ key, title, body, actions = [] }) {
+const TTL_MIN = 45; // a notice is stale after this long
+const MAX_VISITS = 3; // ...or once it's been seen on this many visits to Home
+
+/** actions: [{ label, primary?, run }]. ttlMin: minutes before it clears itself. */
+export function notify({ key, title, body, actions = [], ttlMin = TTL_MIN }) {
   if (key) banners = banners.filter(b => b.key !== key);
-  banners = [...banners, { id: ++seq, key, title, body, actions }];
+  banners = [...banners, { id: ++seq, key, title, body, actions, expires: Date.now() + ttlMin * 60_000, visits: 0 }];
   emit();
   // The iOS app schedules real notifications ahead of time (native.js); this is the browser's stand-in
   if (!globalThis.Capacitor?.isNativePlatform?.() && document.hidden && 'Notification' in window && Notification.permission === 'granted') {
@@ -26,6 +29,17 @@ export function notify({ key, title, body, actions = [] }) {
     } catch { /* some browsers only allow notifications from a service worker */ }
   }
 }
+
+/** Called each time Home opens: counts a visit for each notice, and clears the ones seen enough. */
+export function countVisit() {
+  banners = banners.map(b => ({ ...b, visits: b.visits + 1 })).filter(b => b.visits <= MAX_VISITS);
+  emit();
+}
+
+setInterval(() => {
+  const live = banners.filter(b => b.expires > Date.now());
+  if (live.length !== banners.length) { banners = live; emit(); }
+}, 30_000);
 
 export function dismiss(id) {
   banners = banners.filter(b => b.id !== id);

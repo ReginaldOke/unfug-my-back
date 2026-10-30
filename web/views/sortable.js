@@ -10,7 +10,7 @@ const GLIDE = { duration: 320, easing: 'cubic-bezier(.2, .9, .25, 1)' };
  * grid: container whose element children with [data-id] are the sortable items.
  * onEditChange(editing), onReorder(ids in the new order).
  */
-export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => {} }) {
+export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => {}, onTap = null }) {
   let editing = false, press = null, drag = null, swallowClick = false;
   const items = () => [...grid.children].filter(el => el.dataset.id);
 
@@ -77,7 +77,7 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
 
   grid.addEventListener('pointerdown', e => {
     const el = e.target.closest('[data-id]');
-    if (!el || e.target.closest('.del') || e.button > 0) return;
+    if (!el || e.target.closest('.del, input') || e.button > 0) return;
     press = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
     if (editing) return; // in edit mode a drag starts as soon as the finger moves
     press.timer = setTimeout(() => {
@@ -119,11 +119,13 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
 
   // While editing, taps don't toggle cards; the click that ends a hold never does
   grid.addEventListener('click', e => {
-    if (e.target.closest('.del')) return;
+    if (e.target.closest('.del, input')) return;
     if (swallowClick || editing) {
       e.stopPropagation();
       e.preventDefault();
-      if (!swallowClick && editing && !e.target.closest('[data-id]')) setEditing(false);
+      // A plain tap on a card while editing is the card's own edit (renaming, for example)
+      const item = e.target.closest('[data-id]');
+      if (!swallowClick && editing) item ? onTap?.(item, e) : setEditing(false);
       swallowClick = false;
     }
   }, true);

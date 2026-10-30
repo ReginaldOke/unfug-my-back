@@ -27,13 +27,18 @@ export function init() {
 function giveRoutinesFactors() {
   const missing = S.table('routines').filter(r => !r.isArchived && !factors.get(r.linkedFactorId)?.routineId);
   if (missing.length) S.batch(() => { for (const r of missing) S.update('routines', r.id, { linkedFactorId: routineFactor(r).id }); });
+  // Routine items made before routines had their own emoji all wore the barbell
+  const plain = S.table('routines').filter(r => factors.get(r.linkedFactorId)?.icon === '🏋️' && routineIcon(r) !== '🏋️');
+  if (plain.length) S.batch(() => { for (const r of plain) S.update('factors', r.linkedFactorId, { icon: routineIcon(r) }); });
 }
 /** "Calisthenics · Push" for a variation in a group, otherwise just the name. */
 export const routineLabel = r => (r.group ? `${r.group} · ${r.name}` : r.name);
+/** A routine's emoji: chosen from its group and name ("Daily mobility" → 🤸), or a flexed arm. */
+export const routineIcon = r => r.icon || emojiFor(`${r.group ?? ''} ${r.name}`, { exercise: true });
 
 function routineFactor(r) {
   return S.insert('factors', {
-    name: routineLabel(r), role: 'helper', measureType: 'yesno', unit: '', category: 'exercise', icon: '🏋️',
+    name: routineLabel(r), role: 'helper', measureType: 'yesno', unit: '', category: 'exercise', icon: routineIcon(r),
     status: 'suspected', isArchived: false, source: 'routine', routineId: r.id,
     sortWeight: Math.min(0, ...S.table('factors').map(f => f.sortWeight ?? 0)) - 1,
   });

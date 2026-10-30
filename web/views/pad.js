@@ -5,7 +5,6 @@ import * as R from '../lib/repos.js';
 import { dragHandles } from './sortable.js';
 
 export const DEFAULT_NOTES = [
-  'It’s tension, not damage.',
   'No need to brace every time you bend.',
   'Play the long game. Get stronger at the moves you avoid, like bending.',
 ];
@@ -13,6 +12,8 @@ export const DEFAULT_NOTES = [
 /** Gives every diary the default notes once, existing ones included. Deleting them all keeps it empty. */
 export function seedNotes() {
   if (!Array.isArray(R.settings().padNotes)) R.setSettings({ padNotes: DEFAULT_NOTES.map(text => ({ id: R.uuid(), text })) });
+  // A default note that was taken out, removed once from diaries that still have it unedited
+  if (!R.settings().padRetired) R.setSettings({ padRetired: 1, padNotes: notes().filter(n => n.text !== 'It’s tension, not damage.') });
 }
 const notes = () => R.settings().padNotes ?? [];
 const save = list => R.setSettings({ padNotes: list });

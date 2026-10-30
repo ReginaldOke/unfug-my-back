@@ -24,7 +24,7 @@ export function fmtAmount(factor, value) {
     case 'yesno': return 'Yes';
     case 'minutes': return fmtMinutes(value);
     case 'rating': return `${value}/10`;
-    default: return `${value} ${factor.unit || '×'}`;
+    default: return value === 1 && factor.unit === 'times' ? '1 time' : `${value} ${factor.unit || '×'}`;
   }
 }
 
@@ -68,4 +68,12 @@ export function emojiFor(name, { role, exercise } = {}) {
   const n = (name ?? '').toLowerCase();
   const hit = EMOJI_WORDS.find(([re]) => re.test(n));
   return hit ? hit[1] : exercise ? '💪' : role === 'helper' ? '🌿' : '📍';
+}
+
+/** "about 45 minutes", "about 1 hour 30 minutes"; past six hours it's most likely a night or a day away, so just "hours". */
+export function stillFor(min) {
+  if (min < 60) return `about ${Math.max(5, Math.round(min / 5) * 5)} minutes`;
+  if (min >= 360) return 'hours';
+  const q = Math.round(min / 15) * 15, h = Math.floor(q / 60), m = q % 60;
+  return `about ${h} hour${h > 1 ? 's' : ''}${m ? ` ${m} minutes` : ''}`;
 }

@@ -5,7 +5,7 @@ import { motion } from './motion.js';
 import { notify, dismissKey } from './notify.js';
 import { localDate, minutesSince } from './dates.js';
 import { startNative, syncNotifications } from './native.js';
-import { parseReminder, reminderOn } from './labels.js';
+import { parseReminder, reminderOn, stillFor } from './labels.js';
 
 const TICK_MS = 20_000;
 
@@ -69,13 +69,12 @@ function fire(ev, now) {
 }
 
 function showMovementBanner(ev) {
-  const minutes = Math.max(5, Math.round((ev.stationaryMinutesBefore ?? R.settings().reminder.intervalMin) / 5) * 5);
   const items = R.routines.all()[0]?.items ?? [];
   const idea = items.length ? ` Try: ${items[Math.floor(Math.random() * items.length)].name.toLowerCase()}.` : '';
   notify({
     key: 'move',
     title: 'Time to move',
-    body: `You've been still for about ${minutes} minutes.${idea}`,
+    body: `You've been still for ${stillFor(ev.stationaryMinutesBefore ?? R.settings().reminder.intervalMin)}.${idea}`,
     actions: [
       { label: 'Moving now', primary: true, run: () => respond(ev.id, 'moved') },
       { label: 'Already moved', run: () => respond(ev.id, 'already_moved') },

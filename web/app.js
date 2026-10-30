@@ -1,6 +1,5 @@
 import * as R from './lib/repos.js';
 import * as reminders from './lib/reminders.js';
-import { onBanners, dismiss } from './lib/notify.js';
 import { h } from './lib/ui.js';
 import { HomeView } from './views/home.js';
 import { CheckinView } from './views/checkin.js';
@@ -10,7 +9,7 @@ import { RoutinesView, RoutineView, RoutineRunView } from './views/routines.js';
 import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
 import { HealthView } from './views/health.js';
-import { CheckinsView } from './views/checkins.js';
+import { CheckinsView, CheckinDetailView } from './views/checkins.js';
 import { startTheme } from './lib/theme.js';
 
 R.init();
@@ -21,6 +20,7 @@ const routes = [
   [/^\/$/, HomeView],
   [/^\/checkin$/, CheckinView, { flow: true }],
   [/^\/checkins$/, CheckinsView],
+  [/^\/checkins\/(\d{4}-\d{2}-\d{2})$/, CheckinDetailView],
   [/^\/setup$/, SetupView, { flow: true }],
   [/^\/factor\/([\w-]+)$/, FactorDetailView],
   [/^\/routines$/, RoutinesView],
@@ -62,18 +62,39 @@ function render() {
     a.classList.toggle('active', active);
     if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
+  moveGlider();
 }
+
+// The selected tab's glass lens: one piece that slides between tabs. Like iOS's liquid glass it
+// stretches toward where it's going, thins a little in flight, then settles with a small overshoot.
+const glider = h('span', { class: 'tab-glider', 'aria-hidden': 'true' });
+tabs.prepend(glider);
+let gliderAt = null;
+function moveGlider() {
+  const a = tabs.querySelector('a.active');
+  if (!a || !a.offsetWidth) { glider.style.opacity = '0'; gliderAt = null; return; }
+  const to = { x: a.offsetLeft, w: a.offsetWidth };
+  const from = gliderAt;
+  gliderAt = to;
+  glider.style.opacity = '1';
+  glider.style.width = `${to.w}px`;
+  glider.style.transform = `translateX(${to.x}px)`;
+  if (!from || from.x === to.x || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Mid-flight it spans from the old tab toward the new one, slightly flattened
+  const left = Math.min(from.x, to.x), right = Math.max(from.x + from.w, to.x + to.w);
+  const midW = (right - left) * 0.72, midX = to.x > from.x ? right - midW - (right - to.x - to.w) * 0.6 : left + (from.x - left) * 0.15;
+  glider.animate([
+    // Stretch out smoothly, then spring into place
+    { transform: `translateX(${from.x}px) scaleY(1)`, width: `${from.w}px`, easing: 'cubic-bezier(.45, 0, .55, 1)' },
+    { transform: `translateX(${midX}px) scaleY(0.86)`, width: `${midW}px`, offset: 0.4, easing: 'cubic-bezier(.25, 1.5, .5, 1)' },
+    { transform: `translateX(${to.x}px) scaleY(1)`, width: `${to.w}px` },
+  ], { duration: 560 });
+}
+addEventListener('resize', () => { gliderAt = null; moveGlider(); });
 
 function NotFound() {
   return h('div', { class: 'view' }, h('h1', {}, 'Not found'), h('a', { href: '#/' }, 'Go home'));
 }
-
-const bannersEl = document.getElementById('banners');
-onBanners(list => bannersEl.replaceChildren(...list.map(b => h('div', { class: 'banner glass', role: 'alert' },
-  h('div', { class: 'banner-text' }, h('strong', {}, b.title), h('p', {}, b.body)),
-  h('div', { class: 'banner-actions' },
-    b.actions.map(a => h('button', { type: 'button', class: `btn small ${a.primary ? 'primary' : 'glass'}`, onclick: () => { dismiss(b.id); a.run?.(); } }, a.label)),
-    h('button', { type: 'button', class: 'icon-btn small', 'aria-label': 'Dismiss', onclick: () => dismiss(b.id) }, '✕'))))));
 
 window.addEventListener('hashchange', render);
 render();

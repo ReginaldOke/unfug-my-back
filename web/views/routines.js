@@ -11,13 +11,20 @@ import { dragHandles } from './sortable.js';
 /** Set when a routine is finished, read once by the Today screen to play its celebration. */
 export const justFinished = { id: null };
 
+// Redraws the list in place after a tick, so the page doesn't reload (or replay its entrance)
+let repaintList = () => {};
+
 export function RoutinesView() {
-  const today = localDate();
-  const list = R.routines.all();
+  const cards = h('div', { class: 'routine-list' });
+  repaintList = () => {
+    const today = localDate();
+    cards.replaceChildren(...groupsOf(R.routines.all()).map(days => (days.length > 1 || days[0].group ? groupCard(days, today) : routineCard(days[0], today))));
+  };
+  repaintList();
   return h('div', { class: 'view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Routines')),
-    list.length ? null : h('p', { class: 'muted' }, 'Keep your gym, stretching or calisthenics routines here. Tick one off in your check-in, or open it to log your sets.'),
-    groupsOf(list).map(days => days.length > 1 || days[0].group ? groupCard(days, today) : routineCard(days[0], today)),
+    R.routines.all().length ? null : h('p', { class: 'muted' }, 'Keep your gym, stretching or calisthenics routines here. Tick one off in your check-in, or open it to log your sets.'),
+    cards,
     h('a', { class: 'add-card', href: '#/routine/new' }, '+ New routine'));
 }
 
@@ -33,21 +40,25 @@ function groupsOf(list) {
   return out;
 }
 
-/** One card for the group; tap it to open the first variation, or a chip for that one. */
+/**
+ * One card for the group: its name opens the first variation; below, a row per variation. Each row
+ * opens that variation; the tick sits apart at the far end, so opening one never ticks it by accident.
+ */
 function groupCard(days, today) {
   const status = doneStatus(days, today);
-  return h('section', {
-    class: 'card glass routine-card group-card', role: 'link', tabindex: 0, 'aria-label': `${days[0].group}. Open ${days[0].name}`,
-    onclick: () => { location.hash = `#/routine/${days[0].id}`; },
-    onkeydown: e => { if (e.key === 'Enter') location.hash = `#/routine/${days[0].id}`; },
-  },
-    h('div', {}, h('h2', {}, days[0].group), status ? h('p', { class: 'hint' }, status) : null),
-    h('div', { class: 'routine-days' }, days.map(r => {
+  const first = `#/routine/${days[0].id}`;
+  return h('section', { class: 'card glass routine-card group-card' },
+    h('a', { class: 'routine-head', href: first, 'aria-label': `${days[0].group}. Open ${days[0].name}` },
+      h('span', { class: 'well', 'aria-hidden': 'true' }, R.routineIcon({ name: days[0].group })),
+      h('div', { class: 'grow' }, h('h2', {}, days[0].group), status ? h('p', { class: 'hint' }, status) : null)),
+    h('ul', { class: 'variation-list' }, days.map(r => {
       const done = R.routines.completionsOn(today, r.id).length > 0;
-      return h('a', {
-        class: `chip glass routine-day${done ? ' done' : ''}`, href: `#/routine/${r.id}`,
-        'aria-label': `${R.routineLabel(r)}${done ? ', done today' : ''}. Open`, onclick: e => e.stopPropagation(),
-      }, doneToggle(r, today, done), r.name);
+      return h('li', { class: `variation-row${done ? ' done' : ''}` },
+        h('a', { class: 'variation-open', href: `#/routine/${r.id}`, 'aria-label': `${R.routineLabel(r)}. Open` },
+          h('span', { class: 'variation-name' }, r.name),
+          h('span', { class: 'hint' }, `${r.items.length} move${r.items.length === 1 ? '' : 's'}`),
+          h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
+        doneToggle(r, today, done));
     })));
 }
 
@@ -55,8 +66,9 @@ function routineCard(r, today) {
   const status = doneStatus([r], today);
   const done = R.routines.completionsOn(today, r.id).length > 0;
   return h('a', { class: 'card glass routine-card', href: `#/routine/${r.id}`, 'aria-label': `${r.name}${status ? `, ${status}` : ''}. Open` },
-    h('div', { class: 'row between' },
-      h('div', {}, h('h2', {}, r.name), status ? h('p', { class: 'hint' }, status) : null),
+    h('div', { class: 'routine-head' },
+      h('span', { class: 'well', 'aria-hidden': 'true' }, R.routineIcon(r)),
+      h('div', { class: 'grow' }, h('h2', {}, r.name), status ? h('p', { class: 'hint' }, status) : null),
       doneToggle(r, today, done)),
     h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, it.dose)))));
 }
@@ -74,7 +86,7 @@ function doneToggle(r, today, done) {
         vibrate(10);
         toast(`${R.routineLabel(r)} done`);
       }
-      location.replace('#/routines'); window.dispatchEvent(new HashChangeEvent('hashchange'));
+      repaintList();
     },
   });
 }
@@ -199,7 +211,7 @@ export function RoutineView(ctx) {
         if (s.group === null) { s.group = s.name.trim(); s.name = 'A'; }
         R.routines.save(s.id, { group: s.group.trim(), name: s.name.trim() || 'A', groupOrder: R.routines.get(s.id).groupOrder ?? 0 });
         const next = R.routines.addVariation(s.id);
-        location.hash = `#/routine/${next.id}?${stay}&rename=1`;
+        location.replace(`#/routine/${next.id}?${stay}&rename=1`);
       },
     }, s.group === null ? '+ Add a variation' : '+');
     if (s.group === null) return h('div', { class: 'day-tabs' }, add);
@@ -212,7 +224,7 @@ export function RoutineView(ctx) {
     if (ctx.params.get('rename')) setTimeout(() => { nameBox.focus(); nameBox.select(); }, 80);
     return h('div', { class: 'day-tabs', role: 'tablist' },
       R.routines.group(R.routines.get(s.id)).map(d => d.id === s.id ? nameBox
-        : h('a', { class: 'chip glass day-tab', role: 'tab', href: `#/routine/${d.id}?${stay}` }, sessions.get(`${d.id}|${date}`)?.name ?? d.name)),
+        : h('a', { class: 'chip glass day-tab', role: 'tab', href: `#/routine/${d.id}?${stay}`, onclick: e => { e.preventDefault(); location.replace(e.currentTarget.getAttribute('href')); } }, sessions.get(`${d.id}|${date}`)?.name ?? d.name)),
       add);
   }
 
@@ -355,17 +367,17 @@ export function RoutineView(ctx) {
     field.classList.toggle('counted', counted());
     field.style.setProperty('--h', String(counted() ? 168 : Math.round(f < 0.5 ? 135 - 87 * f * 2 : 48 - 46 * (f - 0.5) * 2)));
   };
-  const switcher = h('div', { class: 'measure-switch', role: 'radiogroup', 'aria-label': 'Measure' });
+  // The question the slider answers, its answer on the right; a quiet link underneath switches what's tracked
+  const question = h('span', { class: 'effort-question' });
+  const switcher = h('button', { type: 'button', class: 'measure-switch', onclick: () => { setMeasure(counted() ? 'effort' : 'count'); vibrate(4); } });
   const setMeasure = m => {
     s.measure = m;
     range.min = 1; range.max = counted() ? MAX_TIMES : 3; range.value = value();
-    switcher.replaceChildren(...[['effort', 'How hard'], ['count', 'How many times']].map(([k, label]) => h('button', {
-      type: 'button', role: 'radio', 'aria-checked': String(s.measure === k), class: s.measure === k ? 'on' : '',
-      onclick: () => { if (s.measure !== k) { setMeasure(k); vibrate(4); } },
-    }, label)));
+    question.textContent = counted() ? 'How many times today?' : 'How hard was it?';
+    switcher.textContent = counted() ? 'Track how hard instead' : 'Track how many times instead';
     paintHow();
   };
-  field.append(h('div', { class: 'row between' }, switcher, word), range);
+  field.append(h('div', { class: 'row between' }, question, word), range, switcher);
   setMeasure(s.measure);
 
   // Reminders, as chips; + adds one
@@ -392,7 +404,8 @@ export function RoutineView(ctx) {
     onclick: () => {
       if (!s.items.some(it => it.name.trim())) return toast('Add a move first');
       if (!s.id) { const saved = saveDraftRoutine(); if (!saved) return; }
-      location.hash = `#/routine/${s.id}/run?date=${date}${fromCheckin ? '&from=checkin' : ''}`;
+      // The player and the routine page swap in place, so Back leaves the routine rather than bouncing between them
+      location.replace(`#/routine/${s.id}/run?date=${date}${fromCheckin ? '&from=checkin' : ''}`);
     },
   });
   play.innerHTML = PLAY;
@@ -482,7 +495,7 @@ export function RoutineRunView(ctx) {
   const moves = s.items.filter(it => it.name.trim());
   let i = Math.max(0, moves.findIndex(it => !it.done));
   const root = h('div', { class: 'flow' });
-  const back = () => { location.hash = `#/routine/${r.id}?date=${date}${fromCheckin ? '&from=checkin' : ''}`; };
+  const back = () => { location.replace(`#/routine/${r.id}?date=${date}${fromCheckin ? '&from=checkin' : ''}`); };
 
   function render() {
     const it = moves[i];

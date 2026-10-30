@@ -45,9 +45,15 @@ function freshDraft(date) {
 export function CheckinView(ctx) {
   const today = localDate();
   let date = ctx.params.get('date') || today;
-  if (date > today || date < addDays(today, -3)) date = today;
+  // New check-ins go back three days at most; one already saved can be edited whenever
+  if (date > today || (date < addDays(today, -3) && !R.checkins.entryFor(date))) date = today;
+  // Opened from a check-in's page: it returns there, and can start at the step being edited
+  const fromDetail = ctx.params.get('from') === 'detail';
   if (!drafts.has(date)) drafts.set(date, freshDraft(date));
   const draft = drafts.get(date);
+  const startAt = STEPS.findIndex(st => st.id === ctx.params.get('step'));
+  if (startAt >= 0) draft.step = startAt;
+  const leave = () => { location.hash = fromDetail ? `#/checkins/${date}` : '#/'; };
   const existing = R.checkins.entryFor(date);
   const yesterday = addDays(date, -1);
 
@@ -57,15 +63,18 @@ export function CheckinView(ctx) {
   const footer = h('div', { class: 'flow-footer' });
 
   const dateSelect = h('select', {
-    class: 'date-pill', 'aria-label': 'Day you’re logging',
+    class: 'flow-day', 'aria-label': 'Day you’re logging',
     onchange: e => { location.hash = `#/checkin?date=${e.target.value}`; },
     value: date,
-  }, [0, -1, -2, -3].map(n => { const d = addDays(today, n); return h('option', { value: d }, dayLabel(d, today) + (R.checkins.entryFor(d) ? ' ✓' : '')); }));
+  }, [...new Set([...[0, -1, -2, -3].map(n => addDays(today, n)), date])].map(d => h('option', { value: d }, dayLabel(d, today) + (R.checkins.entryFor(d) ? ' ✓' : ''))));
 
   root.append(
     h('header', { class: 'flow-head' },
-      iconButton('✕', 'Close check-in', () => { location.hash = '#/'; }),
-      dateSelect, h('span', { class: 'head-spacer', 'aria-hidden': 'true' })),
+      iconButton('✕', 'Close check-in', leave),
+      // A plain title, with the day underneath (tap it to log an earlier day)
+      h('div', { class: 'flow-title' }, h('strong', {}, existing ? 'Edit check-in' : 'Check in'), h('span', { class: 'flow-day-wrap' }, dateSelect)),
+      // Editing from a check-in's page: save from any step, no need to walk to the end
+      fromDetail ? h('button', { type: 'button', class: 'btn small glass head-save', onclick: () => finish() }, 'Save') : h('span', { class: 'head-spacer', 'aria-hidden': 'true' })),
     progress, body, footer);
 
   function go(step) {
@@ -268,6 +277,7 @@ export function CheckinView(ctx) {
     const seconds = Math.round((Date.now() - draft.startedAt) / 1000);
     R.checkins.save(date, { ...draft, durationSeconds: seconds });
     drafts.delete(date);
+    if (fromDetail) { toast('Check-in updated'); leave(); return; }
     root.replaceChildren(doneScreen());
   }
 

@@ -3,7 +3,7 @@
 import * as R from './repos.js';
 import { localDate } from './dates.js';
 import { parseHM } from './reminders-core.js';
-import { parseReminder, reminderOn } from './labels.js';
+import { parseReminder, reminderOn, stillFor } from './labels.js';
 
 const Cap = globalThis.Capacitor;
 export const isNative = !!Cap?.isNativePlatform?.();
@@ -57,7 +57,8 @@ async function plan() {
   // The movement reminder ahead, if there is one
   const move = R.reminders.pending();
   if (move && new Date(move.scheduledFor) > now) {
-    list.push({ id: MOVE_ID, title: 'Time to move', body: `You've been still for a while. A short walk or stretch will do.`, actionTypeId: 'MOVE', schedule: { at: new Date(move.scheduledFor) }, extra: { eventId: move.id } });
+    const still = s.lastMovementAt ? (new Date(move.scheduledFor) - new Date(s.lastMovementAt)) / 60_000 : s.reminder.intervalMin;
+    list.push({ id: MOVE_ID, title: 'Time to move', body: `You've been still for ${stillFor(still)}. A short walk or stretch will do.`, actionTypeId: 'MOVE', schedule: { at: new Date(move.scheduledFor) }, extra: { eventId: move.id } });
   }
   // Check-ins and routines for the next week, skipping today's if they're already done
   let id = 100;

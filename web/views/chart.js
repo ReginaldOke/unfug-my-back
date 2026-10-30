@@ -43,7 +43,7 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   const n = days.length;
   const x = i => left + (n === 1 ? (right - left) / 2 : (i / (n - 1)) * (right - left));
   const y = v => bottom - v * (bottom - top);
-  const labelEvery = n <= 14 ? 1 : 7;
+  const labelEvery = n <= 14 ? 1 : n <= 31 ? 7 : n <= 92 ? 14 : 61; // about six labels at most past a fortnight
   const showLabel = i => (n - 1 - i) % labelEvery === 0;
   const visible = series.filter(sr => !hidden.has(sr.key));
 

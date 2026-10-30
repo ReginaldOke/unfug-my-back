@@ -240,11 +240,13 @@ body.in-flow #tabs { display: none; }
 
 /* ---------- Toast & banners ---------- */
 #toast {
-  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
-  background: rgba(240, 240, 240, 0.95); color: #0a0a0a; padding: 10px 18px; border-radius: var(--r-pill);
+  position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translate(-50%, -16px);
+  background: radial-gradient(90% 140% at 20% 0%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 60%), rgba(36, 36, 40, 0.45);
+  -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 34px -14px rgba(0, 0, 0, 0.7);
+  color: var(--ink); padding: 10px 18px; border-radius: var(--r-pill);
   font-size: 14px; opacity: 0; transition: .25s; pointer-events: none; z-index: 60; max-width: calc(100% - 32px); text-align: center;
 }
-body.in-flow #toast { bottom: calc(100px + env(safe-area-inset-bottom)); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #banners { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(540px, calc(100% - 20px)); z-index: 50; display: flex; flex-direction: column; gap: 8px; }
 .banner { border-radius: 26px; padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 10px; background: rgba(28, 28, 30, 0.96); border-color: var(--glass-edge); animation: drop .35s cubic-bezier(.2, .9, .3, 1.2); }
@@ -1224,7 +1226,7 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
    ====================================================================== */
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #efebe6;
+  --bg: #efeeec;
   --ink: #1d1c1f;
   --ink-2: rgba(29, 28, 31, 0.64);
   --ink-3: rgba(29, 28, 31, 0.4);
@@ -1233,10 +1235,10 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
   --red-2: #c9533f;
   --red-glow: rgba(216, 96, 76, 0.25);
   --helper: #1d1c1f;
-  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.2) 45%, rgba(255, 255, 255, 0.3) 100%);
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.38) 45%, rgba(255, 255, 255, 0.48) 100%);
   --glass-solid: rgba(255, 255, 255, 0.85);
   --glass-edge: rgba(0, 0, 0, 0.05);
-  --glass-shadow: inset 0 0 24px rgba(255, 255, 255, 0.5), 0 1px 2px rgba(60, 40, 30, 0.06), 0 18px 40px -22px rgba(60, 40, 30, 0.28);
+  --glass-shadow: inset 0 0 24px rgba(255, 255, 255, 0.5), 0 1px 2px rgba(40, 42, 52, 0.06), 0 18px 40px -22px rgba(40, 42, 52, 0.28);
   --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.5) 30%, rgba(0, 0, 0, 0.04) 60%, rgba(255, 255, 255, 0.7) 100%);
   --well: rgba(0, 0, 0, 0.05);
 }
@@ -1247,15 +1249,16 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
     radial-gradient(44% 34% at 26% 82%, rgba(232, 180, 168, 0.3), transparent 72%),
     linear-gradient(180deg, #f3efea 0%, #eeeae4 60%, #e9e4de 100%);
 }
+/* Light mode trades the red for a morning sky: soft peach at the top left, blue and sea-glass teal across */
 [data-theme="light"] .aura::before {
-  opacity: 0.55;
+  opacity: 0.9;
   background:
-    radial-gradient(20% 3.12% at 70% 10.62%, rgba(255, 236, 226, 0.9), transparent 70%),
-    radial-gradient(52% 4.38% at 58% 12.50%, rgba(240, 110, 84, 0.85), transparent 72%),
-    radial-gradient(46% 3.75% at 38% 15.00%, rgba(222, 92, 80, 0.6), transparent 72%),
-    radial-gradient(60% 4.38% at 44% 8.12%, rgba(80, 100, 190, 0.7), transparent 72%),
-    radial-gradient(40% 3.75% at 20% 11.88%, rgba(190, 90, 120, 0.5), transparent 72%),
-    radial-gradient(30% 3.75% at 88% 15.62%, rgba(250, 170, 150, 0.6), transparent 72%);
+    radial-gradient(20% 3.12% at 70% 10.62%, rgba(255, 246, 222, 0.95), transparent 70%),
+    radial-gradient(52% 4.38% at 58% 12.50%, rgba(96, 156, 230, 0.75), transparent 72%),
+    radial-gradient(46% 3.75% at 38% 15.00%, rgba(92, 196, 190, 0.6), transparent 72%),
+    radial-gradient(60% 4.38% at 44% 8.12%, rgba(250, 172, 118, 0.6), transparent 72%),
+    radial-gradient(40% 3.75% at 20% 11.88%, rgba(255, 196, 150, 0.6), transparent 72%),
+    radial-gradient(30% 3.75% at 88% 15.62%, rgba(140, 214, 222, 0.6), transparent 72%);
 }
 [data-theme="light"] .aura::after { opacity: 0.25; }
 [data-theme="light"] body::after { opacity: 0.09; mix-blend-mode: multiply; }
@@ -1264,19 +1267,18 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
 [data-theme="light"] .sheet { background: rgba(250, 248, 245, 0.72); }
 [data-theme="light"] .sheet::backdrop { background: rgba(40, 30, 25, 0.18); }
 [data-theme="light"] .banner { background: rgba(255, 255, 255, 0.94); }
-[data-theme="light"] #tabs { background: rgba(255, 255, 255, 0.55); box-shadow: 0 18px 40px -18px rgba(60, 40, 30, 0.35), inset 0 0 22px rgba(255, 255, 255, 0.5); }
+[data-theme="light"] #tabs { background: rgba(255, 255, 255, 0.55); box-shadow: 0 18px 40px -18px rgba(40, 42, 52, 0.35), inset 0 0 22px rgba(255, 255, 255, 0.5); }
 [data-theme="light"] #tabs a.active { color: var(--ink); background: rgba(255, 255, 255, 0.85); }
 [data-theme="light"] .drag-row.lifted, [data-theme="light"] .pad-item.lifted,
-[data-theme="light"] .log-row.lifted .log-inner { background: rgba(255, 255, 255, 0.96); box-shadow: 0 14px 34px -12px rgba(60, 40, 30, 0.35); }
-[data-theme="light"] .log-row.swiping .log-inner, [data-theme="light"] .log-row.open .log-inner { background: #fbfaf8; box-shadow: 6px 0 18px -8px rgba(60, 40, 30, 0.3); }
+[data-theme="light"] .log-row.lifted .log-inner { background: rgba(255, 255, 255, 0.96); box-shadow: 0 14px 34px -12px rgba(40, 42, 52, 0.35); }
+[data-theme="light"] .log-row.swiping .log-inner, [data-theme="light"] .log-row.open .log-inner { background: #fbfaf8; box-shadow: 6px 0 18px -8px rgba(40, 42, 52, 0.3); }
 [data-theme="light"] .body3d-label { background: rgba(255, 255, 255, 0.8); }
 [data-theme="light"] .frost { background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(250, 248, 245, 0.62)); }
 [data-theme="light"] .chart .axis-today { fill: #efebe6; }
-[data-theme="light"] .trend .mark circle { fill: #fbfaf8; stroke: rgba(29, 28, 31, 0.4); }
 [data-theme="light"] .effort-range::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, transparent var(--pct, 50%), rgba(239, 235, 230, 0.75) var(--pct, 50%)), linear-gradient(90deg, #6cc47c, #e6bb3c 50%, #ec6a5a);
+  background: linear-gradient(90deg, transparent var(--pct, 50%), rgba(239, 238, 236, 0.75) var(--pct, 50%)), linear-gradient(90deg, #6cc47c, #e6bb3c 50%, #ec6a5a);
 }
-[data-theme="light"] .effort-range::-webkit-slider-thumb { background: #fff; box-shadow: 0 2px 10px rgba(60, 40, 30, 0.3); }
+[data-theme="light"] .effort-range::-webkit-slider-thumb { background: #fff; box-shadow: 0 2px 10px rgba(40, 42, 52, 0.3); }
 
 /* Text and controls that were white */
 [data-theme="light"] .btn.primary, [data-theme="light"] .btn.glass { color: var(--ink); background: radial-gradient(60% 120% at 14% 0%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 70%), rgba(255, 255, 255, 0.55); }
@@ -1302,8 +1304,8 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] .ruler i.lit { background: rgba(29, 28, 31, 0.8); }
 [data-theme="light"] .seg-dots i.on { background: #1d1c1f; }
 [data-theme="light"] .pill-badge { background: rgba(0, 0, 0, 0.06); }
-[data-theme="light"] .vslider { background: linear-gradient(180deg, rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.04)); box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.06), 0 26px 50px -26px rgba(60, 40, 30, 0.3); }
-[data-theme="light"] .flow-footer { background: linear-gradient(180deg, rgba(239, 235, 230, 0), rgba(239, 235, 230, 0.9) 45%); }
+[data-theme="light"] .vslider { background: linear-gradient(180deg, rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.04)); box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.06), 0 26px 50px -26px rgba(40, 42, 52, 0.3); }
+[data-theme="light"] .flow-footer { background: linear-gradient(180deg, rgba(239, 238, 236, 0), rgba(239, 238, 236, 0.9) 45%); }
 .appearance { flex-direction: row; align-items: center; }
 .appearance .segmented { flex: none; width: auto; }
 .appearance .segmented button { padding: 0 14px; }
@@ -1330,8 +1332,8 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] {
   --lg-body: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.06));
   --lg-catch: radial-gradient(80% 120% at 22% -10%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 62%);
-  --lg-edge: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(120, 90, 70, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  --lg-lift: 0 10px 28px -14px rgba(90, 60, 45, 0.32), 0 2px 6px -2px rgba(90, 60, 45, 0.12);
+  --lg-edge: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(70, 72, 82, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  --lg-lift: 0 10px 28px -14px rgba(40, 42, 52, 0.32), 0 2px 6px -2px rgba(40, 42, 52, 0.12);
 }
 [data-theme="light"] .btn.primary, [data-theme="light"] .btn.glass {
   color: var(--ink);
@@ -1339,20 +1341,20 @@ body:not(.on-home) .ambient { background: var(--bg); }
   -webkit-backdrop-filter: blur(10px) saturate(180%); backdrop-filter: blur(10px) saturate(180%);
   box-shadow: var(--lg-edge), var(--lg-lift);
 }
-[data-theme="light"] .btn.primary:active, [data-theme="light"] .btn.glass:active { box-shadow: var(--lg-edge), 0 4px 12px -8px rgba(90, 60, 45, 0.3); }
+[data-theme="light"] .btn.primary:active, [data-theme="light"] .btn.glass:active { box-shadow: var(--lg-edge), 0 4px 12px -8px rgba(40, 42, 52, 0.3); }
 [data-theme="light"] .icon-btn.glass, [data-theme="light"] .well.action, [data-theme="light"] .well {
   background: var(--lg-catch), linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.14));
-  box-shadow: var(--lg-edge), 0 6px 16px -10px rgba(90, 60, 45, 0.3);
+  box-shadow: var(--lg-edge), 0 6px 16px -10px rgba(40, 42, 52, 0.3);
 }
 [data-theme="light"] .chip:not(.on):not(.day-add) { background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18)); box-shadow: var(--lg-edge); }
-[data-theme="light"] .segmented { background: rgba(120, 90, 70, 0.07); box-shadow: inset 0 1px 2px rgba(90, 60, 45, 0.08); }
+[data-theme="light"] .segmented { background: rgba(70, 72, 82, 0.07); box-shadow: inset 0 1px 2px rgba(40, 42, 52, 0.08); }
 [data-theme="light"] .segmented button.on, [data-theme="light"] .chip.on { box-shadow: 0 4px 12px -6px rgba(29, 28, 31, 0.5); }
 [data-theme="light"] #tabs {
   background: var(--lg-catch), linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.2));
-  box-shadow: var(--lg-edge), 0 18px 40px -18px rgba(90, 60, 45, 0.4);
+  box-shadow: var(--lg-edge), 0 18px 40px -18px rgba(40, 42, 52, 0.4);
 }
-[data-theme="light"] #tabs a.active { background: rgba(255, 255, 255, 0.7); box-shadow: var(--lg-edge), 0 4px 12px -6px rgba(90, 60, 45, 0.25); }
-[data-theme="light"] .card, [data-theme="light"] .tile:not(.add), [data-theme="light"] .select-card:not(.add) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 16px 36px -22px rgba(90, 60, 45, 0.3); }
+[data-theme="light"] #tabs a.active { background: rgba(255, 255, 255, 0.7); box-shadow: var(--lg-edge), 0 4px 12px -6px rgba(40, 42, 52, 0.25); }
+[data-theme="light"] .card, [data-theme="light"] .tile:not(.add), [data-theme="light"] .select-card:not(.add) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 16px 36px -22px rgba(40, 42, 52, 0.3); }
 /* Choice cards: icons stay readable when unpicked; the tick ring shows */
 [data-theme="light"] .select-card .well { opacity: 0.9; filter: grayscale(0.35); }
 [data-theme="light"] .select-card .tick { border-color: rgba(0, 0, 0, 0.18); }
@@ -1362,7 +1364,7 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] .progress i.now { background: #1d1c1f; }
 [data-theme="light"] .fig-floor { stroke: rgba(0, 0, 0, 0.12); }
 [data-theme="light"] .fig-limb.far { stroke: rgba(29, 28, 31, 0.25); }
-[data-theme="light"] .move-figure { filter: drop-shadow(0 10px 24px rgba(90, 60, 45, 0.18)); }
+[data-theme="light"] .move-figure { filter: drop-shadow(0 10px 24px rgba(40, 42, 52, 0.18)); }
 [data-theme="light"] .key:not(.on) .key-name { text-decoration-color: rgba(0, 0, 0, 0.3); }
 [data-theme="light"] .cal-cell.today:not(.logged)::before { box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.3); }
 [data-theme="light"] .cal-cell.sel::before { box-shadow: 0 8px 20px -6px var(--dot2, transparent), 0 0 0 2px var(--bg), 0 0 0 3.5px rgba(29, 28, 31, 0.8); }
@@ -1459,8 +1461,8 @@ body:not(.on-home) .ambient::after {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 0 0 1px rgba(255, 255, 255, 0.45),
-    inset 0 -18px 30px -20px rgba(90, 60, 45, 0.18),
-    0 26px 50px -24px rgba(90, 60, 45, 0.35);
+    inset 0 -18px 30px -20px rgba(40, 42, 52, 0.18),
+    0 26px 50px -24px rgba(40, 42, 52, 0.35);
 }
 /* The fill: the value's colour, softened for paper, with a vertical sheen so it reads as glass */
 [data-theme="light"] .vslider.hued .vs-fill {
@@ -1496,14 +1498,16 @@ body:not(.on-home) .ambient::after {
 .key.change-key, .key.change-key .key-name { text-decoration: none; color: var(--ink-2); }
 .key.change-key i { width: 7px; height: 7px; border-radius: 50%; background: #fbfbfd; opacity: 1; box-shadow: 0 0 3px rgba(255, 255, 255, 0.7), 0 0 0 4px rgba(255, 255, 255, 0.14), 0 0 9px 3px rgba(255, 255, 255, 0.12); margin: 0 5px; }
 [data-theme="light"] .trend .mark line { stroke: rgba(0, 0, 0, 0.16); }
-[data-theme="light"] .trend .mark .mark-glow { fill: rgba(255, 255, 255, 0.9); filter: blur(2px); }
-[data-theme="light"] .trend .mark .mark-dot { fill: #fff; stroke: rgba(29, 28, 31, 0.28); stroke-width: 0.8; filter: drop-shadow(0 1px 2px rgba(60, 40, 30, 0.25)); }
-[data-theme="light"] .key.change-key i { background: #fff; box-shadow: 0 0 0 0.8px rgba(29, 28, 31, 0.3), 0 1px 3px rgba(60, 40, 30, 0.2); }
+/* In light mode the change dot is ink with a soft halo, the way the white one glows on dark */
+[data-theme="light"] .trend .mark .mark-glow { fill: rgba(29, 28, 31, 0.1); filter: blur(2.5px); }
+[data-theme="light"] .trend .mark:focus-visible .mark-glow { fill: rgba(29, 28, 31, 0.2); }
+[data-theme="light"] .trend .mark .mark-dot { fill: #2a292d; filter: drop-shadow(0 0 3px rgba(29, 28, 31, 0.35)); }
+[data-theme="light"] .key.change-key i { background: #2a292d; box-shadow: 0 0 3px rgba(29, 28, 31, 0.35), 0 0 0 4px rgba(29, 28, 31, 0.07), 0 0 9px 3px rgba(29, 28, 31, 0.06); }
 
 /* The details sheet */
 .change-item strong { font-weight: 500; }
 .change-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #fbfbfd; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
-[data-theme="light"] .change-dot { background: #fff; box-shadow: 0 0 0 1px rgba(29, 28, 31, 0.3); }
+[data-theme="light"] .change-dot { background: #2a292d; box-shadow: 0 0 6px rgba(29, 28, 31, 0.35); }
 
 /* Notes: a plain list with small dots, no dividers */
 .pad-note, .pad-add, .pad-input { font-size: 14px; padding: 7px 0; }
@@ -1534,14 +1538,14 @@ body:not(.on-home) .ambient::after {
 [data-theme="light"] .done-toggle { border-color: rgba(0, 0, 0, 0.2); background: rgba(255, 255, 255, 0.5); }
 
 /* How it went: a quiet two-word switch, then the slider */
-.measure-switch { display: inline-flex; gap: 14px; }
-.measure-switch button { border: 0; background: none; padding: 4px 0; font: inherit; font-size: 14px; color: var(--ink-3); cursor: pointer; transition: color .2s; }
-.measure-switch button.on { color: var(--ink); }
+.effort-question { font-size: 15px; color: var(--ink); }
+.measure-switch { align-self: flex-start; border: 0; background: none; padding: 6px 0; font: inherit; font-size: 13px; color: var(--ink-3); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.effort-range:focus-visible { outline: none; }
 .effort-field.counted .effort-range::-webkit-slider-runnable-track {
   background: linear-gradient(90deg, transparent var(--pct, 0%), rgba(24, 24, 26, 0.72) var(--pct, 0%)), linear-gradient(90deg, #4fb3a6, #74d4c0);
 }
 [data-theme="light"] .effort-field.counted .effort-range::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, transparent var(--pct, 0%), rgba(239, 235, 230, 0.75) var(--pct, 0%)), linear-gradient(90deg, #4fb3a6, #74d4c0);
+  background: linear-gradient(90deg, transparent var(--pct, 0%), rgba(239, 238, 236, 0.75) var(--pct, 0%)), linear-gradient(90deg, #4fb3a6, #74d4c0);
 }
 
 /* Routine reminders: a time, the days it's on, and ✕ */
@@ -1581,10 +1585,10 @@ body:not(.on-home) .ambient::after {
 
 /* The check-in button on Home: clear glass like the tiles under it */
 .btn.primary.hero-cta { background: radial-gradient(60% 120% at 14% 0%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 70%), var(--glass-bg); }
-/* Settings cards, Patterns and Notes look like Home's small tiles: no shiny rim, just a faint edge */
-#app .settings-view .card::before, #app .card.patterns::before, #app .card.pad::before { display: none; }
-#app .settings-view .card, #app .card.patterns, #app .card.pad { border-color: rgba(255, 255, 255, 0.07); }
-[data-theme="light"] #app .settings-view .card, [data-theme="light"] #app .card.patterns, [data-theme="light"] #app .card.pad { border-color: rgba(0, 0, 0, 0.06); }
+/* Every card and tile: no shiny rim, just a faint edge */
+#app :is(.card, .tile:not(.add), .mini-tile, .stat)::before { display: none; }
+#app :is(.card:not(.warn), .tile:not(.add), .mini-tile, .stat) { border-color: rgba(255, 255, 255, 0.07); }
+[data-theme="light"] #app :is(.card:not(.warn), .tile:not(.add), .mini-tile, .stat) { border-color: rgba(0, 0, 0, 0.06); }
 
 /* Check-ins: today's button, then the list by month */
 .checkin-cta { margin: 4px 0 8px; }
@@ -1611,5 +1615,167 @@ body:not(.on-home) .ambient::after {
 }
 [data-theme="light"] #banners .banner {
   background: radial-gradient(90% 120% at 15% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 60%), rgba(255, 255, 255, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 20px 44px -20px rgba(90, 60, 45, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 20px 44px -20px rgba(40, 42, 52, 0.35);
 }
+
+/* Delete all: press and hold, the bar fills, and only a full hold deletes */
+.wipe-sheet .btn { width: 100%; }
+.hold-btn { position: relative; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+.hold-btn .hold-fill { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.22); transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease-out; pointer-events: none; }
+.hold-btn.holding .hold-fill { transform: scaleX(1); transition: transform var(--hold, 1.5s) linear; }
+.hold-btn .hold-label { position: relative; }
+.data-swatch.off { background: var(--ink-3); box-shadow: none; opacity: 0.5; }
+
+/* Notices at the top of Home: compact, in the flow (they push the page down), unfold in and fold away */
+.notices { display: flex; flex-direction: column; }
+.notice-wrap { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .4s var(--ease-out, ease), opacity .3s ease, margin .4s ease; margin-bottom: 10px; }
+.notice-wrap.out { grid-template-rows: 0fr; opacity: 0; margin-bottom: 0; }
+.notice-inner { min-height: 0; overflow: hidden; }
+.notice { border-radius: 20px; padding: 10px 8px 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+#app .notice::before { display: none; }
+#app .notice { border-color: rgba(255, 255, 255, 0.07); }
+[data-theme="light"] #app .notice { border-color: rgba(0, 0, 0, 0.06); }
+.notice-main { display: flex; align-items: flex-start; gap: 6px; }
+.notice-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; color: inherit; text-decoration: none; font-size: 14px; line-height: 1.35; }
+.notice-text strong { font-weight: 500; }
+.notice-text span { color: var(--ink-2); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.notice-x { flex: none; width: 30px; height: 30px; margin: -4px 0 -4px; border: 0; background: none; color: var(--ink-3); font-size: 13px; border-radius: 50%; }
+.notice-x:active { background: var(--well); }
+.notice-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.notice-actions .btn.small { min-height: 30px; padding: 0 12px; font-size: 13px; }
+
+/* Patterns: what to try, above the bars */
+.findings { display: flex; flex-direction: column; gap: 12px; }
+.finding { display: flex; align-items: flex-start; gap: 10px; text-decoration: none; color: inherit; font-size: 14px; line-height: 1.35; }
+.finding-title { display: block; }
+.finding-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+.finding-dot.bad { background: #f3a46e; box-shadow: 0 0 8px rgba(243, 164, 110, 0.6); }
+.finding-dot.good { background: #74d4c0; box-shadow: 0 0 8px rgba(116, 212, 192, 0.6); }
+.findings + .pat-head { margin-top: 8px; }
+
+/* Renaming a stressor or helper: in edit mode the emoji and name are fields */
+.sortable.editing .select-card .well { outline: 1px dashed var(--ink-3); outline-offset: 2px; }
+.sortable.editing .select-card .card-title { text-decoration: underline dotted var(--ink-3); text-underline-offset: 4px; }
+.sortable-item.renaming > .select-card { animation: none !important; }
+.rename-card { cursor: auto; }
+.rename-input { font: inherit; color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 10px; -webkit-user-select: text; user-select: text; }
+.rename-input:focus { outline: none; border-color: var(--ink-3); }
+.icon-input { width: 44px; height: 44px; border-radius: 50%; text-align: center; font-size: 22px; padding: 0; caret-color: transparent; }
+.name-input { width: 100%; padding: 6px 8px; font-size: 15px; margin: -7px 0 -7px -9px; }
+
+/* Routine cards: an emoji, the name; a group lists its variations as rows, the tick apart at the end */
+.routine-head { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+.routine-head .well { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; background: var(--well); }
+.variation-list { list-style: none; margin: 0 -4px; padding: 0; display: flex; flex-direction: column; }
+.variation-row { display: flex; align-items: center; gap: 14px; }
+.variation-row + .variation-row { border-top: 1px solid var(--line); }
+.variation-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 4px; text-decoration: none; color: var(--ink); border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.variation-open:active { background: var(--well); }
+.variation-name { font-size: 15px; }
+.variation-open .hint { margin-left: auto; }
+.variation-open .chev { color: var(--ink-3); }
+.variation-row.done .variation-name { color: var(--ink-2); }
+.variation-row .done-toggle { margin-right: 4px; }
+.group-card { cursor: auto; }
+
+/* Check-ins: today's button rests just above the tab bar, by the thumb, over a soft fade */
+.checkins-view.has-dock { padding-bottom: 112px; }
+.checkin-dock {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 15;
+  bottom: calc(100px + env(safe-area-inset-bottom)); width: min(520px, calc(100% - 2 * var(--gutter)));
+}
+.checkin-dock::before {
+  content: ''; position: absolute; left: -40px; right: -40px; top: -28px; bottom: -110px; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, transparent, var(--bg) 45%);
+}
+.checkin-dock .btn { width: 100%; min-height: 56px; font-size: 17px; }
+
+/* One check-in, to read: no cards, just the three scores, then labelled sections of hairline rows */
+.checkin-detail { gap: 26px; }
+.checkin-detail .top-bar { min-height: 44px; margin-bottom: -12px; }
+.checkin-detail h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.01em; }
+.detail-scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: -6px; }
+.detail-score { display: flex; flex-direction: column; gap: 4px; }
+.detail-num { font-size: 40px; font-weight: 200; letter-spacing: -0.03em; line-height: 1; }
+.detail-num small { font-size: 14px; color: var(--ink-3); margin-left: 2px; letter-spacing: 0; font-weight: 400; }
+.detail-num[style] { color: var(--dot); }
+.detail-block { display: flex; flex-direction: column; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+.detail-head .section-label { margin: 0; }
+.detail-body > * { border-top: 1px solid var(--line); }
+.detail-body > .hint, .detail-body > .detail-notes { padding: 12px 0; }
+.detail-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 0; font-size: 15px; }
+.detail-row > .grow { min-width: 0; }
+.detail-lead { flex: none; width: 24px; text-align: center; font-size: 17px; }
+.detail-value { color: var(--ink-2); font-size: 14px; white-space: nowrap; }
+.detail-session > .detail-row { border-top: 0; }
+.detail-moves { list-style: none; margin: -2px 0 12px 36px; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.detail-moves li { display: flex; justify-content: space-between; gap: 12px; }
+.detail-moves li span:first-child { min-width: 0; }
+.detail-moves li .hint { flex: none; max-width: 45%; text-align: right; }
+.detail-notes { white-space: pre-wrap; font-size: 15px; line-height: 1.45; }
+.block-edit { width: 32px; height: 32px; margin-right: -8px; display: grid; place-items: center; border-radius: 50%; color: var(--ink-3); }
+.block-edit:active { background: var(--well); }
+.head-save { justify-self: end; }
+[data-theme="light"] .detail-num[style] { color: var(--dot2); }
+
+/* Settings lists: rows set the rhythm, so the card adds only a little above and below */
+.settings-view .card:has(> .list-row) { padding: 4px 20px; gap: 0; }
+.settings-view .card > .list-row { padding: 14px 0; }
+
+/* Check-in header: a centred title, the day as a quiet line under it */
+.flow-head { position: relative; }
+.flow-title { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none; }
+.flow-title strong { font-size: 17px; font-weight: 500; }
+.flow-day-wrap { position: relative; pointer-events: auto; display: inline-flex; align-items: center; }
+.flow-day { appearance: none; -webkit-appearance: none; background: none; border: 0; padding: 2px 0; font: inherit; font-size: 13px; color: var(--ink-3); text-align: center; text-align-last: center; color-scheme: dark; cursor: pointer; }
+[data-theme="light"] .flow-day { color-scheme: light; }
+.flow-day:focus { outline: none; }
+
+/* Factor tiles in light mode: clean white glass; the emoji's colour only as a soft wash in the corner */
+[data-theme="light"] .tile.factor {
+  background: radial-gradient(120% 90% at 0% 0%, rgba(var(--tint, 255, 255, 255), 0.18), rgba(var(--tint, 255, 255, 255), 0) 65%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.6));
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(40, 42, 52, 0.05), 0 12px 28px -18px rgba(40, 42, 52, 0.28);
+}
+[data-theme="light"] .tile.factor .well { background: rgba(var(--tint, 0, 0, 0), 0.16); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7); }
+[data-theme="light"] .tile.factor .tile-action-wrap .well, [data-theme="light"] .tile.factor .icon-btn.glass { background: rgba(255, 255, 255, 0.9); box-shadow: 0 2px 8px -3px rgba(40, 42, 52, 0.25); }
+[data-theme="light"] .tile.factor .tile-fill { background: linear-gradient(90deg, rgba(var(--tint, 0, 0, 0), 0.22), rgba(var(--tint, 0, 0, 0), 0.06)); }
+[data-theme="light"] .tile.factor.on { background: radial-gradient(120% 90% at 0% 0%, rgba(var(--tint, 255, 255, 255), 0.26), rgba(var(--tint, 255, 255, 255), 0) 70%), #fff; }
+[data-theme="light"] .tile.add { background: rgba(255, 255, 255, 0.35); border-color: rgba(0, 0, 0, 0.12); }
+
+/* Settings without cards: small labels, then rows split by hairlines; space between groups does the separating */
+.settings-view { gap: 30px; }
+.settings-group { display: flex; flex-direction: column; }
+.settings-group .section-label { margin: 0 0 4px; }
+.settings-rows { display: flex; flex-direction: column; }
+.settings-rows > .list-row { border-top: 1px solid var(--line); padding: 14px 0; min-height: 56px; font-size: 16px; }
+.settings-rows > .list-row:last-child { border-bottom: 1px solid var(--line); }
+.settings-view .list-row.appearance { padding: 8px 0; }
+.settings-view .appearance .segmented { flex: none; }
+.settings-stack { display: flex; flex-direction: column; gap: 12px; }
+.settings-stack > .btn { margin-top: 6px; }
+.plain-date { background: none; border: 0; padding: 0; font: inherit; font-size: 15px; color: var(--ink-2); text-align: right; color-scheme: dark; }
+[data-theme="light"] .plain-date { color-scheme: light; }
+.plain-date::-webkit-calendar-picker-indicator { opacity: 0.45; margin-left: 6px; }
+.settings-view .danger-row { color: #ff8a80; justify-content: center; border: 0; min-height: 52px; margin-top: -12px; }
+[data-theme="light"] .settings-view .danger-row { color: #c4402f; }
+
+[data-theme="light"] #toast {
+  background: radial-gradient(90% 140% at 20% 0%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 60%), rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 #fff, inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 14px 34px -14px rgba(40, 42, 52, 0.35);
+}
+.routine-list { display: flex; flex-direction: column; gap: 14px; }
+
+/* Tab bar: one glass lens slides to the selected tab (app.js); the tabs themselves stay clear */
+#tabs a { position: relative; z-index: 1; -webkit-tap-highlight-color: transparent; }
+#tabs a.active, [data-theme="light"] #tabs a.active { background: none; box-shadow: none; }
+#tabs a:focus { outline: none; }
+#tabs a:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
+.tab-glider {
+  position: absolute; top: 5px; left: 0; height: calc(100% - 10px); border-radius: var(--r-pill); pointer-events: none; z-index: 0;
+  transform-origin: center; will-change: transform, width;
+  background: radial-gradient(100% 120% at 50% 0%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+}
+[data-theme="light"] .tab-glider { background: rgba(255, 255, 255, 0.72); box-shadow: var(--lg-edge), 0 4px 12px -6px rgba(40, 42, 52, 0.25); }

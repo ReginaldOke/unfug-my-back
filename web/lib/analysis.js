@@ -240,3 +240,68 @@ function withAmount(f, v) {
 function joinNames(names) {
   return names.flatMap((nm, i) => [i ? ' and ' : '', { b: nm }]).filter(x => x !== '');
 }
+
+// ---------- Findings you can act on ----------
+
+export const TREND_DAYS = 14; // look back two weeks, so a finding reflects a run of days, not one bad day
+export const TREND_MIN_CHECKINS = 7;
+const STRONG = 0.45, WEAK_COUNTER = 0.3;
+
+/**
+ * Longer-run links between what you log and your pain, each phrased as something to try. Uses the last
+ * TREND_DAYS of check-ins; needs a week's worth of them, and the factor both logged and missed on a few.
+ * Returns findings, strongest first: { key, factor, kind, title, body, r, n, strong }.
+ *   stressor + pain rises with it  → 'avoid'     try cutting back and see if pain eases
+ *   stressor + pain falls with it  → 'not-stressor' it may not be a stressor for you
+ *   helper + pain falls with it    → 'keep'      it seems to help, keep it up
+ *   helper + pain rises with it    → 'rethink'   it may not be helping as it is
+ */
+export function trendFindings(data, factors, today = localDate()) {
+  const since = addDays(today, -(TREND_DAYS - 1));
+  const days = data.dailyEntries.filter(e => e.painScore != null && e.date >= since && e.date <= today);
+  const n = days.length;
+  if (n < TREND_MIN_CHECKINS) return [];
+  const painUp = weekShift(days.map(e => [e.date, e.painScore]), today);
+
+  const out = [];
+  for (const f of factors) {
+    const amounts = amountsByDate(data.factorLogs.filter(l => l.date >= since && l.date <= today), f.id);
+    const xs = days.map(e => (f.measureType === 'yesno' ? ((amounts.get(e.date) || 0) > 0 ? 1 : 0) : amounts.get(e.date) || 0));
+    const withDays = xs.filter(x => x > 0).length;
+    // Needs a few days with it, and enough variety to compare: days without, or a spread of amounts
+    const distinct = new Set(xs).size;
+    if (withDays < 3 || distinct < 2 || (n - withDays < 2 && distinct < 3)) continue;
+    const r = pearson(xs, days.map(e => e.painScore));
+    const helper = f.role === 'helper';
+    const name = midSentence(f.name);
+    const more = f.measureType === 'yesno' ? `on days with ${name}` : `on days with more ${name}`;
+    let kind = null, title, body;
+    if (!helper && r >= STRONG) {
+      kind = 'avoid';
+      const rising = painUp > 0.5 && weekShift(days.map((e, i) => [e.date, xs[i]]), today) > 0;
+      title = rising ? `Your pain has risen along with ${name}` : `Pain runs higher ${more}`;
+      body = `Try cutting back on ${name} for a week or two and see if your pain eases.`;
+    } else if (!helper && r <= -WEAK_COUNTER) {
+      kind = 'not-stressor';
+      title = `${f.name} may not be a stressor for you`;
+      body = `Your pain has been lower ${more}, not higher.`;
+    } else if (helper && r <= -STRONG) {
+      kind = 'keep';
+      title = `${f.name} seems to help`;
+      body = `Your pain has been lower ${more}. Keep it up.`;
+    } else if (helper && r >= STRONG) {
+      kind = 'rethink';
+      title = `${f.name} may not be helping`;
+      body = `Your pain has been higher ${more}. Try easing off or changing how you do it.`;
+    }
+    if (kind) out.push({ key: `${f.id}:${kind}`, factor: f, kind, title, body, r, n, strong: Math.abs(r) >= 0.6 && n >= 10 });
+  }
+  return out.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+}
+
+/** How much the second week's average is above the first's (dates and values in the TREND_DAYS window). */
+function weekShift(pairs, today) {
+  const mid = addDays(today, -6);
+  const early = pairs.filter(([d]) => d < mid).map(p => p[1]), late = pairs.filter(([d]) => d >= mid).map(p => p[1]);
+  return early.length && late.length ? mean(late) - mean(early) : 0;
+}
