@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Unfug My Back</title>
+  <meta name="description" content="A one-minute daily check-in that shows what eases your back pain and what sets it off. Free, private, on your iPhone.">
+  <meta property="og:title" content="Unfug My Back">
+  <meta property="og:description" content="A one-minute daily check-in that shows what eases your back pain and what sets it off.">
+  <meta property="og:image" content="https://reginaldoke.github.io/unfug-my-back/assets/site/1-home.jpg">
+  <meta name="theme-color" content="#0d0d0f">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500&display=swap">
+  <style>
+    /* The app's own look: near-black, a red and navy glow at the top, quiet glass cards */
+    :root {
+      color-scheme: dark;
+      --bg: #0d0d0f; --ink: #f5f5f7; --ink-2: rgba(235, 235, 245, 0.62); --ink-3: rgba(235, 235, 245, 0.34);
+      --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.025) 45%, rgba(255, 255, 255, 0.045));
+      --edge: rgba(255, 255, 255, 0.07);
+      --teal: #74d4c0; --amber: #f3b46e; --coral: #f4908a;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 Outfit, -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: clip; }
+    a { color: inherit; }
+    .glow {
+      position: absolute; inset: -160px -30% auto; height: 820px; z-index: -1; pointer-events: none; filter: blur(30px);
+      background:
+        radial-gradient(22% 26% at 66% 30%, rgba(255, 222, 210, 0.35), transparent 70%),
+        radial-gradient(48% 34% at 56% 38%, rgba(236, 78, 52, 0.7), transparent 72%),
+        radial-gradient(44% 30% at 36% 46%, rgba(196, 48, 40, 0.55), transparent 72%),
+        radial-gradient(56% 36% at 44% 22%, rgba(30, 44, 112, 0.85), transparent 72%);
+      -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent); mask-image: linear-gradient(180deg, #000 40%, transparent);
+    }
+    main { max-width: 1040px; margin: 0 auto; padding: 0 20px; position: relative; }
+    header { display: flex; align-items: center; gap: 12px; padding: 22px 0; }
+    header img { width: 36px; height: 36px; border-radius: 9px; }
+    header span { font-size: 18px; }
+
+    .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; padding: 48px 0 80px; }
+    h1 { font-size: clamp(44px, 7vw, 76px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.02; margin: 0 0 22px; }
+    .lead { font-size: clamp(19px, 2.2vw, 23px); font-weight: 300; color: var(--ink-2); margin: 0 0 32px; max-width: 30ch; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .btn {
+      display: inline-flex; align-items: center; min-height: 52px; padding: 0 26px; border-radius: 999px; text-decoration: none; font-weight: 500;
+      color: #fff; border: 1px solid rgba(255, 255, 255, 0.28);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.1));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 12px 32px -14px rgba(0, 0, 0, 0.9);
+    }
+    .btn.quiet { background: none; border-color: transparent; box-shadow: none; color: var(--ink-2); padding: 0 8px; }
+    .soon { font-size: 14px; color: var(--ink-3); margin-top: 14px; }
+
+    .phone { width: 100%; max-width: 340px; justify-self: center; border-radius: 46px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.95), 0 0 0 8px rgba(255, 255, 255, 0.03); }
+    .phone img { display: block; width: 100%; height: auto; }
+
+    .label { font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 14px; }
+    h2 { font-size: clamp(30px, 4vw, 42px); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 16px; }
+    .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; padding: 64px 0; }
+    .feature.flip .copy { order: 2; }
+    .feature p { color: var(--ink-2); margin: 0 0 12px; max-width: 42ch; }
+    .feature .phone { max-width: 300px; }
+
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 40px 0 72px; }
+    .card { background: var(--glass); border: 1px solid var(--edge); border-radius: 28px; padding: 24px; }
+    .card .dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 18px; box-shadow: 0 0 12px currentColor; }
+    .card h3 { font-size: 19px; font-weight: 500; margin: 0 0 6px; }
+    .card p { color: var(--ink-2); font-size: 16px; margin: 0; }
+
+    .private { text-align: center; padding: 40px 0 80px; }
+    .private p { color: var(--ink-2); margin: 0 auto; max-width: 52ch; }
+    .note { font-size: 14px; color: var(--ink-3); margin-top: 28px !important; }
+
+    footer { border-top: 1px solid var(--edge); padding: 28px 0 48px; display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; color: var(--ink-3); font-size: 14px; }
+    footer nav { display: flex; gap: 20px; }
+    footer a { text-decoration: none; color: var(--ink-2); }
+
+    @media (max-width: 760px) {
+      .hero, .feature { grid-template-columns: 1fr; gap: 36px; }
+      .hero { padding-top: 24px; text-align: left; }
+      .feature { padding: 40px 0; }
+      .feature.flip .copy { order: 0; }
+      .steps { grid-template-columns: 1fr; }
+      .phone { max-width: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow" aria-hidden="true"></div>
+  <main>
+    <header><img src="icons/icon-192.png" alt=""><span>Unfug My Back</span></header>
+
+    <section class="hero">
+      <div>
+        <h1>Find out what your back is telling you.</h1>
+        <p class="lead">A one-minute daily check-in that shows what eases your back pain, and what sets it off.</p>
+        <div class="cta">
+          <a class="btn" href="./">Try it in your browser</a>
+          <a class="btn quiet" href="#how">How it works ↓</a>
+        </div>
+        <p class="soon">Free on iPhone. Coming soon to the App Store.</p>
+      </div>
+      <div class="phone"><img src="assets/site/1-home.jpg" alt="The home screen: today's pain, a reminder to move, today's routine and a chart of pain against sitting and walking" width="900" height="1955"></div>
+    </section>
+
+    <section class="steps" id="how" aria-label="How it works">
+      <div class="card"><div class="dot" style="color: var(--coral); background: var(--coral)"></div><h3>Check in</h3><p>Once a day: how much it hurts, where, and what you did. About a minute.</p></div>
+      <div class="card"><div class="dot" style="color: var(--amber); background: var(--amber)"></div><h3>See the pattern</h3><p>Pain shown alongside sitting, walking, sleep, workouts and anything else you track.</p></div>
+      <div class="card"><div class="dot" style="color: var(--teal); background: var(--teal)"></div><h3>Try a change</h3><p>Clear suggestions from your own data, like cutting back on long sitting for a week.</p></div>
+    </section>
+
+    <section class="feature">
+      <div class="copy">
+        <p class="label">Patterns</p>
+        <h2>What moves your pain, in plain words.</h2>
+        <p>After a week or two, the app points out what tends to come with more pain and what comes with less, then suggests something to try.</p>
+      </div>
+      <div class="phone"><img src="assets/site/2-patterns.jpg" alt="Patterns: pain has risen along with long sitting; walking seems to help" width="900" height="1955" loading="lazy"></div>
+    </section>
+
+    <section class="feature flip">
+      <div class="copy">
+        <p class="label">Check-in</p>
+        <h2>Tap where it hurts.</h2>
+        <p>A 3D body map, quick sliders for pain, stress and sleep, and one-tap tiles for the things you did today.</p>
+      </div>
+      <div class="phone"><img src="assets/site/3-body-map.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy"></div>
+    </section>
+
+    <section class="feature">
+      <div class="copy">
+        <p class="label">Routines and nudges</p>
+        <h2>Keep moving, without thinking about it.</h2>
+        <p>Mobility and gym routines with reps and weights, a gentle nudge when you've been still too long, and steps and sleep from Apple Health.</p>
+      </div>
+      <div class="phone"><img src="assets/site/4-check-in.jpg" alt="Check-in exercise tiles for routines like Daily mobility and a gym split" width="900" height="1955" loading="lazy"></div>
+    </section>
+
+    <section class="private">
+      <p class="label">Private by design</p>
+      <h2>Your diary stays on your phone.</h2>
+      <p>No account, no ads, no tracking. Export it any time, or share it with an AI chat for a deeper look.</p>
+      <p class="note">Unfug My Back helps you notice patterns. It doesn't diagnose or treat anything.</p>
+    </section>
+
+    <footer>
+      <span>© 2026 Reginald Oke</span>
+      <nav><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="./">Open the app</a></nav>
+    </footer>
+  </main>
+</body>
+</html>

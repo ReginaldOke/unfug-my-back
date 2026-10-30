@@ -3,7 +3,7 @@
 //  - App files: network first (so every new deploy shows up on the next open), cached copy when offline.
 //  - Google Fonts: cached copy first, refreshed in the background.
 //  - api/*: never cached (it needs the live server).
-const CACHE = 'unfug-my-back-v74';
+const CACHE = 'unfug-my-back-v75';
 
 // Everything the app needs to start offline. test/sw.test.js checks this list against web/.
 const ASSETS = [
@@ -11,7 +11,7 @@ const ASSETS = [
   'assets/body.obj', 'nudge.wav',
   'icons/apple-touch-icon.png', 'icons/favicon-32.png', 'icons/icon-192.png', 'icons/icon-512.png',
   'lib/ai.js', 'lib/analysis.js', 'lib/dates.js', 'lib/export.js', 'lib/health.js', 'lib/import.js', 'lib/interpret.js', 'lib/labels.js',
-  'lib/motion.js', 'lib/notify.js', 'lib/native.js', 'lib/theme.js', 'views/checkins.js', 'privacy.html', 'support.html', 'lib/regions.js', 'lib/regions3d.js', 'lib/reminders-core.js',
+  'lib/motion.js', 'lib/notify.js', 'lib/native.js', 'lib/theme.js', 'views/checkins.js', 'privacy.html', 'support.html', 'about.html', 'assets/site/1-home.jpg', 'assets/site/2-patterns.jpg', 'assets/site/3-body-map.jpg', 'assets/site/4-check-in.jpg', 'assets/site/6-routine.jpg', 'lib/regions.js', 'lib/regions3d.js', 'lib/reminders-core.js',
   'lib/reminders.js', 'lib/repos.js', 'lib/seed.js', 'lib/store.js', 'lib/ui.js', 'lib/voice.js',
   'views/body3d.js', 'views/calendar.js', 'views/chart.js', 'views/checkin.js', 'views/controls.js',
   'views/factor.js', 'views/figure.js', 'views/health.js', 'views/help.js', 'views/home.js', 'views/pad.js', 'views/reminder-sheet.js', 'views/routines.js', 'views/settings.js',
