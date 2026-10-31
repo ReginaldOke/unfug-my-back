@@ -34,13 +34,23 @@ function syncReport() {
     `Sleep: ${r.sleepSamples} records${r.sleepSamples ? ` (${r.sleepStates.join(', ')}), ${r.sleepNights} nights of an hour or more` : ''}`,
     ...r.errors,
   ];
-  const help = !r.errors.length && !r.sleepSamples
-    ? 'No sleep came through. Check Settings › Health › Data Access & Devices › Unfug My Back has Sleep turned on, and that the Health app shows sleep under Browse › Sleep.'
-    : null;
-  return h('section', { class: 'card glass stack tight sync-report' },
+  const report = h('section', { class: 'card glass stack tight sync-report' },
     h('h2', {}, `Last sync · ${new Date(r.at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`),
-    lines.map(t => h('p', { class: 'hint' }, t)),
-    help ? h('p', { class: 'hint' }, help) : null);
+    lines.map(t => h('p', { class: 'hint' }, t)));
+  if (r.errors.length || r.sleepSamples) return report;
+  // Steps came but no sleep at all: almost always Sleep switched off for the app in Health's permissions
+  return h('div', { class: 'stack' },
+    h('section', { class: 'card glass stack sleep-fix' },
+      h('h2', {}, 'Sleep isn’t coming through'),
+      h('p', { class: 'muted' }, 'iPhone isn’t sharing sleep with the app yet. To turn it on:'),
+      h('ol', { class: 'fix-steps' },
+        h('li', {}, 'Open the Health app and tap your picture (top right)'),
+        h('li', {}, 'Tap Apps, then Unfug My Back'),
+        h('li', {}, 'Turn on Sleep'),
+        h('li', {}, 'Come back here and tap Sync now')),
+      h('a', { class: 'btn glass', href: 'x-apple-health://' }, 'Open the Health app'),
+      h('p', { class: 'hint' }, 'If Sleep is already on, check the Health app has sleep under Browse › Sleep. Without an Apple Watch, set a sleep schedule there with “Track Time in Bed with iPhone” turned on.')),
+    report);
 }
 
 function nativeCard(render) {

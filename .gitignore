@@ -1,6 +1,5 @@
 node_modules/
 .DS_Store
-.claude/
 # Third-party design screenshots used as inspiration; not ours to publish
 reference UI/
 # Source copy of the body model; the app uses web/assets/body.obj

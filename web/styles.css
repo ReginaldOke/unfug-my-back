@@ -477,14 +477,6 @@ body.in-flow #tabs { display: none; }
 .hero-orb { width: 120px; height: 120px; align-self: center; margin: 14px 0 6px; }
 @keyframes breathe { 50% { transform: scale(1.1); box-shadow: 0 0 80px rgba(255, 255, 255, 0.22); } }
 
-/* ---------- Markdown (Claude summary) ---------- */
-.md { display: flex; flex-direction: column; gap: 8px; color: var(--ink-2); font-size: 15px; line-height: 1.55; }
-.md h3 { color: var(--ink); font-size: 16px; margin-top: 10px; }
-.md h3:first-child { margin-top: 0; }
-.md ul, .md ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
-.md strong { color: var(--ink); font-weight: 500; }
-.md.clamp { max-height: 190px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent); mask-image: linear-gradient(180deg, #000 60%, transparent); }
-
 /* ---------- Factor detail ---------- */
 .lag-bars { display: flex; flex-direction: column; gap: 10px; }
 .lag { display: grid; grid-template-columns: 86px 1fr 44px; align-items: center; gap: 10px; }
@@ -606,8 +598,6 @@ details.more[open] summary::after { transform: rotate(90deg); }
 details.more[open] summary { margin-bottom: 10px; }
 .glass-input.narrow { width: auto; }
 
-/* Claude tile spans the row under movement and routine */
-.tile.claude { grid-column: 1 / -1; min-height: 110px; }
 
 
 /* ======================================================================
@@ -705,9 +695,10 @@ details.more[open] summary { margin-bottom: 10px; }
 .trend .area { mix-blend-mode: screen; transition: opacity .3s; }
 .trend .line { fill: none; stroke-width: 1.8; stroke-linecap: round; mix-blend-mode: screen; }
 .trend .hair { stroke: #fff; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5)); }
-.trend .series { animation: series-in .9s var(--ease-out) both; transform-origin: 50% 100%; }
-.trend .series:nth-of-type(2) { animation-delay: 80ms; }
-.trend .series:nth-of-type(3) { animation-delay: 160ms; }
+.trend.animate .series { animation: series-in .9s var(--ease-out) both; transform-origin: 50% 100%; }
+.trend.animate .series:nth-of-type(2) { animation-delay: 80ms; }
+.trend.animate .series:nth-of-type(3) { animation-delay: 160ms; }
+.trend .series { transform-origin: 50% 100%; }
 @keyframes series-in { from { opacity: 0; transform: scaleY(0.6); } }
 .trend-readout { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 8px; font-size: 13px; color: var(--ink-2); min-height: 20px; }
 .trend-readout .when { color: var(--ink); }
@@ -1792,3 +1783,15 @@ html, body { overflow-x: clip; }
 .import-routines li { display: flex; justify-content: space-between; gap: 12px; }
 .detail-delete { align-self: center; margin: 6px 0 12px; padding: 12px 20px; border: 0; background: none; font: inherit; font-size: 15px; color: #ff8a80; cursor: pointer; }
 [data-theme="light"] .detail-delete { color: #c4402f; }
+/* Light mode: the Move in ruler fills in the chart's walking teal rather than near-black */
+[data-theme="light"] .ruler i.lit { background: linear-gradient(180deg, #74d4c0, #4fb3a6); }
+.import-clash { padding: 14px 16px; border-radius: 18px; background: var(--well); }
+.import-clash p { margin: 0; font-size: 14px; }
+.import-clash .segmented { align-self: flex-start; }
+/* A missed day in the Check-ins list: an empty ring, quieter text, and a way to fill it in */
+.checkin-row.missed .checkin-when { color: var(--ink-2); }
+.checkin-dot.empty { background: none; box-shadow: none; border: 1.5px dashed var(--ink-3); }
+.missed-cta { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.fix-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); font-size: 15px; }
+.fig-prop { stroke: rgba(255, 255, 255, 0.3); stroke-width: 2.5; }
+[data-theme="light"] .fig-prop { stroke: rgba(0, 0, 0, 0.25); }

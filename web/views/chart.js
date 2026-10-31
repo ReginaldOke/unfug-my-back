@@ -36,7 +36,7 @@ function smoothPath(pts, top, bottom) {
  * focus: index of the day the key shows by default (today). fadeLeft: the data carries on before the first day.
  * marks: [{ i, texts }] days to flag (routine changes): a soft white dot on the baseline, with a key entry. onMark(mark) on tap.
  */
-export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [], onMark = () => {} }) {
+export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [], onMark = () => {}, animate = true }) {
   const id = ++uid;
   // Even side padding, just enough to keep the first and last day labels whole
   const W = 340, H = 196, top = 46, bottom = 176, left = 22, right = W - 22;
@@ -93,7 +93,7 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   });
 
   const hair = s('line', { class: 'hair', y1: 30, y2: bottom + 6 });
-  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'trend', role: 'img', 'aria-label': summaryLabel(days, series) },
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: `trend${animate ? ' animate' : ''}`, role: 'img', 'aria-label': summaryLabel(days, series) },
     defs,
     days.map((d, i) => (showLabel(i) ? s('line', { class: 'day-line', x1: x(i), x2: x(i), y1: 34, y2: bottom }) : null)),
     days.map((d, i) => (showLabel(i) ? s('g', { class: `day-label${d.logged ? '' : ' missing'}`, 'data-i': i },

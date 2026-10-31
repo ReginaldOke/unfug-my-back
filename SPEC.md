@@ -12,7 +12,7 @@ A native iOS app that helps one person (later, the public) find and reduce their
 2. Show where pain is felt using a rotatable 3D body model.
 3. Prompt movement breaks after prolonged inactivity.
 4. Identify likely triggers and helpers from the data, including delayed effects (pain often appears hours to a day after the cause).
-5. Export data for analysis in Claude now; add in-app AI analysis later.
+5. Export data for analysis in an AI chat now; add in-app AI analysis later.
 
 **Principles**
 
@@ -36,8 +36,8 @@ Native iOS in Swift and SwiftUI, local-first storage, with clean layers so cloud
 | Motion data | Core Motion (CMMotionActivityManager, CMPedometer) | Activity history and steps |
 | Notifications | UserNotifications, actionable notifications | Optional AlarmKit (iOS 26+) for alarm-style reminders |
 | Background work | BackgroundTasks (BGAppRefreshTask), HealthKit background delivery | Opportunistic wake-ups for rescheduling |
-| Voice (phase 3) | Speech framework (on-device transcription) | Transcript sent to Claude for structuring |
-| Backend (phase 4) | Small serverless API, e.g. Supabase or Cloudflare Workers | Holds the Claude API key, sync, auth |
+| Voice (phase 3) | Speech framework (on-device transcription) | Transcript sent to an AI model for structuring |
+| Backend (phase 4) | Small serverless API, e.g. Supabase or Cloudflare Workers | Holds the AI API key, sync, auth |
 
 **Architecture rules**
 
@@ -189,7 +189,7 @@ Auto-collected data fills DailyMetrics each evening and pre-fills the check-in, 
 
 ## Analysis and AI
 
-Simple on-device statistics run in v1; Claude does the deeper interpretation via export, and later in-app through a backend.
+Simple on-device statistics run in v1; an AI chat does the deeper interpretation via export, and later in-app through a backend.
 
 ### On-device analysis (per factor)
 
@@ -201,10 +201,10 @@ Simple on-device statistics run in v1; Claude does the deeper interpretation via
 - **Helpers:** the same comparisons, plus consistency (e.g. "routine done 9 of 14 days").
 - **Experiments:** compare the experiment period against the preceding matched period.
 
-### Export to Claude (phase 1)
+### Export for AI analysis (phase 1)
 
 - Settings → Export creates a JSON file (all entities, factor definitions, date range selectable) and shares it via the iOS share sheet.
-- The export includes a ready-made analysis prompt so the user can paste both into Claude.
+- The export includes a ready-made analysis prompt so the user can paste both into an AI chat.
 - Also offer CSV per table for spreadsheet use.
 
 Suggested built-in prompt:
@@ -226,13 +226,13 @@ Do not give a diagnosis.
 ### Voice logging (phase 3)
 
 1. On-device speech transcription (Speech framework).
-2. Transcript sent to Claude via the backend with the user's factor list.
-3. Claude returns structured JSON: factor logs with amounts, pain and stress scores, flare details, and suggested new factors.
+2. Transcript sent to an AI model via the backend with the user's factor list.
+3. The model returns structured JSON: factor logs with amounts, pain and stress scores, flare details, and suggested new factors.
 4. User reviews and confirms before anything is saved.
 
 ### In-app AI (phase 4)
 
-- A backend endpoint proxies Claude API calls; the key never ships in the app.
+- A backend endpoint proxies AI API calls; the key never ships in the app.
 - Weekly AI summary and on-demand "analyse my data" using the same prompt.
 - Send only the data needed (summaries or a date range), and let the user opt in.
 
@@ -242,7 +242,7 @@ Build for privacy from day one, so the public release needs no rework.
 
 - **Data stays on device in v1.** No analytics or third-party SDKs that collect health data.
 - **Health data rules.** Apple restricts how HealthKit data can be used and shared (no advertising or data mining). Provide a privacy policy and accurate App Store privacy labels before release.
-- **AI features are opt-in.** Clearly explain what is sent to Claude, and send the minimum needed.
+- **AI features are opt-in.** Clearly explain what is sent to the AI service, and send the minimum needed.
 - **Export and delete.** Users can export all their data and delete everything from settings.
 - **No medical claims.** Use wording like "track", "notice patterns" and "build habits". Avoid "diagnose", "treat", "cure" or "fix" in the app and store listing, since therapeutic claims can make software a regulated medical device (TGA in Australia, FDA in the US). Get advice before release if unsure.
 - **Safety notice.** Onboarding and a help screen list warning signs that need prompt medical care: new numbness in the groin or saddle area, bladder or bowel changes, progressive leg weakness, or symptoms spreading to both legs.
@@ -264,7 +264,7 @@ Four phases, each usable on its own. Finish and use each phase for at least a we
 - [ ] Movement reminders (dead man's switch) with actionable notifications and active hours
 - [ ] JSON and CSV export with the analysis prompt
 
-Acceptance: a full check-in takes under 60 seconds; a body map tap selects the correct region from any angle; reminders reschedule after a walk when the app is woken; export opens cleanly in Claude.
+Acceptance: a full check-in takes under 60 seconds; a body map tap selects the correct region from any angle; reminders reschedule after a walk when the app is woken; export opens cleanly in an AI chat.
 
 ### Phase 2: Automatic data and insights
 
@@ -280,7 +280,7 @@ Acceptance: insights show "not enough data" correctly below thresholds; lag 0, 1
 ### Phase 3: Voice logging
 
 - [ ] On-device transcription
-- [ ] Minimal backend endpoint to call Claude for structuring
+- [ ] Minimal backend endpoint to call an AI model for structuring
 - [ ] Review-and-confirm screen before saving
 
 Acceptance: a spoken summary of a day produces correct factor logs that the user can edit before saving.
@@ -295,51 +295,9 @@ Acceptance: a spoken summary of a day produces correct factor logs that the user
 
 Acceptance: passes App Review with personal-build features compiled out.
 
-## Seed data and notes for Claude Code
+## Seed data
 
-The personal build ships with factors and a routine based on the user's known history; the public build ships with a generic set.
-
-**Seed factors (personal build)**
-
-| Factor | Role | Measure |
-| --- | --- | --- |
-| Guitar (seated) | Trigger | Minutes |
-| Desk sitting | Trigger | Minutes |
-| Driving | Trigger | Minutes |
-| Lying propped up in bed | Unsure | Minutes |
-| Crossed-leg sitting | Trigger | Yes-no |
-| Manual work (building, lifting, bending) | Unsure | Minutes |
-| Crunches or sit-ups | Trigger | Count |
-| Handstands | Unsure | Count |
-| Glute bridges | Unsure | Count |
-| Calisthenics session | Unsure | Minutes |
-| Training volume above plan | Trigger | Yes-no |
-| Walking | Helper | Minutes |
-| Running | Helper | Minutes |
-| Cycling | Helper | Minutes |
-| Mobility routine | Helper | Count (times done) |
-| Extension breaks (cobras, standing back-bends) | Helper | Count |
-
-**Seed routine: Daily mobility (twice daily)**
-
-1. Half-kneeling hip flexor stretch, 2 x 30 sec hold each side
-2. Single-leg hinge x 6 each side
-3. Cat-cow x 4
-4. Open book x 6 each side
-5. Cobra and downward dog x 4
-6. Bird dog x 4 each side
-7. Hamstring stretch x 2
-8. Deep squat hold x 2
-
-**Instructions for Claude Code**
-
-- Save this spec in the repo as `SPEC.md` and treat it as the source of truth. Update it when decisions change.
-- Build phase 1 only, in small, testable steps. Confirm each step runs on a real device before moving on.
-- Write unit tests for the analysis maths (lags, thresholds, dose response) using synthetic data.
-- Use SwiftUI previews with mock repositories for every screen.
-- Ask before adding any third-party dependency.
-- Test notifications and background behaviour on a physical iPhone, not just the simulator.
-- Keep personal-build features (background location, seed data) behind build configurations.
+New users start with a short list of common stressors and helpers switched on, more available to pick, and two starter routines (Daily mobility, and a Gym push / pull / legs split). See `web/lib/seed.js`.
 
 **Open questions**
 
@@ -349,6 +307,6 @@ The personal build ships with factors and a routine based on the user's known hi
 
 - **2026-10-28 · Web prototype first.** Xcode isn't installed yet, so the flows are being prototyped as a local web app (`web/`, `server.js`) before the native build. Storage, analysis, reminder rules and export mirror this spec so they port to Swift. Core Motion and HealthKit are stubbed: a movement simulator stands in for motion data, and the "Auto data" step waits for phase 2.
 - **2026-10-28 · Default reminder interval is 45 minutes** (adjustable 20–60).
-- **2026-10-28 · Main flows (owner's priorities):** setup with default stressors and helpers plus your own; a gamified daily survey under a minute (tap tiles, swipe for time, drag vertical bars for pain and stress, tap the body, free text with voice); a dashboard showing pain trend and activities associated with higher pain; a movement nudge after 45 minutes still; one-tap "Analyse with Claude" from home (pulled forward from phase 4, via a local server that holds the API key); and defining a movement routine.
+- **2026-10-28 · Main flows (owner's priorities):** setup with default stressors and helpers plus your own; a gamified daily survey under a minute (tap tiles, swipe for time, drag vertical bars for pain and stress, tap the body, free text with voice); a dashboard showing pain trend and activities associated with higher pain; a movement nudge after 45 minutes still; "Analyse with AI" from home (sharing the diary with an AI chat app); and defining a movement routine.
 - **2026-10-28 · UI language:** triggers are called "stressors" in the UI; the data model keeps `role = trigger`.
 - **2026-10-28 · Visual design:** black base with red ambient glow, liquid-glass surfaces and radii from the iOS 26 Control Center kit (tiles 30px, pill controls, vertical fill sliders), thin oversized numerals, minimal data vis (glowing area curve, tick rulers, single highlighted point). Source: the "Unfug my back inspo" Figma file.

@@ -10,7 +10,7 @@ export const motion = {
     const end = new Date();
     const sample = { type, start: new Date(+end - minutes * 60_000).toISOString(), end: end.toISOString(), minutes, steps };
     const samples = [...R.settings().motionSamples, sample].filter(s => +end - new Date(s.end) < WEEK_MS);
-    R.setSettings({ motionSamples: samples });
+    R.setSettings({ motionSamples: samples }, { quiet: true });
   },
 
   samplesSince(iso) {

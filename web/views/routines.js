@@ -18,9 +18,19 @@ export function RoutinesView() {
   const cards = h('div', { class: 'routine-list' });
   repaintList = () => {
     const today = localDate();
-    cards.replaceChildren(...groupsOf(R.routines.all()).map(days => (days.length > 1 || days[0].group ? groupCard(days, today) : routineCard(days[0], today))));
+    cards.replaceChildren(...groupsOf(R.routines.all()).map(days => {
+      const card = days.length > 1 || days[0].group ? groupCard(days, today) : routineCard(days[0], today);
+      card.classList.add('drag-row');
+      card.dataset.ids = days.map(r => r.id).join(',');
+      return card;
+    }));
   };
   repaintList();
+  // Hold a card, then drag, to move it; the first one is the routine on Home
+  dragHandles(cards, {
+    hold: true, skip: '.done-toggle',
+    onReorder: rows => R.routines.reorder(rows.flatMap(r => r.dataset.ids.split(','))),
+  });
   return h('div', { class: 'view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Routines')),
     R.routines.all().length ? null : h('p', { class: 'muted' }, 'Keep your gym, stretching or calisthenics routines here. Tick one off in your check-in, or open it to log your sets.'),

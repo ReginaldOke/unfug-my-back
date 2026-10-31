@@ -10,7 +10,7 @@ const phone = () => ({
   factors: [{ id: 'p-sit', name: 'Long sitting' }, { id: 'p-mob', name: 'Daily mobility · Day 1', routineId: 'p-r1' }],
   routines: [{ id: 'p-r1', group: 'Daily mobility', name: 'Day 1', linkedFactorId: 'p-mob' }],
   dailyEntries: [{ id: 'p-e1', date: '2026-10-30', painScore: 4 }],
-  factorLogs: [{ id: 'p-l1', factorId: 'p-sit', date: '2026-10-30', value: 60 }],
+  factorLogs: [{ id: 'p-l1', factorId: 'p-sit', date: '2026-10-30', value: 60, dailyEntryId: 'p-e1' }],
 });
 
 // The website: two days, one of them also checked in on the phone
@@ -39,7 +39,17 @@ test('import adds new days and matches stressors and routines by name', () => {
   assert.deepEqual(add.factorLogs.map(l => [l.factorId, l.date]), [['p-sit', '2026-10-29'], ['w-guitar', '2026-10-29']]);
   assert.ok(add.factorLogs.every(l => !('factorName' in l)));
   assert.equal(add.routineCompletions[0].routineId, 'p-r1');
-  assert.deepEqual(summary, { checkins: 1, skippedDays: 1, factors: 1, routines: 0, sessions: 1, healthDays: 0 });
+  assert.deepEqual(summary, { checkins: 1, skippedDays: 1, replacedDays: 0, factors: 1, routines: 0, sessions: 1, healthDays: 0 });
+});
+
+test('with replaceDays, the file’s check-in replaces this diary’s for days in both', () => {
+  const { add, replace, summary } = planImport(phone(), web(), { replaceDays: true });
+  assert.deepEqual(replace, ['2026-10-30']);
+  assert.deepEqual(add.dailyEntries.map(e => e.date).sort(), ['2026-10-29', '2026-10-30']);
+  assert.deepEqual(add.painMarkers.map(m => m.id).sort(), ['w-m1', 'w-m2']);
+  // The file's 200 min of sitting on the 30th comes in; the phone's log for that day goes with its check-in
+  assert.ok(add.factorLogs.some(l => l.date === '2026-10-30' && l.value === 200));
+  assert.equal(summary.replacedDays, 1);
 });
 
 test('importing the same file twice adds nothing the second time', () => {

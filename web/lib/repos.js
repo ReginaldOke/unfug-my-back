@@ -122,6 +122,8 @@ function addNewSeeds() {
 
 /** Merges an exported diary into this one (see import.js). Returns the plan's summary. */
 export function importDiary(data, plan = planImport(S.snapshot(), data)) {
+  // Days whose check-in is being replaced by the file's: remove this diary's first
+  for (const date of plan.replace ?? []) checkins.remove(date);
   S.batch(() => {
     for (const [name, rows] of Object.entries(plan.add)) S.table(name)?.push(...rows);
   });
@@ -305,7 +307,14 @@ export function describeRoutineChange(before, after) {
 }
 
 export const routines = {
-  all: () => S.table('routines').filter(r => !r.isArchived),
+  /** In the order the user arranged them (routines made since go last, in the order they were made). */
+  all: () => S.table('routines').filter(r => !r.isArchived).map((r, i) => [r, i])
+    .sort(([a, i], [b, j]) => (a.sortOrder ?? 1e6 + i) - (b.sortOrder ?? 1e6 + j)).map(([r]) => r),
+
+  /** Saves a new order: ids listed in their new places (variations of a group move together). */
+  reorder(ids) {
+    S.batch(() => ids.forEach((id, i) => S.update('routines', id, { sortOrder: i })));
+  },
   get: id => S.table('routines').find(r => r.id === id),
 
   /** The routine's own exercise item (what the check-in ticks and the patterns count). */

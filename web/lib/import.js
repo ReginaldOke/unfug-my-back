@@ -82,10 +82,12 @@ const dayOf = c => c.date ?? new Date(c.timestamp).toISOString().slice(0, 10);
 export const isDiaryExport = x => !!x && typeof x === 'object' && Array.isArray(x.dailyEntries) && Array.isArray(x.factors);
 
 /**
- * What importing `incoming` into `current` would add: { add: { table: rows }, summary }.
- * Rows keep their ids, with references remapped to the matching rows already here.
+ * What importing `incoming` into `current` would add: { add: { table: rows }, replace: [dates], summary }.
+ * Rows keep their ids, with references remapped to the matching rows already here. A day checked in on
+ * both keeps this diary's version, unless replaceDays: then the file's check-in for that day is used
+ * instead (`replace` lists the days whose check-in here gets removed first).
  */
-export function planImport(current, raw) {
+export function planImport(current, raw, { replaceDays = false } = {}) {
   const incoming = cleanDiary(raw);
   const t = name => incoming[name] ?? [];
   const add = {};
@@ -111,7 +113,11 @@ export function planImport(current, raw) {
   const mapRoutine = id => routineId.get(id) ?? id;
 
   // Check-ins: one per day; a day already here stays as it is
-  const haveDays = new Set(current.dailyEntries.map(e => e.date));
+  const clash = new Set(current.dailyEntries.map(e => e.date));
+  const theirs = new Set((raw?.dailyEntries ?? []).map(e => e?.date));
+  const replace = replaceDays ? [...clash].filter(d => theirs.has(d)) : [];
+  // Days being replaced count as free: the file's check-in, spots and logs for them come in
+  const haveDays = new Set([...clash].filter(d => !replace.includes(d)));
   const newEntries = t('dailyEntries').filter(e => !haveDays.has(e.date));
   newEntries.forEach(e => push('dailyEntries', e));
   const entryIds = new Set(newEntries.map(e => e.id));
@@ -125,7 +131,7 @@ export function planImport(current, raw) {
   for (const m of t('painMarkers')) if (entryIds.has(m.dailyEntryId) || flareIds.has(m.flareId)) push('painMarkers', m);
 
   // Logs: not on days kept from this diary, and never a second log of the same thing on the same day
-  const haveLog = new Set(current.factorLogs.map(l => `${l.factorId}|${l.date}`));
+  const haveLog = new Set(current.factorLogs.filter(l => !replace.includes(l.date) || !l.dailyEntryId).map(l => `${l.factorId}|${l.date}`));
   for (const l of t('factorLogs')) {
     const row = { ...l, factorId: mapFactor(l.factorId) };
     const key = `${row.factorId}|${row.date}`;
@@ -158,9 +164,9 @@ export function planImport(current, raw) {
 
   const n = name => add[name]?.length ?? 0;
   return {
-    add,
+    add, replace,
     summary: {
-      checkins: n('dailyEntries'), skippedDays: skippedDays.size, factors: n('factors'), routines: n('routines'),
+      checkins: n('dailyEntries'), skippedDays: skippedDays.size, replacedDays: replace.length, factors: n('factors'), routines: n('routines'),
       sessions: n('routineCompletions'), healthDays: n('healthDays'),
     },
   };

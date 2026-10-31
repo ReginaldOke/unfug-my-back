@@ -65,10 +65,10 @@ export function load() {
   return db;
 }
 
-export function save() {
+export function save({ quiet = false } = {}) {
   if (batching) return;
   try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { console.error('Could not save diary', e); }
-  listeners.forEach(fn => fn());
+  if (!quiet) listeners.forEach(fn => fn());
 }
 
 /** Run several writes and persist once at the end. */
@@ -118,9 +118,10 @@ export function removeWhere(t, pred) {
 
 export const settings = () => db.settings;
 
-export function setSettings(patch) {
+/** quiet: bookkeeping nothing on screen depends on (timestamps, motion samples), so views aren't redrawn. */
+export function setSettings(patch, { quiet = false } = {}) {
   Object.assign(db.settings, patch);
-  save();
+  save({ quiet });
 }
 
 export const snapshot = () => structuredClone(db);

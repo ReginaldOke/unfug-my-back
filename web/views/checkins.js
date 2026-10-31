@@ -2,7 +2,7 @@
 // and a page per check-in that sets out everything logged that day (all of it goes into the export).
 import { h, iconButton, confirmSheet, toast } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
-import { localDate, dayLabel, parseDate, fmtTime, fmtMinutes } from '../lib/dates.js';
+import { localDate, dayLabel, parseDate, fmtTime, fmtMinutes, addDays } from '../lib/dates.js';
 import { fmtAmount, sleepWord, ROLE_ICON } from '../lib/labels.js';
 import { regionById } from '../lib/regions.js';
 import { painColour } from './calendar.js';
@@ -15,9 +15,17 @@ export function CheckinsView() {
   if (!entries.length) { location.replace('#/checkin'); return h('div'); }
   const doneToday = entries[0]?.date === today;
 
+  // Days missed since the first check-in (up to two months back, not today: that's the button below),
+  // listed among the others so any of them can be filled in afterwards
+  const have = new Set(entries.map(e => e.date));
+  const from = [entries.at(-1).date, addDays(today, -MISSED_DAYS)].sort()[1];
+  const missed = [];
+  for (let d = addDays(today, -1); d >= from; d = addDays(d, -1)) if (!have.has(d)) missed.push({ date: d, missed: true });
+  const days = [...entries, ...missed].sort((a, b) => b.date.localeCompare(a.date));
+
   // Grouped by month, the month named once above its days
   const groups = new Map();
-  for (const e of entries) {
+  for (const e of days) {
     const month = parseDate(e.date).toLocaleDateString(undefined, { month: 'long', year: e.date.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric' });
     if (!groups.has(month)) groups.set(month, []);
     groups.get(month).push(e);
@@ -27,9 +35,20 @@ export function CheckinsView() {
     h('header', { class: 'top-bar' }, h('h1', {}, 'Check-ins')),
     [...groups].map(([month, list]) => h('section', { class: 'checkin-group' },
       h('h2', { class: 'section-label' }, month),
-      h('div', { class: 'card glass checkin-list' }, list.map(e => checkinRow(e, today))))),
+      h('div', { class: 'card glass checkin-list' }, list.map(e => (e.missed ? missedRow(e.date, today) : checkinRow(e, today)))))),
     // Today's check-in waits just above the tab bar, where the thumb is
     doneToday ? null : h('div', { class: 'checkin-dock' }, h('a', { class: 'btn primary big wide hero-cta', href: '#/checkin' }, 'Check in')));
+}
+
+const MISSED_DAYS = 60;
+
+/** A day without a check-in: tap to do it now, for that day. */
+function missedRow(date, today) {
+  const when = dayLabel(date, today);
+  return h('a', { class: 'checkin-row missed', href: `#/checkin?date=${date}`, 'aria-label': `${when}: no check-in. Check in for this day` },
+    h('span', { class: 'checkin-dot empty', 'aria-hidden': 'true' }),
+    h('span', { class: 'grow' }, h('span', { class: 'checkin-when' }, when, h('span', { class: 'hint' }, 'Missed'))),
+    h('span', { class: 'missed-cta' }, 'Check in ›'));
 }
 
 function checkinRow(e, today) {

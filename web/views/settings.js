@@ -1,5 +1,5 @@
 // Settings: what you track, reminders, your data, help.
-import { h, shareOrDownload, sheet, vibrate, toast } from '../lib/ui.js';
+import { h, shareOrDownload, sheet, vibrate, toast, segmented } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { buildExport } from '../lib/export.js';
 import { planImport, isDiaryExport } from '../lib/import.js';
@@ -129,21 +129,44 @@ const readText = raw => (/^[^\n]*[,\t;][^\n]*\n[^\n]*[,\t;]/.test(raw.trim()) &&
 
 /** What an import would add, then merge it in on Import. */
 function previewImport(data) {
-  const plan = planImport(R.snapshot(), data);
-  const { checkins, skippedDays, factors, routines, sessions, healthDays } = plan.summary;
   const n = (k, one, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
-  const adds = [checkins && n(checkins, 'check-in'), factors && n(factors, 'thing to track', 'things to track'),
-    routines && n(routines, 'routine'), sessions && n(sessions, 'past session'), healthDays && n(healthDays, 'day of steps and sleep', 'days of steps and sleep')].filter(Boolean);
-  if (!adds.length) return toast(skippedDays ? 'Nothing new: you already have those days' : 'Nothing new to add');
+  // Days checked in both here and in the file: the file's version can replace this phone's
+  let replaceDays = false;
+  const summaryOf = plan => {
+    const { checkins, factors, routines, sessions, healthDays } = plan.summary;
+    return [checkins && n(checkins, 'check-in'), factors && n(factors, 'thing to track', 'things to track'),
+      routines && n(routines, 'routine'), sessions && n(sessions, 'past session'), healthDays && n(healthDays, 'day of steps and sleep', 'days of steps and sleep')].filter(Boolean);
+  };
+  const plans = { keep: planImport(R.snapshot(), data), replace: planImport(R.snapshot(), data, { replaceDays: true }) };
+  const clashes = plans.keep.summary.skippedDays;
+  if (!summaryOf(plans.keep).length && !clashes) return toast('Nothing new to add');
   // Show the routines as they'll appear, so a note that was read oddly is caught before it's added
-  const newRoutines = plan.add.routines ?? [];
+  const newRoutines = plans.keep.add.routines ?? [];
+  const adds = h('p', { class: 'muted' });
+  const paint = () => {
+    const list = summaryOf(replaceDays ? plans.replace : plans.keep);
+    adds.textContent = list.length ? `Adds ${list.join(', ').replace(/, ([^,]*)$/, ' and $1')}.` : 'Nothing new to add.';
+  };
+  paint();
+  const choice = clashes ? h('div', { class: 'stack tight import-clash' },
+    h('p', {}, `${n(clashes, 'day')} in this file ${clashes === 1 ? 'is' : 'are'} already checked in on this phone. Which version should ${clashes === 1 ? 'it' : 'they'} keep?`),
+    segmented([['keep', 'This phone’s'], ['replace', 'The file’s']], 'keep', v => { replaceDays = v === 'replace'; paint(); }, 'Which check-ins to keep')) : null;
   sheet(close => h('div', { class: 'stack' },
     h('h2', {}, 'Bring this in?'),
-    h('p', { class: 'muted' }, `Adds ${adds.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`),
+    adds,
     newRoutines.length ? h('div', { class: 'import-routines' }, newRoutines.map(routinePreview)) : null,
-    skippedDays ? h('p', { class: 'hint' }, `${n(skippedDays, 'day')} you’ve already checked in here keep${skippedDays === 1 ? 's' : ''} this phone’s version.`) : null,
-    h('p', { class: 'hint' }, 'Nothing here is changed or removed. You can edit or delete anything afterwards.'),
-    h('button', { type: 'button', class: 'btn primary', onclick: () => { R.importDiary(data, plan); close(); toast(`Added ${adds[0]}${adds.length > 1 ? ' and more' : ''}`); } }, 'Add'),
+    choice,
+    h('p', { class: 'hint' }, 'Nothing else here is changed or removed. You can edit or delete anything afterwards.'),
+    h('button', {
+      type: 'button', class: 'btn primary', onclick: () => {
+        const plan = replaceDays ? plans.replace : plans.keep;
+        const list = summaryOf(plan);
+        if (!list.length) { close(); return toast('Nothing new to add'); }
+        R.importDiary(data, plan);
+        close();
+        toast(`Added ${list[0]}${list.length > 1 ? ' and more' : ''}`);
+      },
+    }, 'Add'),
     h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Cancel')), { tall: true });
 }
 

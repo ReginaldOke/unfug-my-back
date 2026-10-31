@@ -45,8 +45,8 @@ function freshDraft(date) {
 export function CheckinView(ctx) {
   const today = localDate();
   let date = ctx.params.get('date') || today;
-  // New check-ins go back three days at most; one already saved can be edited whenever
-  if (date > today || (date < addDays(today, -3) && !R.checkins.entryFor(date))) date = today;
+  // Any past day can be checked in (a missed day, filled in afterwards); never a future one
+  if (date > today) date = today;
   // Opened from a check-in's page: it returns there, and can start at the step being edited
   const fromDetail = ctx.params.get('from') === 'detail';
   if (!drafts.has(date)) drafts.set(date, freshDraft(date));

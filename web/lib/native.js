@@ -33,8 +33,12 @@ export async function startNative({ respond }) {
   const { display } = await Notes.checkPermissions();
   if (display === 'prompt' || display === 'prompt-with-rationale') await Notes.requestPermissions();
   syncNotifications();
-  if (R.settings().healthSync) syncHealth().catch(() => {});
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && R.settings().healthSync) syncHealth().catch(() => {}); });
+  // Steps and sleep are read again on every open, on coming back to the app, and every 15 minutes while
+  // it's open, so a day's steps keep counting after its check-in (each sync rewrites the last 60 days)
+  const refresh = () => { if (R.settings().healthSync && !document.hidden) syncHealth().catch(() => {}); };
+  refresh();
+  document.addEventListener('visibilitychange', refresh);
+  setInterval(refresh, 15 * 60_000);
 }
 
 export async function notificationPermission() {
@@ -164,7 +168,7 @@ export async function syncHealth(days = 60) {
 
   const n = R.health.merge([...rows.values()], 'healthkit');
   report.sleepNights = [...rows.values()].filter(r => r.sleepHours != null).length;
-  R.setSettings({ healthReport: report });
+  R.setSettings({ healthReport: report }, { quiet: true });
   // The first time sleep or steps arrive, they go on Home's chart straight away (switch them off from its •••)
   const added = R.settings().healthOnChart ?? [];
   const fresh = ['sleepHours', 'steps'].filter(key => !added.includes(key) && R.health.has(key));

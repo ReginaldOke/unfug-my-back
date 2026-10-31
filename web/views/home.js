@@ -17,7 +17,7 @@ import { dragHandles } from './sortable.js';
 import { ScratchPad, seedNotes } from './pad.js';
 
 // View state that should survive the periodic re-render
-const ui = { range: 7, hidden: null, view: 'chart', month: localDate().slice(0, 7), day: null };
+const ui = { range: 7, hidden: null, view: 'chart', month: localDate().slice(0, 7), day: null, drawn: null };
 // Lines switched off in the chart, remembered between visits (read once the diary has loaded)
 const hiddenLines = () => (ui.hidden ??= new Set(R.settings().chartHidden ?? []));
 let rerender = () => {};
@@ -49,6 +49,7 @@ function sectionOrder() {
 }
 
 export function HomeView(ctx) {
+  ui.drawn = null; // a fresh visit draws the chart in again
   // Header, notices and sections are built once and filled on each render, so a notice that's
   // sliding in isn't restarted by the periodic redraw
   const head = h('div', { class: 'home-head' });
@@ -331,8 +332,9 @@ function trendCard(today) {
       h('div', { class: 'row tight' },
         viewToggle(),
         ranges.length ? segmented(ranges.map(([v, label]) => [v, label]), ui.range, v => { ui.range = v; rerender(); }, 'Range') : null)),
+    // The lines draw in when Home opens or the range changes, not on every quiet redraw
     TrendChart({
-      days, series, hidden: hiddenLines(),
+      animate: ui.drawn !== ui.range && !!(ui.drawn = ui.range), days, series, hidden: hiddenLines(),
       focus: dates.indexOf(today), fadeLeft: start > first, marks,
       onMark: m => openChangeSheet(marks, m?.date),
       onToggle: key => { toggleHidden(key); rerender(); },
@@ -541,7 +543,7 @@ function routineTile(today) {
 }
 
 function aiTile() {
-  return h('button', { type: 'button', class: 'tile static ai-tile', onclick: openAIShare },
+  return h('button', { type: 'button', class: 'tile static ai-tile', onclick: openShareSheet },
     h('div', { class: 'ai-text' },
       h('h2', {}, 'Analyse your data with AI'),
       h('span', { class: 'hint' }, 'Export your diary to an AI chat to spot trends and see what lines up with your pain.')),
@@ -549,7 +551,7 @@ function aiTile() {
 }
 
 /** Share sheet with the diary file (it carries its own instructions), or copy it as text to paste. */
-function openAIShare() {
+function openShareSheet() {
   const n = R.checkins.all().length;
   if (!n) return toast('Check in at least once first');
   sheet(close => h('div', { class: 'stack' },

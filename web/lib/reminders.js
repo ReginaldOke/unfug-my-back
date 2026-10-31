@@ -32,7 +32,7 @@ function runWake() {
   const s = R.settings();
   const cfg = s.reminder;
   const samples = motion.samplesSince(s.lastWakeAt);
-  R.setSettings({ lastWakeAt: now.toISOString() });
+  R.setSettings({ lastWakeAt: now.toISOString() }, { quiet: true });
   checkDailyReminders(now);
 
   if (!cfg.enabled) return cancelPending();
@@ -159,5 +159,5 @@ function checkDailyReminders(now) {
       });
     });
   }
-  if (changed) R.setSettings({ lastNotified: sent });
+  if (changed) R.setSettings({ lastNotified: sent }, { quiet: true });
 }
