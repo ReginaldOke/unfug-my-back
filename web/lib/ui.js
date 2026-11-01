@@ -47,7 +47,9 @@ export function select(options, value, props = {}) {
 }
 
 export function field(label, control, hint) {
-  return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), control, hint ? h('span', { class: 'hint' }, hint) : null);
+  // A label sends every tap inside it to its first button, so a row of buttons can't sit in one
+  const tag = control.querySelector?.('button') ? 'div' : 'label';
+  return h(tag, { class: 'field' }, h('span', { class: 'field-label' }, label), control, hint ? h('span', { class: 'hint' }, hint) : null);
 }
 
 /** Segmented control. options: [[value, label]] */

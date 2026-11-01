@@ -111,7 +111,7 @@ function hero(entry, today) {
   // Within a twentieth of a point of the average it's the same, so no ↑ or ↓
   const delta = entry?.painScore != null && avg != null && Math.abs(entry.painScore - avg) >= 0.05 ? entry.painScore - avg : null;
 
-  return h('section', { class: 'hero' },
+  return h('section', { class: `hero${entry ? '' : ' empty'}` },
     h('div', { class: 'hero-num' },
       entry ? h('span', { class: 'eyebrow' }, 'Pain today') : null,
       h('div', {}, h('span', { class: 'giant' }, entry?.painScore ?? '–'), h('span', { class: 'unit' }, '/10')),

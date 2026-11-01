@@ -61,19 +61,27 @@ function playEntrance(el) {
   setTimeout(() => el.classList.remove('enter'), 1000);
 }
 
-// The loading spine stays up at least this long from the moment the page starts, so a fast start still
-// reads as one gentle movement rather than a flicker. The first screen rises in as it fades.
-const BOOT_MIN_MS = 800;
+// In the app the loading spine is drawn natively: it's told the page is ready, and calls back as it fades.
+// In a browser it shows for at least one beat of its animation, so a fast start doesn't flicker.
+const BOOT_MIN_MS = 500;
 let booted = false;
+const riseIn = () => { if (app.firstElementChild) playEntrance(app.firstElementChild); };
 async function finishBoot() {
   const boot = document.getElementById('boot');
+  const native = globalThis.Capacitor?.isNativePlatform?.();
   await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 400))]);
-  await new Promise(r => setTimeout(r, Math.max(0, BOOT_MIN_MS - performance.now())));
+  if (!native) await new Promise(r => setTimeout(r, Math.max(0, BOOT_MIN_MS - performance.now())));
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   booted = true;
-  if (app.firstElementChild) playEntrance(app.firstElementChild);
+  if (native) {
+    boot.remove();
+    window.__reveal = riseIn;
+    window.__appReady = true;
+    return;
+  }
+  riseIn();
   boot.classList.add('out');
-  setTimeout(() => boot.remove(), 700);
+  setTimeout(() => boot.remove(), 450);
 }
 
 function render() {
@@ -132,6 +140,26 @@ addEventListener('resize', () => { gliderAt = null; moveGlider(); });
 function NotFound() {
   return h('div', { class: 'view' }, h('h1', {}, 'Not found'), h('a', { href: '#/' }, 'Go home'));
 }
+
+// No dragging links and images out of the page, and a fade under the status bar once scrolled
+addEventListener('dragstart', e => e.preventDefault());
+
+// iOS still sends a click when a long press on a link is let go, even after dragging away. Only a real
+// tap opens a link: a press that moved or was held doesn't. Clicks with no touch before them (VoiceOver) pass.
+let press = null;
+addEventListener('touchstart', e => { const t = e.touches[0]; press = { x: t.clientX, y: t.clientY, at: Date.now(), moved: false, ended: 0 }; }, { capture: true, passive: true });
+addEventListener('touchmove', e => {
+  const t = e.touches[0];
+  if (press && Math.hypot(t.clientX - press.x, t.clientY - press.y) > 12) press.moved = true;
+}, { capture: true, passive: true });
+addEventListener('touchend', () => { if (press) press.ended = Date.now(); }, { capture: true, passive: true });
+addEventListener('click', e => {
+  const p = press;
+  press = null;
+  if (!p?.ended || Date.now() - p.ended > 600 || !e.target.closest?.('a[href]')) return;
+  if (p.moved || p.ended - p.at > 600) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+addEventListener('scroll', () => document.body.classList.toggle('scrolled', scrollY > 6), { passive: true });
 
 window.addEventListener('hashchange', render);
 render();

@@ -2,31 +2,192 @@ import UIKit
 import Capacitor
 import CoreMotion
 
-/// The app's web view, with the plugin below registered on it.
+/// The app's web view, with the plugins below registered on it.
 class AppViewController: CAPBridgeViewController {
+    private var loader: SpineLoader?
+
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(MotionHistoryPlugin())
+        bridge?.registerPluginInstance(AppLaunchPlugin())
     }
 
-    /// The launch image stays over the web view until the page's own spine, in the same spot, has painted.
     override open func viewDidLoad() {
         super.viewDidLoad()
-        let cover = UIImageView(image: UIImage(named: "Splash"))
-        cover.contentMode = .scaleAspectFill
-        cover.frame = view.bounds
-        cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(cover)
-        liftWhenPainted(cover, triesLeft: 150)
+        // Drawn natively so it moves from the first frame, while the web code is still loading
+        let dark = AppLaunchPlugin.launchesDark()
+        overrideUserInterfaceStyle = dark ? .dark : .light
+        let loader = SpineLoader(frame: view.bounds, dark: dark)
+        loader.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(loader)
+        self.loader = loader
+        loader.start()
+        liftWhenReady(triesLeft: 400)
+        // Holding a link shouldn't lift iOS's drag preview out of the app
+        webView?.scrollView.subviews.forEach { $0.interactions.compactMap { $0 as? UIDragInteraction }.forEach { $0.isEnabled = false } }
+        // iOS 26's fade under the status bar takes its colour from the launch background; the page draws its own
+        if #available(iOS 26.0, *) {
+            webView?.scrollView.topEdgeEffect.isHidden = true
+        }
     }
 
-    private func liftWhenPainted(_ cover: UIView, triesLeft: Int) {
-        webView?.evaluateJavaScript("document.getElementById('boot') ? 1 : 0") { [weak self] result, _ in
+    private func liftWhenReady(triesLeft: Int) {
+        webView?.evaluateJavaScript("window.__appReady === true ? 1 : 0") { [weak self] result, _ in
+            guard let self else { return }
             if (result as? Int) == 1 || triesLeft == 0 {
-                UIView.animate(withDuration: 0.15, delay: 0.1, options: [], animations: { cover.alpha = 0 }, completion: { _ in cover.removeFromSuperview() })
+                self.loader?.finish(onReveal: {
+                    self.overrideUserInterfaceStyle = .unspecified
+                    self.webView?.evaluateJavaScript("window.__reveal && window.__reveal()", completionHandler: nil)
+                })
+                self.loader = nil
             } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { self?.liftWhenPainted(cover, triesLeft: triesLeft - 1) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { self.liftWhenReady(triesLeft: triesLeft - 1) }
             }
         }
+    }
+}
+
+/// The logo's spine on the app's background: it grows from its centre out to both ends and back, then
+/// settles at full length and fades into the app.
+final class SpineLoader: UIView {
+    private let group = CALayer()
+    private let glow = CAShapeLayer()
+    private let line = CAShapeLayer()
+    private let gradient = CAGradientLayer()
+    private var startedAt = CACurrentMediaTime()
+    private static let side: CGFloat = 182 // the logo's 1024 square, drawn at this many points
+    private static let beat: CFTimeInterval = 0.5
+    private static let curve = CAMediaTimingFunction(controlPoints: 0.65, 0, 0.35, 1)
+
+    init(frame: CGRect, dark: Bool) {
+        super.init(frame: frame)
+        backgroundColor = dark ? UIColor(red: 13 / 255, green: 13 / 255, blue: 15 / 255, alpha: 1) : UIColor(red: 239 / 255, green: 238 / 255, blue: 236 / 255, alpha: 1)
+        let k = Self.side / 1024
+        let p = { (x: CGFloat, y: CGFloat) in CGPoint(x: x * k, y: y * k) }
+        let path = UIBezierPath()
+        path.move(to: p(512, 222))
+        path.addCurve(to: p(520, 522), controlPoint1: p(606, 300), controlPoint2: p(592, 424))
+        path.addCurve(to: p(512, 806), controlPoint1: p(448, 620), controlPoint2: p(418, 720))
+        let size = CGSize(width: Self.side, height: Self.side)
+        group.bounds = CGRect(origin: .zero, size: size)
+        for shape in [glow, line] {
+            shape.frame = group.bounds
+            shape.path = path.cgPath
+            shape.fillColor = nil
+            shape.lineWidth = 42 * k
+            shape.lineCap = .round
+            shape.strokeColor = UIColor.black.cgColor
+        }
+        let coral = UIColor(red: 240 / 255, green: 112 / 255, blue: 94 / 255, alpha: 1)
+        glow.strokeColor = (dark ? UIColor(red: 249 / 255, green: 221 / 255, blue: 216 / 255, alpha: 1) : coral).cgColor
+        glow.shadowColor = glow.strokeColor
+        glow.shadowOpacity = dark ? 0.75 : 0.45
+        glow.shadowRadius = 11
+        glow.shadowOffset = .zero
+        gradient.frame = group.bounds
+        gradient.startPoint = CGPoint(x: 0.5, y: 220 / 1024)
+        gradient.endPoint = CGPoint(x: 0.5, y: 806 / 1024)
+        gradient.colors = (dark
+            ? [UIColor.white, UIColor(red: 249 / 255, green: 221 / 255, blue: 216 / 255, alpha: 1), coral]
+            : [UIColor(red: 29 / 255, green: 28 / 255, blue: 31 / 255, alpha: 1), UIColor(red: 150 / 255, green: 80 / 255, blue: 72 / 255, alpha: 1), coral]).map(\.cgColor)
+        gradient.locations = [0, 0.45, 1]
+        gradient.mask = line
+        group.addSublayer(glow)
+        group.addSublayer(gradient)
+        layer.addSublayer(group)
+    }
+
+    required init?(coder: NSCoder) { fatalError("Not used from a storyboard") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // The logo's curve sits a little low in its square: centre the curve itself
+        group.position = CGPoint(x: bounds.midX, y: bounds.midY - (514 - 512) * Self.side / 1024)
+    }
+
+    /// Both ends move the same distance from the middle, at the same pace.
+    func start() {
+        startedAt = CACurrentMediaTime()
+        if UIAccessibility.isReduceMotionEnabled { return }
+        for shape in [glow, line] {
+            for (key, from, to) in [("strokeStart", 0.44, 0.0), ("strokeEnd", 0.56, 1.0)] {
+                let pulse = CABasicAnimation(keyPath: key)
+                pulse.fromValue = from
+                pulse.toValue = to
+                pulse.duration = Self.beat
+                pulse.timingFunction = Self.curve
+                pulse.autoreverses = true
+                pulse.repeatCount = .infinity
+                shape.add(pulse, forKey: key)
+            }
+        }
+    }
+
+    /// Runs out to full length from wherever it is, then fades as the app rises in beneath.
+    func finish(onReveal: @escaping () -> Void) {
+        let wait = max(0, Self.beat - (CACurrentMediaTime() - startedAt))
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [self] in
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.22)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+            CATransaction.setCompletionBlock { [self] in
+                onReveal()
+                UIView.animate(withDuration: 0.34, delay: 0, options: [.curveEaseInOut], animations: {
+                    self.alpha = 0
+                }, completion: { _ in self.removeFromSuperview() })
+                let grow = CABasicAnimation(keyPath: "transform.scale")
+                grow.fromValue = 1
+                grow.toValue = 1.08
+                grow.duration = 0.34
+                grow.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                grow.fillMode = .forwards
+                grow.isRemovedOnCompletion = false
+                group.add(grow, forKey: "grow")
+            }
+            for shape in [glow, line] {
+                let start = shape.presentation()?.strokeStart ?? 0, end = shape.presentation()?.strokeEnd ?? 1
+                shape.removeAllAnimations()
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                shape.strokeStart = start
+                shape.strokeEnd = end
+                CATransaction.commit()
+                let a = CABasicAnimation(keyPath: "strokeStart"), b = CABasicAnimation(keyPath: "strokeEnd")
+                a.fromValue = start
+                a.toValue = 0
+                b.fromValue = end
+                b.toValue = 1
+                shape.add(a, forKey: "strokeStart")
+                shape.add(b, forKey: "strokeEnd")
+                shape.strokeStart = 0
+                shape.strokeEnd = 1
+            }
+            CATransaction.commit()
+        }
+    }
+}
+
+/// Remembers the Appearance setting where the loader can read it, before any web code has run.
+@objc(AppLaunchPlugin)
+public class AppLaunchPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "AppLaunchPlugin"
+    public let jsName = "AppLaunch"
+    public let pluginMethods: [CAPPluginMethod] = [CAPPluginMethod(name: "setTheme", returnType: CAPPluginReturnPromise)]
+    private static let key = "themeSetting"
+
+    /// The same rule as theme.js: the setting if there is one, otherwise light from 6am and dark from 5pm.
+    static func launchesDark() -> Bool {
+        switch UserDefaults.standard.string(forKey: key) {
+        case "light": return false
+        case "dark": return true
+        default:
+            let hour = Calendar.current.component(.hour, from: Date())
+            return !(hour >= 6 && hour < 17)
+        }
+    }
+
+    @objc func setTheme(_ call: CAPPluginCall) {
+        UserDefaults.standard.set(call.getString("setting") ?? "auto", forKey: Self.key)
+        call.resolve()
     }
 }
 

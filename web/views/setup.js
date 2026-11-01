@@ -82,7 +82,7 @@ export function SetupView(ctx) {
       const sort = makeSortable(list, {
         onEditChange: on => { done.hidden = !on; if (!on) list.querySelector('.rename-input')?.blur(); },
         onReorder: ids => R.factors.reorder(ids),
-        onTap: (item, e) => renameInline(item, R.factors.get(item.dataset.id), e.target.closest('.well') ? 'icon' : 'name'),
+        onTap: (item, e) => renameInline(item, R.factors.get(item.dataset.id), e.target.closest('.card-top') ? 'icon' : 'name'),
       });
       fill();
       if (startEditing) setTimeout(() => sort.setEditing(true), 0);
@@ -125,6 +125,7 @@ const lastGlyph = text => {
   const parts = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text.trim())];
   return parts.at(-1)?.segment ?? '';
 };
+const isEmoji = text => /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(text);
 
 /**
  * While editing the list, a card's emoji and name are fields: type over either, and it saves as you
@@ -140,12 +141,22 @@ function renameInline(item, f, focus) {
     h('span', { class: 'card-top' }, icon, h('span', { class: 'tick', 'aria-hidden': 'true' }, '✓')),
     h('span', { class: 'card-text' }, name, btn.querySelector('.card-detail')?.cloneNode(true)));
   item.classList.add('renaming');
-  icon.addEventListener('input', () => { icon.value = lastGlyph(icon.value); if (icon.value) name.focus(); });
+  // Only an emoji goes in this field: anything else leaves the current one, which stays selected to type over
+  let shown = f.icon || '';
+  const pick = () => icon.select();
+  icon.addEventListener('focus', pick);
+  icon.addEventListener('click', pick);
+  icon.addEventListener('input', () => {
+    const glyph = lastGlyph(icon.value);
+    if (!isEmoji(glyph)) { icon.value = shown; pick(); return; }
+    icon.value = shown = glyph;
+    name.focus();
+  });
   const save = () => {
     // Wait a moment: focus may just be moving between the two fields
     setTimeout(() => {
       if (card.contains(document.activeElement) || !card.isConnected) return;
-      const patch = { name: name.value.replace(/\s+/g, ' ').trim() || f.name, icon: icon.value || f.icon };
+      const patch = { name: name.value.replace(/\s+/g, ' ').trim() || f.name, icon: shown || f.icon };
       if (patch.name !== f.name || patch.icon !== f.icon) R.factors.save(f.id, patch);
       Object.assign(f, patch);
       btn.querySelector('.well').textContent = patch.icon;

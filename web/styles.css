@@ -1,4 +1,5 @@
 @font-face { font-family: 'Outfit'; src: url('assets/fonts/outfit.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Italiana'; src: url('assets/fonts/italiana.woff2') format('woff2'); font-display: swap; }
 /* Back Story — liquid glass, black and red.
    Glass recipe and radii follow the iOS 26 Control Center kit in the Figma file:
    tiles 30px, controls and sliders are pills, symbol wells are circles, "on" state is a bright fill. */
@@ -111,6 +112,18 @@ h2 { font-size: 15px; font-weight: 500; color: var(--ink); }
 h3 { font-size: 15px; font-weight: 500; margin-top: 14px; }
 p { margin: 0; }
 a { color: inherit; }
+/* Links and images are parts of the app here: holding one shouldn't lift iOS's link preview */
+a, img, svg { -webkit-touch-callout: none; -webkit-user-drag: none; }
+/* Nor should holding a row select its text, as a native app wouldn't; fields and the Shortcut link still can */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable], .url-box { -webkit-user-select: text; user-select: text; }
+/* iOS's own fade under the status bar is off (it came out dark in light mode). This one only shows once
+   content is scrolled beneath the clock, so Home's glow stays clear at rest. */
+body::before {
+  content: ''; position: fixed; inset: 0 0 auto; height: calc(env(safe-area-inset-top) * 1.3); z-index: 30; pointer-events: none;
+  background: linear-gradient(180deg, var(--bg) 55%, transparent); opacity: 0; transition: opacity .2s ease;
+}
+body.scrolled::before { opacity: 1; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--red-2); outline-offset: 3px; }
@@ -145,7 +158,7 @@ button { cursor: pointer; }
 .view { padding: calc(14px + env(safe-area-inset-top)) var(--gutter) 24px; display: flex; flex-direction: column; gap: 14px; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .top-bar h1 { font-size: 22px; }
-.wordmark { font-size: 30px; font-weight: 300; letter-spacing: -0.03em; padding-top: 6px; }
+.top-bar .wordmark { font-family: 'Italiana', serif; font-size: 34px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 4px; }
 .card { position: relative; border-radius: var(--r-card); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .card.warn { border-color: rgba(255, 90, 80, 0.35); background: linear-gradient(180deg, rgba(255, 59, 48, 0.14), rgba(255, 59, 48, 0.04)); }
 
@@ -385,6 +398,9 @@ body.in-flow #tabs { display: none; }
 /* ---------- Home ---------- */
 .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 10px 2px 6px; }
 .hero-num { display: flex; flex-direction: column; gap: 2px; }
+/* Before today's check-in it's only a dash, so it needn't hold the row open at full numeral height */
+.hero.empty { padding-top: 6px; }
+.hero.empty .giant { display: inline-block; font-size: 56px; line-height: 1; }
 .giant { font-size: 104px; font-weight: 200; line-height: 0.9; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .hero .unit { font-size: 22px; color: var(--ink-3); margin-left: 4px; }
 .pill-badge { align-self: flex-start; margin-top: 8px; font-size: 12px; padding: 4px 10px; border-radius: var(--r-pill); background: rgba(255, 255, 255, 0.1); }
@@ -1497,13 +1513,19 @@ body:not(.on-home) .ambient::after {
 }
 .done-toggle::before { content: ''; position: absolute; inset: -10px; } /* bigger target than it looks */
 .done-toggle:active { transform: scale(0.9); }
-.done-toggle.on { background: rgba(116, 212, 192, 0.85); border-color: transparent; }
-.done-toggle.on::after { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 5px; border: 1.8px solid #0f2620; border-top: 0; border-right: 0; transform: translate(-50%, -65%) rotate(-45deg); }
+.done-toggle.on {
+  /* The same coral, amber and teal as the pain calendar's scale */
+  background: linear-gradient(135deg, #f4908a 0%, #f3b46e 48%, #74d4c0 100%); border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 2px 12px -2px rgba(244, 144, 138, 0.55), 0 2px 12px -2px rgba(116, 212, 192, 0.55);
+}
+.done-toggle.on::after { content: ''; position: absolute; left: 50%; top: 50%; width: 10px; height: 5px; border: 2px solid #231a16; border-top: 0; border-right: 0; border-radius: 1px; transform: translate(-50%, -65%) rotate(-45deg); }
+.done-toggle.on.fresh { animation: pop-in .45s var(--spring) both; }
+@media (prefers-reduced-motion: reduce) { .done-toggle.on.fresh { animation: none; } }
 .routine-day .done-toggle { width: 18px; height: 18px; margin-left: -6px; }
 .routine-day .done-toggle.on::after { width: 7px; height: 4px; border-width: 1.5px; }
 .routine-day .day-tick { display: none; }
 .group-card { cursor: pointer; }
-[data-theme="light"] .done-toggle { border-color: rgba(0, 0, 0, 0.2); background: rgba(255, 255, 255, 0.5); }
+[data-theme="light"] .done-toggle:not(.on) { border-color: rgba(0, 0, 0, 0.2); background: rgba(255, 255, 255, 0.5); }
 
 /* How it went: a quiet two-word switch, then the slider */
 .effort-question { font-size: 15px; color: var(--ink); }
@@ -1586,6 +1608,7 @@ body:not(.on-home) .ambient::after {
 
 /* Notices at the top of Home: compact, in the flow (they push the page down), unfold in and fold away */
 .notices { display: flex; flex-direction: column; }
+.notices:empty { display: none; }
 .notice-wrap { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .4s var(--ease-out, ease), opacity .3s ease, margin .4s ease; margin-bottom: 10px; }
 .notice-wrap.out { grid-template-rows: 0fr; opacity: 0; margin-bottom: 0; }
 .notice-inner { min-height: 0; overflow: hidden; }
@@ -1619,7 +1642,9 @@ body:not(.on-home) .ambient::after {
 .rename-card { cursor: auto; }
 .rename-input { font: inherit; color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 10px; -webkit-user-select: text; user-select: text; }
 .rename-input:focus { outline: none; border-color: var(--ink-3); }
-.icon-input { width: 44px; height: 44px; border-radius: 50%; text-align: center; font-size: 22px; padding: 0; caret-color: transparent; }
+.icon-input { width: 52px; height: 52px; margin: -4px; border-radius: 50%; text-align: center; font-size: 26px; padding: 0; caret-color: transparent; transition: box-shadow .2s, border-color .2s; }
+.icon-input::selection { background: transparent; }
+.icon-input:focus { border-color: #f3b46e; box-shadow: 0 0 0 3px rgba(243, 180, 110, 0.35); }
 .name-input { width: 100%; padding: 6px 8px; font-size: 15px; margin: -7px 0 -7px -9px; }
 
 /* Routine cards: an emoji, the name; a group lists its variations as rows, the tick apart at the end */

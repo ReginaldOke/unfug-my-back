@@ -6,7 +6,8 @@
   "ios": {
     "contentInset": "never",
     "scrollEnabled": true,
-    "limitsNavigationsToAppBoundDomains": false
+    "limitsNavigationsToAppBoundDomains": false,
+    "allowsLinkPreview": false
   },
   "plugins": {
     "LocalNotifications": { "iconColor": "#e5534b" }

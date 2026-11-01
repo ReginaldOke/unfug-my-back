@@ -35,8 +35,8 @@ Needs the Apple Developer Program ($99/yr, approval usually 1–2 days).
 
 - **Privacy policy URL:** https://reginaldoke.github.io/unfug-my-back/privacy.html
 - **App Privacy ("nutrition label"):** Data Not Collected (everything stays on device; nothing is sent to a server).
-- **Category:** Health & Fitness. **Age rating:** 4+.
-- **Screenshots:** 6.9" iPhone (1320 × 2868), 3–5 of them: Today, check-in, body map, routine, calendar. iPhone only,
+- **Category:** Health & Fitness. **Age rating:** answer the questions honestly; expect 13+.
+- **Screenshots:** 6.9" iPhone (1320 × 2868), in `appstore/`, which isn't in Git. iPhone only,
   so no iPad screenshots are needed.
 - **Review notes:** "No account needed. Health access is optional (Settings › Apple Health) and read-only: steps and
   sleep, shown next to pain scores on the device. Notifications are local reminders to move and to check in."

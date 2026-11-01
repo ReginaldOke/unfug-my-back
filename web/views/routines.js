@@ -84,9 +84,14 @@ function routineCard(r, today) {
 }
 
 /** The quick way: a circle that marks the routine done for today (with its usual reps), or undoes it. */
+// The list is redrawn on every tick: this is the one that just went on, so only it pops
+let justTicked = null;
+
 function doneToggle(r, today, done) {
+  const fresh = done && justTicked === r.id;
+  if (fresh) justTicked = null;
   return h('button', {
-    type: 'button', class: `done-toggle${done ? ' on' : ''}`, 'aria-pressed': String(done),
+    type: 'button', class: `done-toggle${done ? ' on' : ''}${fresh ? ' fresh' : ''}`, 'aria-pressed': String(done),
     'aria-label': done ? `Unmark ${R.routineLabel(r)} for today` : `Mark ${R.routineLabel(r)} done for today`,
     onclick: e => {
       e.preventDefault(); e.stopPropagation();
@@ -94,6 +99,7 @@ function doneToggle(r, today, done) {
       else {
         R.routines.logSession(r.id, today, { log: r.items.map(it => ({ name: it.name, did: it.dose || '✓' })) });
         vibrate(10);
+        justTicked = r.id;
         toast(`${R.routineLabel(r)} done`);
       }
       repaintList();

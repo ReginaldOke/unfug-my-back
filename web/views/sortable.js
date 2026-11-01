@@ -77,6 +77,8 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
 
   grid.addEventListener('pointerdown', e => {
     const el = e.target.closest('[data-id]');
+    // iOS often sends no click after a long press, so a flag left over from the last press mustn't eat this tap
+    swallowClick = false;
     if (!el || e.target.closest('.del, input') || e.button > 0) return;
     press = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
     if (editing) return; // in edit mode a drag starts as soon as the finger moves
