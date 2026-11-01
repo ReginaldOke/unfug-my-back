@@ -1,0 +1,14 @@
+{
+  "appId": "com.reginaldoke.unfugmyback",
+  "appName": "Back Story",
+  "webDir": "dist",
+  "backgroundColor": "#0d0d0f",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": true,
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "LocalNotifications": { "iconColor": "#e5534b" }
+  }
+}

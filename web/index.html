@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor://localhost; script-src 'self' capacitor://localhost 'sha256-5frCRWUHZIKzl0PVOMwXae5w0M2wNdM+aZu73ybnz/M='; style-src 'self' capacitor://localhost 'unsafe-inline'; font-src 'self' capacitor://localhost; img-src 'self' capacitor://localhost data: blob:; media-src 'self' capacitor://localhost blob:; connect-src 'self' capacitor://localhost; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0f">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Back Story">
+  <title>Back Story</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* The loading spine. Here rather than styles.css so it paints before anything else has loaded. */
+    #boot { position: fixed; inset: 0; z-index: 9999; background: #0d0d0f; transition: opacity .5s cubic-bezier(.4, 0, .2, 1); animation: boot-giveup .4s 10s forwards; }
+    #boot.out { opacity: 0; pointer-events: none; }
+    /* The launch screen's image fills the screen's longer side, and the logo is 520/2732 of it */
+    .boot-spine { position: absolute; left: 50%; top: 50%; width: 19.033vmax; height: 19.033vmax; margin: -9.5165vmax; transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
+    #boot.out .boot-spine { transform: scale(1.07); }
+    .boot-spine svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; stroke: url(#boot-spine); stroke-linecap: round; stroke-width: 42; will-change: transform; animation: boot-sway 1.5s calc(120ms + var(--i) * 16ms) infinite; }
+    .boot-spine .boot-glow, .boot-spine .boot-soft { will-change: opacity; }
+    .boot-spine .boot-glow { animation: boot-breathe 1.5s 120ms ease-in-out infinite; }
+    .boot-spine .boot-soft { animation: boot-settle .3s 120ms ease-out forwards; }
+    /* From the base up, each piece leans one way then the other, and the whole length lifts a little */
+    @keyframes boot-sway {
+      0%, 100% { transform: translate3d(0, 0, 0); animation-timing-function: cubic-bezier(.37, 0, .63, 1); }
+      25% { transform: translate3d(calc(var(--a) * 1%), calc(var(--b) * -1%), 0); animation-timing-function: cubic-bezier(.37, 0, .63, 1); }
+      75% { transform: translate3d(calc(var(--a) * -1%), calc(var(--b) * -.4%), 0); animation-timing-function: cubic-bezier(.37, 0, .63, 1); }
+    }
+    @keyframes boot-breathe { 50% { opacity: .65; } }
+    @keyframes boot-settle { to { opacity: 0; } }
+    /* If the app ever failed to start, don't leave the spine up forever */
+    @keyframes boot-giveup { to { opacity: 0; visibility: hidden; } }
+    @media (prefers-reduced-motion: reduce) { .boot-spine svg { animation: none !important; } }
+  </style>
+</head>
+<body>
+  <!-- First paint: the logo's spine, cut into pieces that each move on their own layer, so it stays smooth while the app's code loads. Sits exactly where the launch screen drew it. -->
+  <div id="boot" aria-hidden="true">
+    <svg width="0" height="0" style="position:absolute"><defs>
+      <linearGradient id="boot-spine" x1="0" y1="220" x2="0" y2="806" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#f9ddd8"/><stop offset="1" stop-color="#f0705e"/></linearGradient>
+      <filter id="boot-blur" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><feGaussianBlur stdDeviation="34"/></filter>
+      <filter id="boot-soft" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><feGaussianBlur stdDeviation="9"/></filter>
+    </defs></svg>
+    <div class="boot-spine">
+      <svg class="boot-glow" viewBox="0 0 1024 1024"><path d="M512 222C606 300 592 424 520 522C448 620 418 720 512 806" stroke-width="66" opacity=".45" filter="url(#boot-blur)"/></svg>
+      <svg class="boot-soft" viewBox="0 0 1024 1024"><path d="M512 222C606 300 592 424 520 522C448 620 418 720 512 806" stroke-width="52" opacity=".6" filter="url(#boot-soft)"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:31;--a:3.14;--b:0.98"><path d="M512.0 222.0C517.9 226.9 523.3 231.9 528.4 237.1"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:30;--a:3.03;--b:0.95"><path d="M528.4 237.1C533.4 242.4 538.0 247.7 542.3 253.3"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:29;--a:2.91;--b:0.92"><path d="M542.3 253.3C546.5 258.8 550.4 264.5 553.8 270.3"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:28;--a:2.80;--b:0.89"><path d="M553.8 270.3C557.3 276.0 560.3 282.0 563.0 288.0"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:27;--a:2.69;--b:0.86"><path d="M563.0 288.0C565.7 294.0 568.0 300.2 570.0 306.4"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:26;--a:2.58;--b:0.83"><path d="M570.0 306.4C572.0 312.6 573.6 319.0 574.8 325.4"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:25;--a:2.46;--b:0.80"><path d="M574.8 325.4C576.1 331.8 577.0 338.2 577.5 344.8"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:24;--a:2.35;--b:0.77"><path d="M577.5 344.8C578.1 351.3 578.3 357.9 578.2 364.5"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:23;--a:2.24;--b:0.73"><path d="M578.2 364.5C578.2 371.1 577.7 377.8 577.0 384.5"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:22;--a:2.13;--b:0.70"><path d="M577.0 384.5C576.3 391.2 575.2 397.9 573.9 404.6"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:21;--a:2.03;--b:0.67"><path d="M573.9 404.6C572.6 411.3 570.9 418.0 569.0 424.7"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:20;--a:1.92;--b:0.64"><path d="M569.0 424.7C567.1 431.4 564.8 438.1 562.3 444.8"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:19;--a:1.81;--b:0.61"><path d="M562.3 444.8C559.9 451.4 557.1 458.0 554.1 464.6"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:18;--a:1.70;--b:0.58"><path d="M554.1 464.6C551.0 471.2 547.7 477.7 544.2 484.2"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:17;--a:1.60;--b:0.55"><path d="M544.2 484.2C540.6 490.6 536.8 497.0 532.8 503.3"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:16;--a:1.49;--b:0.52"><path d="M532.8 503.3C528.8 509.6 524.5 515.9 520.0 522.0"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:15;--a:1.39;--b:0.48"><path d="M520.0 522.0C515.5 528.1 511.2 534.3 507.0 540.4"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:14;--a:1.29;--b:0.45"><path d="M507.0 540.4C502.9 546.5 498.9 552.7 495.1 558.8"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:13;--a:1.19;--b:0.42"><path d="M495.1 558.8C491.4 565.0 487.8 571.1 484.5 577.2"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:12;--a:1.09;--b:0.39"><path d="M484.5 577.2C481.1 583.4 478.0 589.5 475.2 595.6"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:11;--a:0.99;--b:0.36"><path d="M475.2 595.6C472.3 601.8 469.7 607.9 467.3 614.0"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:10;--a:0.89;--b:0.33"><path d="M467.3 614.0C464.9 620.1 462.9 626.2 461.0 632.2"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:9;--a:0.79;--b:0.30"><path d="M461.0 632.2C459.2 638.3 457.7 644.4 456.5 650.4"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:8;--a:0.70;--b:0.27"><path d="M456.5 650.4C455.3 656.5 454.3 662.5 453.8 668.5"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:7;--a:0.60;--b:0.23"><path d="M453.8 668.5C453.2 674.5 452.9 680.5 453.0 686.4"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:6;--a:0.51;--b:0.20"><path d="M453.0 686.4C453.0 692.4 453.5 698.3 454.2 704.2"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:5;--a:0.42;--b:0.17"><path d="M454.2 704.2C455.0 710.1 456.2 715.9 457.7 721.8"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:4;--a:0.34;--b:0.14"><path d="M457.7 721.8C459.2 727.6 461.1 733.4 463.5 739.1"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:3;--a:0.25;--b:0.11"><path d="M463.5 739.1C465.8 744.9 468.5 750.6 471.7 756.3"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:2;--a:0.17;--b:0.08"><path d="M471.7 756.3C474.8 761.9 478.4 767.5 482.4 773.1"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:1;--a:0.09;--b:0.05"><path d="M482.4 773.1C486.4 778.7 490.9 784.2 495.8 789.7"/></svg>
+      <svg viewBox="0 0 1024 1024" style="--i:0;--a:0.03;--b:0.02"><path d="M495.8 789.7C500.7 795.2 506.1 800.6 512.0 806.0"/></svg>
+    </div>
+  </div>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="aura" aria-hidden="true"></div>
+  <main id="app"></main>
+  <nav id="tabs" class="glass" aria-label="Main">
+    <a href="#/" data-path="/"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg><small>Home</small></a>
+    <a href="#/checkins" data-path="/checkin" class="tab-cta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><small>Check in</small></a>
+    <a href="#/routines" data-path="/routine"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/></svg><small>Routines</small></a>
+    <a href="#/settings" data-path="/settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><small>Settings</small></a>
+  </nav>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

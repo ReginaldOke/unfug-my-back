@@ -1,0 +1,68 @@
+// Notes on Today: short reminders to yourself. Tap one to edit it, clear it to delete it, or add your own.
+import { h, vibrate } from '../lib/ui.js';
+import * as R from '../lib/repos.js';
+import { dragHandles } from './sortable.js';
+
+/** Starts every diary with an empty list once. */
+export function seedNotes() {
+  if (!Array.isArray(R.settings().padNotes)) R.setSettings({ padNotes: [] });
+}
+const notes = () => R.settings().padNotes ?? [];
+const save = list => R.setSettings({ padNotes: list });
+
+export function ScratchPad() {
+  const list = h('ul', { class: 'pad-list' });
+  const card = h('section', { class: 'card glass pad' },
+    h('h2', {}, 'Notes'),
+    list);
+
+  function paint() {
+    list.replaceChildren(
+      ...notes().map(n => h('li', { class: 'pad-item drag-row', 'data-id': n.id },
+        h('button', { type: 'button', class: 'pad-note', onclick: e => edit(e.currentTarget, n) }, n.text))),
+      h('li', {}, h('button', { type: 'button', class: 'pad-add', onclick: e => edit(e.currentTarget, null) }, '+ Add a note')));
+  }
+  // Hold a note, then drag, to reorder; a tap still edits it
+  dragHandles(list, {
+    hold: true,
+    onReorder: rows => {
+      const byId = new Map(notes().map(n => [n.id, n]));
+      save(rows.map(r => byId.get(r.dataset.id)).filter(Boolean));
+    },
+  });
+
+  /** Swaps a line for a text box; Enter or tapping away saves. ✕ (or clearing it) deletes the note. */
+  function edit(btn, note) {
+    const box = h('textarea', { class: 'pad-input', rows: 1, maxlength: 140, enterkeyhint: 'done', placeholder: 'A reminder to yourself', 'aria-label': note ? 'Edit note' : 'New note' }, note?.text ?? '');
+    const fit = () => { box.style.height = 'auto'; box.style.height = `${box.scrollHeight}px`; };
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      const text = box.value.replace(/\s+/g, ' ').trim();
+      const all = notes();
+      if (note) save(text ? all.map(n => (n.id === note.id ? { ...n, text } : n)) : all.filter(n => n.id !== note.id));
+      else if (text) save([...all, { id: R.uuid(), text }]);
+      if (note && !text) vibrate(6);
+      paint();
+    };
+    box.addEventListener('input', fit);
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); box.blur(); }
+      if (e.key === 'Escape') { done = true; paint(); }
+    });
+    box.addEventListener('blur', commit);
+    // pointerdown, not click: it runs before the text box loses focus and saves
+    const del = note ? h('button', {
+      type: 'button', class: 'pad-del', 'aria-label': 'Delete note',
+      onpointerdown: e => { e.preventDefault(); box.value = ''; commit(); },
+    }, '✕') : null;
+    btn.replaceWith(h('div', { class: 'pad-edit' }, box, del));
+    fit();
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+
+  paint();
+  return card;
+}
