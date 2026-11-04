@@ -2,9 +2,10 @@
 import { h, sheet, segmented, field, toast, iconButton } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { ROLE_OPTIONS, ROLE_LABEL, ROLE_ICON, MEASURE_OPTIONS, fmtAmount } from '../lib/labels.js';
-import { analyseFactor } from '../lib/analysis.js';
-import { dayLabel } from '../lib/dates.js';
+import { analyseFactor, factorStory, SAME_BAND } from '../lib/analysis.js';
+import { dayLabel, addDays, localDate } from '../lib/dates.js';
 import { SelectCard } from './controls.js';
+import { TrendChart, PALETTES } from './chart.js';
 
 /**
  * Tall drawer to add a stressor or helper: your own at the top, common ones you haven't switched on below.
@@ -55,40 +56,56 @@ export function quickAddFactor({ role = 'trigger', status = 'suspected', title, 
 export function FactorDetailView(ctx) {
   const f = R.factors.get(ctx.args[0]);
   if (!f) return h('div', { class: 'view' }, h('p', {}, 'That factor no longer exists.'), h('a', { href: '#/' }, 'Home'));
-  const a = analyseFactor(f, R.snapshot());
-  const logs = R.factors.logs(f.id).slice(0, 8);
+  const data = R.snapshot();
+  const story = factorStory(f, data);
+  const a = analyseFactor(f, data);
+  const dose = a.dose.filter(b => b.n);
+  const logged = R.factors.logs(f.id);
+  const recent = logged.filter(l => l.date >= addDays(localDate(), -13));
+  const amounts = recent.filter(l => l.value > 0).map(l => Number(l.value));
 
   const name = h('input', {
     type: 'text', class: 'title-input', value: f.name, 'aria-label': 'Name', maxlength: 60,
     onchange: e => { if (e.target.value.trim()) { R.factors.save(f.id, { name: e.target.value.trim() }); toast('Renamed'); } },
   });
 
-  return h('div', { class: 'view' },
+  // The summary reads the role, so it's redrawn when the type changes
+  const summary = () => {
+    const now = R.factors.get(f.id);
+    return h('section', { class: 'card glass stack' },
+      h('p', { class: 'lead story' }, headline(now, story)),
+      story.best ? compare(now, story) : null,
+      advice(now, story) ? h('p', { class: 'advice' }, advice(now, story)) : null);
+  };
+  let top = summary();
+
+  return h('div', { class: 'view factor-page' },
     h('header', { class: 'top-bar' }, iconButton('‹', 'Back', () => history.back()), h('span', { class: 'eyebrow' }, `${ROLE_ICON[f.role]} ${ROLE_LABEL[f.role]}`), h('span')),
     h('div', { class: 'title-row' }, h('span', { class: 'well big' }, f.icon || ROLE_ICON[f.role]), name),
 
-    h('section', { class: 'card glass' },
-      h('h2', {}, 'Pain with vs without'),
-      a.best
-        ? h('p', { class: 'lead' }, insightSentence(a))
-        : h('p', { class: 'muted' }, notEnoughSentence(a)),
-      h('div', { class: 'lag-bars' }, a.lags.map(l => lagBar(l))),
-      h('p', { class: 'hint' }, 'Shows what tends to go together, not what causes what.')),
+    top,
 
-    a.dose.length ? h('section', { class: 'card glass' },
+    story.state === 'none' ? null : h('section', { class: 'card glass' },
+      h('h2', {}, story.strip.length >= 14 ? 'Last two weeks' : 'Since you started'),
+      dayChart(f, story)),
+
+    dose.length >= 3 && dose.filter(b => b.label !== 'None').every(b => b.n >= 2) ? h('section', { class: 'card glass' },
       h('h2', {}, 'By amount'),
-      h('div', { class: 'dose' }, a.dose.map(b => h('div', { class: 'dose-col' },
-        h('div', { class: 'dose-bar' }, h('i', { style: `height:${b.meanPain == null ? 0 : b.meanPain * 10}%` })),
-        h('strong', {}, b.meanPain == null ? '–' : b.meanPain.toFixed(1)),
-        h('span', { class: 'hint' }, b.label), h('span', { class: 'hint' }, `${b.n} d`))))) : null,
+      h('div', { class: 'dose' }, dose.map(b => h('div', { class: 'dose-col' },
+        h('div', { class: 'dose-bar' }, h('i', { style: `height:${b.meanPain * 10}%` })),
+        h('strong', {}, b.meanPain.toFixed(1)),
+        h('span', { class: 'hint' }, b.label === 'None' ? 'None' : doseRange(f, b)), h('span', { class: 'hint' }, `${b.n} ${b.n === 1 ? 'day' : 'days'}`)))),
+      h('p', { class: 'hint' }, 'Average pain for each amount.')) : null,
 
     h('section', { class: 'card glass stats-grid' },
-      miniStat(`${a.consistency.done}/${a.consistency.days}`, 'days in last 2 weeks'),
-      miniStat(String(a.daysLogged), 'days logged in total')),
+      miniStat(`${a.consistency.done}/${a.consistency.days}`, 'days in the last 2 weeks'),
+      f.measureType !== 'yesno' && amounts.length
+        ? miniStat(fmtAmount(f, Math.round(amounts.reduce((x, y) => x + y, 0) / amounts.length)), 'on a typical day')
+        : miniStat(logged[0] ? dayLabel(logged[0].date) : '–', 'last logged')),
 
     h('section', { class: 'card glass stack' },
       h('h2', {}, 'Settings'),
-      field('Type', segmented(ROLE_OPTIONS, f.role, v => { R.factors.save(f.id, { role: v }); toast('Saved'); }, 'Type')),
+      field('Type', segmented(ROLE_OPTIONS, f.role, v => { R.factors.save(f.id, { role: v }); toast('Saved'); const next = summary(); top.replaceWith(next); top = next; }, 'Type')),
       field('Track it as', segmented(MEASURE_OPTIONS.slice(0, 3), f.measureType, v => { R.factors.save(f.id, { measureType: v }); toast('Saved'); }, 'Track it as'),
         'Past entries will show in the new format.'),
       h('button', {
@@ -97,36 +114,88 @@ export function FactorDetailView(ctx) {
           toast(f.isArchived ? 'Back in your check-in' : 'Hidden. Past entries are kept.');
           history.back();
         },
-      }, f.isArchived ? 'Show in check-ins again' : 'Hide from check-ins')),
-
-    logs.length ? h('section', { class: 'card glass' }, h('h2', {}, 'Recent'),
-      h('ul', { class: 'list' }, logs.map(l => h('li', { class: 'list-row' }, h('span', { class: 'grow' }, dayLabel(l.date)), h('span', { class: 'muted' }, fmtAmount(f, l.value)))))) : null);
+      }, f.isArchived ? 'Show in check-ins again' : 'Hide from check-ins')));
 }
 
-const LAG_NAME = ['Same day', 'Next day', '2 days later'];
+// "Long sitting" reads "long sitting" mid-sentence; "TV time" stays as it is
+const lower = n => (/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n);
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export function insightSentence(a) {
-  const b = a.best;
-  const when = ['On days with', 'The day after', 'Two days after'][b.lag];
-  const sure = a.early ? 'early sign' : `${b.confidence} confidence`;
-  return `${when} ${a.factor.name.toLowerCase()}, pain averages ${b.meanWith.toFixed(1)}, against ${b.meanWithout.toFixed(1)} without. ${b.nWith} days with, ${b.nWithout} without, ${sure}.`;
+/** The one sentence at the top: what the diary shows so far, in plain words. */
+export function headline(f, st) {
+  const n = lower(f.name);
+  switch (st.state) {
+    case 'none': return `You haven't logged ${n} in the last four weeks.`;
+    case 'always': return `You've logged ${n} on all ${plural(st.nCheckins, 'check-in')}, so there are no days without it to compare with yet.`;
+    case 'few': {
+      const need = [st.need.with && `${st.need.with === 1 ? 'one more day' : `${st.need.with} more days`} with it`, st.need.without && `${st.need.without === 1 ? 'one' : st.need.without} without`].filter(Boolean).join(' and ');
+      return `Logged on ${st.nWith} of ${plural(st.nCheckins, 'check-in')}. ${need[0].toUpperCase()}${need.slice(1)} and there's something to compare.`;
+    }
+    case 'same': return `Your pain is about the same with or without ${n}.`;
+    default: {
+      const gap = Math.abs(st.best.delta).toFixed(1);
+      const when = st.best.lag ? `the day after ${n}` : `on days with ${n}`;
+      return `Your pain is ${gap} points ${st.state === 'up' ? 'higher' : 'lower'} ${when}.`;
+    }
+  }
 }
 
-function notEnoughSentence(a) {
-  const l = a.lags[0];
-  const parts = [];
-  if (l.needWith) parts.push(`${l.needWith} more day${l.needWith > 1 ? 's' : ''} with it`);
-  if (l.needWithout) parts.push(`${l.needWithout} more without`);
-  return `Not enough days yet. Needs ${parts.join(' and ')}.`;
+/** What to do with it: one suggestion that fits the role and which way the pain goes. */
+export function advice(f, st) {
+  const n = lower(f.name);
+  if (st.state === 'none') return `Tap it in your check-in on days it happens.`;
+  if (st.state === 'always') return `A day or two without ${n} would show whether it makes a difference.`;
+  if (st.state === 'few') return null;
+  if (st.state === 'same') return `No sign it matters either way yet. If it keeps looking like this, you could hide it from check-ins.`;
+  if (st.state === 'up') return f.role === 'helper'
+    ? `Try easing off or doing it differently for a few days, and see if the gap closes.`
+    : `Try a few days with less ${n} and see if the gap closes.`;
+  if (f.role === 'trigger') return `It doesn't line up with more pain so far. If that holds, you could mark it as a helper.`;
+  if (f.role === 'unsure') return `So far it goes with easier days. Mark it as a helper if that matches how it feels.`;
+  return `Keep it going. It goes with easier days.`;
 }
 
-function lagBar(l) {
-  return h('div', { class: 'lag' },
-    h('span', { class: 'hint' }, LAG_NAME[l.lag]),
-    h('div', { class: 'pair' },
-      h('div', { class: 'bar with' }, h('i', { style: `width:${l.enough ? l.meanWith * 10 : 0}%` })),
-      h('div', { class: 'bar without' }, h('i', { style: `width:${l.enough ? l.meanWithout * 10 : 0}%` }))),
-    h('span', { class: 'lag-num' }, l.enough ? `${l.delta > 0 ? '+' : ''}${l.delta.toFixed(1)}` : '–'));
+/** With and without, as two bars out of 10, then how many days that's from. */
+function compare(f, st) {
+  const b = st.best;
+  const row = (label, v, cls) => h('div', { class: 'cmp-row' },
+    h('span', { class: 'hint' }, label),
+    h('span', { class: 'cmp-track' }, h('i', { class: cls, style: `--w:${v * 10}%` })),
+    h('strong', {}, v.toFixed(1)));
+  const basis = `${plural(b.nWith, 'day')} with it, ${b.nWithout} without. ${st.early ? 'An early read that will firm up as you check in.' : `${b.confidence[0].toUpperCase()}${b.confidence.slice(1)} confidence.`}`;
+  const nx = st.next;
+  return h('div', { class: 'cmp' },
+    h('span', { class: 'eyebrow' }, b.lag ? 'Pain the next day' : 'Average pain'),
+    row('With', b.meanWith, 'with'),
+    row('Without', b.meanWithout, 'without'),
+    nx && Math.abs(nx.delta) >= SAME_BAND && Math.sign(nx.delta) === Math.sign(b.delta)
+      ? h('p', { class: 'hint' }, `It carries into the next day too: ${nx.meanWith.toFixed(1)} after it, ${nx.meanWithout.toFixed(1)} after days without.`) : null,
+    h('p', { class: 'hint' }, basis));
+}
+
+/** Pain and this factor over the strip's days, drawn by the same chart as Home. */
+function dayChart(f, st) {
+  const days = st.strip.map(d => ({ date: d.date, logged: d.pain != null }));
+  // Scaled to its own busiest day and left unsmoothed, so its peaks can be read against pain's
+  const max = Math.max(...st.strip.map(d => d.amount), 1);
+  const level = st.strip.map(d => (f.measureType === 'yesno' ? (d.amount ? 0.6 : 0) : d.amount / max));
+  const series = [
+    { key: 'pain', label: 'Pain', palette: PALETTES.pain, values: st.strip.map(d => (d.pain == null ? null : d.pain / 10)), format: i => `${st.strip[i].pain ?? '–'}/10` },
+    { key: 'factor', label: f.name, palette: f.role === 'helper' ? PALETTES.helper : PALETTES.stressor, values: level.map(v => 0.04 + v * 0.86), format: i => (st.strip[i].amount ? fmtAmount(f, st.strip[i].amount) : 'none') },
+  ];
+  const hidden = new Set();
+  const wrap = h('div', {});
+  const draw = animate => wrap.replaceChildren(TrendChart({
+    days, series, hidden, animate, fadeLeft: false,
+    onToggle: key => { if (hidden.has(key)) hidden.delete(key); else hidden.add(key); draw(false); },
+  }));
+  draw(true);
+  return wrap;
+}
+
+function doseRange(f, b) {
+  const fmt = v => fmtAmount(f, Math.round(v));
+  return b.max == null ? `${fmt(b.min)}+` : b.min == null ? `Under ${fmt(b.max)}` : `${fmt(b.min)}–${fmt(b.max)}`;
 }
 
 const miniStat = (v, label) => h('div', { class: 'mini-stat' }, h('span', { class: 'num' }, v), h('span', { class: 'hint' }, label));

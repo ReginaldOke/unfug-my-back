@@ -5,26 +5,28 @@ import * as reminders from '../lib/reminders.js';
 import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
-import { rankInsights, quickSummary, trendFindings } from '../lib/analysis.js';
+import { quickSummary, trendFindings, factorStory } from '../lib/analysis.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
 import { fmtAmount, reminderOn } from '../lib/labels.js';
 import { TrendChart, PALETTES, EXTRA_PALETTES } from './chart.js';
 import { PainCalendar } from './calendar.js';
-import { Ruler, SelectCard, PENCIL } from './controls.js';
+import { Ruler, SelectCard, PENCIL, healthSwitch } from './controls.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
 import { justFinished } from './routines.js';
 import { dragHandles } from './sortable.js';
-import { ScratchPad, seedNotes } from './pad.js';
 
 // View state that should survive the periodic re-render
 const ui = { range: 7, hidden: null, view: 'chart', month: localDate().slice(0, 7), day: null, drawn: null };
 // Lines switched off in the chart, remembered between visits (read once the diary has loaded)
 const hiddenLines = () => (ui.hidden ??= new Set(R.settings().chartHidden ?? []));
+// Lines switched off in Chart data: gone from the chart and its key (a tap on the key only dims a line)
+const removedLines = () => new Set(R.settings().chartRemoved ?? []);
 let rerender = () => {};
 
-// Sections the user can rearrange by holding and dragging, in the default order
-const SECTIONS = ['hero', 'tiles', 'trend', 'patterns', 'pad', 'ai'];
+// Sections the user can rearrange by holding and dragging, in the default order.
+// The notes pad (pad.js) is left out for now.
+const SECTIONS = ['hero', 'tiles', 'trend', 'patterns', 'ai'];
 
 /** The tiles moved above Trends by default; saved orders get the same move once. */
 function moveTilesUp() {
@@ -67,10 +69,9 @@ export function HomeView(ctx) {
     onDrop: () => { dragging = false; setTimeout(() => render(), 360); },
     onReorder: rows => R.setSettings({ homeOrder: rows.map(r => r.dataset.section) }),
   });
-  seedNotes();
   const render = () => {
-    // Never rebuild under the finger, or while a note is being typed
-    if (dragging || sections.querySelector('.pad-input')) return;
+    // Never rebuild under the finger
+    if (dragging) return;
     const { top, parts } = build();
     head.replaceChildren(...top.filter(Boolean));
     sections.replaceChildren(...sectionOrder().map(k => parts[k]));
@@ -95,7 +96,6 @@ function build() {
     ],
     parts: {
       hero: section('hero', hero(entry, today)),
-      pad: section('pad', ScratchPad()),
       trend: section('trend', trendCard(today)),
       tiles: section('tiles', h('div', { class: 'tile-grid quad' }, movementTile(), routineTile(today))),
       patterns: section('patterns', patternsCard(today)),
@@ -333,22 +333,41 @@ function trendCard(today) {
     } else series.push(factorSeries(`x-${x}`, R.factors.get(x), palette));
   });
 
+  // Chart data can take pain, the main stressor and top helper off the chart altogether
+  const autoLines = series.slice(0, 1 + !!mainStressor + !!topHelper);
+  const removed = removedLines();
+  const shownSeries = series.filter(sr => !removed.has(sr.key));
   const changes = R.routines.changesByDate();
   const marks = dates.flatMap((d, i) => (d <= today && changes.has(d)
     ? [{ i, date: d, changes: changes.get(d), texts: changes.get(d).map(c => c.text) }] : []));
+  // Each day's routines: done (a session, or ticked in the check-in) and changed
+  const routineList = R.routines.all();
+  const routineDays = dates.flatMap((d, i) => {
+    if (d > today) return [];
+    const changed = new Set((changes.get(d) ?? []).map(c => c.routineId));
+    const ticked = R.checkins.factorValues(d);
+    const items = routineList.map(r => ({
+      label: R.routineLabel(r), changed: changed.has(r.id),
+      done: R.routines.completionsOn(d, r.id).length > 0 || ticked.has(r.linkedFactorId),
+    }));
+    // A change to a routine since deleted still shows, as a change
+    for (const c of changes.get(d) ?? []) if (!routineList.some(r => r.id === c.routineId)) items.push({ label: c.name, changed: true, done: false });
+    const shown = items.filter(it => it.done || it.changed);
+    return shown.length ? [{ i, items: shown }] : [];
+  });
 
   return h('section', { class: 'card glass trend-card' },
     h('div', { class: 'row between' }, h('h2', {}, 'Trends'),
       h('div', { class: 'row tight' },
         viewToggle(),
-        ranges.length ? segmented(ranges.map(([v, label]) => [v, label]), ui.range, v => { ui.range = v; rerender(); }, 'Range') : null)),
+        ranges.length > 1 ? segmented(ranges.map(([v, label]) => [v, label]), ui.range, v => { ui.range = v; rerender(); }, 'Range') : null)),
     // The lines draw in when Home opens or the range changes, not on every quiet redraw
     TrendChart({
-      animate: ui.drawn !== ui.range && !!(ui.drawn = ui.range), days, series, hidden: hiddenLines(),
-      focus: dates.indexOf(today), fadeLeft: start > first, marks,
+      animate: ui.drawn !== ui.range && !!(ui.drawn = ui.range), days, series: shownSeries, hidden: hiddenLines(),
+      focus: dates.indexOf(today), fadeLeft: start > first, marks, routineDays,
       onMark: m => openChangeSheet(marks, m?.date),
       onToggle: key => { toggleHidden(key); rerender(); },
-      onAdd: () => openDataSheet(series.slice(0, 1 + !!mainStressor + !!topHelper), [...auto].filter(Boolean)),
+      onAdd: () => openDataSheet(autoLines, [...auto].filter(Boolean)),
     }));
 }
 
@@ -356,6 +375,13 @@ function trendCard(today) {
 const METRICS = ['stress', 'sleep', 'sleepHours', 'steps'];
 
 /** Pick extra lines for the chart: stress, sleep, steps, or any stressor or helper. */
+/** Takes one of the automatic lines off the chart and its key, or puts it back (shown, not dimmed). */
+function setRemoved(key, off) {
+  const removed = removedLines();
+  if (off) removed.add(key); else { removed.delete(key); hiddenLines().delete(key); R.setSettings({ chartHidden: [...hiddenLines()] }); }
+  R.setSettings({ chartRemoved: [...removed] });
+}
+
 function toggleHidden(key) {
   const hidden = hiddenLines();
   hidden.has(key) ? hidden.delete(key) : hidden.add(key);
@@ -396,7 +422,7 @@ function openDataSheet(autoLines, autoIds) {
     h('h2', {}, 'Chart data'),
     h('div', { class: 'data-list' },
       autoLines.map(sr => row(swatch(sr.palette[0]), sr.label, AUTO_DETAIL[sr.key],
-        !hiddenLines().has(sr.key), () => toggleHidden(sr.key))),
+        !removedLines().has(sr.key), on => setRemoved(sr.key, !on))),
       options.map(o => row(swatches.get(o.id), o.title, o.detail,
         chosen.has(o.id), on => { on ? chosen.add(o.id) : chosen.delete(o.id); R.setSettings({ chartExtras: [...chosen] }); paintSwatches(); }))));
   paintSwatches();
@@ -426,7 +452,6 @@ const changeWhat = c => (c.summary.endsWith(c.name) ? c.summary.slice(0, -c.name
 function patternsCard(today) {
   const data = R.snapshot();
   const factors = R.factors.all();
-  const { ready } = rankInsights(data, factors, today);
   const head = h('h2', {}, 'Patterns');
 
   // Before the first check-in: the shape of what's coming, softly tinted
@@ -436,25 +461,21 @@ function patternsCard(today) {
       h('p', { class: 'hint' }, 'Check in to start seeing what moves your pain.'));
   }
 
-  // Established patterns first; then early reads from the days so far, so there's something from day one
-  const solid = new Map(ready.filter(a => !a.early).map(a => [a.factor.id, a.best.delta]));
-  const rows = factors.map(f => {
-    if (solid.has(f.id)) return { factor: f, delta: solid.get(f.id), early: false };
-    const q = quickDelta(data, f.id);
-    return q && { factor: f, delta: q.delta, early: true };
-  }).filter(Boolean)
-    .sort((a, b) => (b.delta == null ? -1 : Math.abs(b.delta)) - (a.delta == null ? -1 : Math.abs(a.delta)))
+  // Only factors whose pain differs with and without, by the same numbers as their own page
+  const rows = factors.map(f => ({ factor: f, st: factorStory(f, data, today) }))
+    .filter(x => x.st.state === 'up' || x.st.state === 'down')
+    .map(x => ({ factor: x.factor, delta: x.st.best.delta, early: x.st.early }))
+    .sort((a, b) => (a.early - b.early) || Math.abs(b.delta) - Math.abs(a.delta))
     .slice(0, 5);
   if (!rows.length) {
     return h('section', { class: 'card glass patterns' }, head,
       h('div', { class: 'pat-list ghost', 'aria-hidden': 'true' }, [0.55, -0.4, 0.22].map(w => patRow(null, w))),
-      h('p', { class: 'hint' }, 'Log a stressor or helper in your check-in to see it here.'));
+      h('p', { class: 'hint' }, data.dailyEntries.length < 4 ? 'A few more check-ins and patterns show here.' : 'Nothing stands out yet.'));
   }
 
-  // While it's all early reads, keep it to two: a stressor and a helper if there are both
+  const shown = rows;
   const allEarly = rows.every(a => a.early);
-  const shown = allEarly ? pickTwo(rows) : rows;
-  const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta ?? 0)));
+  const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta)));
   // Over a couple of weeks, what to try: up to two, the clearest first
   const findings = trendFindings(data, factors, today).slice(0, 2);
   return h('section', { class: 'card glass patterns' },
@@ -462,8 +483,8 @@ function patternsCard(today) {
     h('div', { class: 'pat-head' }, findings.length ? h('span', {}) : head,
       h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
     h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
-    allEarly ? h('p', { class: 'hint pat-note' }, 'Check in again to see patterns emerge here') : null,
-    h('p', { class: 'hint pat-note' }, 'These are patterns from your own diary, not causes or medical advice. Check with a doctor before making medical decisions.'));
+    allEarly ? h('p', { class: 'hint pat-note' }, 'Early reads. They firm up as you check in.') : null,
+    h('p', { class: 'hint pat-note' }, 'Patterns from your diary, not medical advice.'));
 }
 
 /** "Try cutting back on desk sitting…": a dot for which way it points, the finding, then what to do. */
@@ -472,25 +493,6 @@ function findingRow(f) {
   return h('a', { class: 'finding', href: `#/factor/${f.factor.id}` },
     h('i', { class: `finding-dot ${good ? 'good' : 'bad'}`, 'aria-hidden': 'true' }),
     h('span', { class: 'grow' }, h('span', { class: 'finding-title' }, f.title), h('span', { class: 'hint block' }, f.body)));
-}
-
-function pickTwo(rows) {
-  const stressor = rows.find(a => a.factor.role !== 'helper'), helper = rows.find(a => a.factor.role === 'helper');
-  return stressor && helper ? [stressor, helper] : rows.slice(0, 2);
-}
-
-/**
- * A first read from however many days there are: pain on check-in days with the factor minus days
- * without. delta is null while every check-in had it (nothing to compare yet). Null if never logged.
- */
-function quickDelta(data, factorId) {
-  const pain = new Map(data.dailyEntries.map(e => [e.date, e.painScore]));
-  const withDays = new Set(data.factorLogs.filter(l => l.factorId === factorId && l.value > 0 && pain.has(l.date)).map(l => l.date));
-  if (!withDays.size) return null;
-  const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const withP = [...withDays].map(d => pain.get(d));
-  const withoutP = [...pain].filter(([d]) => !withDays.has(d)).map(([, p]) => p);
-  return { delta: withoutP.length ? mean(withP) - mean(withoutP) : null };
 }
 
 /** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).
@@ -534,10 +536,12 @@ function movementTile() {
 function routineTile(today) {
   const r = R.routines.all()[0];
   if (!r) return h('a', { class: 'tile static', href: '#/routine/new' }, h('h2', {}, 'Routine'), h('span', { class: 'tile-title' }, '+ Create a movement routine'));
-  const done = R.routines.completionsOn(today, r.id).length;
+  // A session done more than once (mobility twice in a day) counts each time
+  const timesOn = date => R.routines.completionsOn(date, r.id).reduce((n, c) => n + (c.times ?? 1), 0);
+  const done = timesOn(today);
   const target = Math.max(1, r.schedule.filter(e => reminderOn(e, today)).length);
   const allDone = done >= target;
-  const week = Array.from({ length: 7 }, (_, i) => R.routines.completionsOn(addDays(today, -i), r.id).length).reduce((a, b) => a + b, 0);
+  const week = Array.from({ length: 7 }, (_, i) => timesOn(addDays(today, -i))).reduce((a, b) => a + b, 0);
   // Play the celebration once, on the first render after finishing a routine
   const celebrate = justFinished.id === r.id;
   if (celebrate) setTimeout(() => { justFinished.id = null; }, 1600);
@@ -545,7 +549,7 @@ function routineTile(today) {
     h('div', { class: 'tile-top' }, h('h2', {}, 'Routine'),
       h('span', { class: `well action${allDone ? ' done-mark' : ''}`, 'aria-hidden': 'true' }, allDone ? '✓' : '▶')),
     allDone
-      ? h('div', {}, h('span', { class: 'done-title' }, 'Done for today'))
+      ? h('div', {}, h('span', { class: 'done-title' }, done > 1 ? `Done ${done}× today` : 'Done today'))
       : h('div', {}, h('span', { class: 'num' }, String(done)), h('span', { class: 'unit' }, `/${target} today`)),
     h('div', { class: 'seg-dots', 'aria-hidden': 'true' },
       Array.from({ length: target }, (_, i) => h('i', { class: `${i < done ? 'on' : ''}${celebrate && i === done - 1 ? ' fresh' : ''}` }))),
@@ -563,13 +567,16 @@ function aiTile() {
 
 /**
  * Sharing the diary with an AI chat: says what goes and to whom, right above the buttons that send it.
- * The app sends nothing itself; the person picks where it goes. Apple Health data stays out.
+ * The app sends nothing itself; the person picks where it goes. Apple Health data stays out unless switched on.
  */
 function openShareSheet() {
   if (!R.checkins.all().length) return toast('Check in at least once first');
+  const health = healthSwitch();
+  const opts = () => ({ health: health?.input.checked });
   sheet(close => h('div', { class: 'stack' },
     h('h2', {}, 'Analyse with AI'),
     h('p', { class: 'muted' }, 'Shares your pain, notes and activity with the AI app you choose, under its own privacy terms. Its answers aren’t medical advice.'),
-    h('button', { type: 'button', class: 'btn primary', onclick: async () => { await shareDiary(); close(); } }, 'Share'),
-    h('button', { type: 'button', class: 'btn glass', onclick: async () => { toast((await copyDiary()) ? 'Copied. Paste it into an AI chat.' : 'Couldn’t copy'); close(); } }, 'Copy as text')));
+    health?.row,
+    h('button', { type: 'button', class: 'btn primary', onclick: async () => { await shareDiary(opts()); close(); } }, 'Share'),
+    h('button', { type: 'button', class: 'btn glass', onclick: async () => { toast((await copyDiary(opts())) ? 'Copied. Paste it into an AI chat.' : 'Couldn’t copy'); close(); } }, 'Copy as text')));
 }

@@ -14,7 +14,7 @@
   <link rel="icon" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <style>
-    @font-face { font-family: 'Italiana'; src: url('assets/fonts/italiana.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: 'Michroma'; src: url('assets/fonts/michroma.woff2') format('woff2'); font-weight: 400; font-display: swap; }
     @font-face { font-family: 'Outfit'; src: url('assets/fonts/outfit.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
     /* The app's own look: near-black, a red and navy glow at the top, quiet glass cards */
     :root {
@@ -22,7 +22,6 @@
       --bg: #0d0d0f; --ink: #f5f5f7; --ink-2: rgba(235, 235, 245, 0.62); --ink-3: rgba(235, 235, 245, 0.34);
       --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.025) 45%, rgba(255, 255, 255, 0.045));
       --edge: rgba(255, 255, 255, 0.07);
-      --teal: #74d4c0; --amber: #f3b46e; --coral: #f4908a;
     }
     * { box-sizing: border-box; }
     html { -webkit-text-size-adjust: 100%; }
@@ -40,7 +39,7 @@
     main { max-width: 1040px; margin: 0 auto; padding: 0 20px; position: relative; }
     header { display: flex; align-items: center; gap: 12px; padding: 22px 0; }
     header img { width: 36px; height: 36px; border-radius: 9px; }
-    header span { font-family: 'Italiana', serif; font-size: 24px; }
+    header span { font-family: 'Michroma', sans-serif; font-weight: 400; font-size: 16px; }
 
     .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; padding: 48px 0 80px; }
     h1 { font-size: clamp(44px, 7vw, 76px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.02; margin: 0 0 22px; }
@@ -58,24 +57,24 @@
     .phone { width: 100%; max-width: 340px; justify-self: center; border-radius: 46px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.95), 0 0 0 8px rgba(255, 255, 255, 0.03); }
     .phone img { display: block; width: 100%; height: auto; }
 
-    .label { font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 14px; }
     h2 { font-size: clamp(30px, 4vw, 42px); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 16px; }
     .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; padding: 64px 0; }
     .feature.flip .copy { order: 2; }
     .feature p { color: var(--ink-2); margin: 0 0 12px; max-width: 42ch; }
     .feature .phone { max-width: 300px; }
 
-    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 40px 0 72px; }
-    .card { background: var(--glass); border: 1px solid var(--edge); border-radius: 28px; padding: 24px; }
-    .card .dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 18px; box-shadow: 0 0 12px currentColor; }
-    .card h3 { font-size: 19px; font-weight: 500; margin: 0 0 6px; }
-    .card p { color: var(--ink-2); font-size: 16px; margin: 0; }
+    /* The three steps: numbered columns on a shared rule, not boxes */
+    .steps { list-style: none; counter-reset: step; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin: 0; padding: 32px 0 72px; border-top: 1px solid var(--edge); }
+    .steps li { counter-increment: step; }
+    .steps li::before { content: counter(step); display: block; font: 400 40px/1 'Michroma', sans-serif; color: var(--ink-3); margin-bottom: 18px; }
+    .steps h3 { font-size: 19px; font-weight: 500; margin: 0 0 6px; }
+    .steps p { color: var(--ink-2); font-size: 16px; margin: 0; max-width: 30ch; }
 
     .private { text-align: center; padding: 40px 0 80px; }
     .private p { color: var(--ink-2); margin: 0 auto; max-width: 52ch; }
     .note { font-size: 14px; color: var(--ink-3); margin-top: 28px !important; }
 
-    footer { border-top: 1px solid var(--edge); padding: 28px 0 48px; display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; color: var(--ink-3); font-size: 14px; }
+    footer { border-top: 1px solid var(--edge); padding: 28px 0 48px; font-size: 14px; }
     footer nav { display: flex; gap: 20px; }
     footer a { text-decoration: none; color: var(--ink-2); }
 
@@ -84,7 +83,7 @@
       .hero { padding-top: 24px; text-align: left; }
       .feature { padding: 40px 0; }
       .feature.flip .copy { order: 0; }
-      .steps { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; gap: 28px; }
       .phone { max-width: 300px; }
     }
   </style>
@@ -96,59 +95,54 @@
 
     <section class="hero">
       <div>
-        <h1>See the patterns behind your back pain.</h1>
-        <p class="lead">A one-minute daily check-in that shows how your days and your pain line up.</p>
+        <h1>Keep a diary of your back pain. See what lines up with it.</h1>
+        <p class="lead">Check in once a day. After a week or two you'll start to see what your bad days have in common.</p>
         <div class="cta">
           <a class="btn" href="./">Try it in your browser</a>
-          <a class="btn quiet" href="#how">How it works ↓</a>
+          <a class="btn quiet" href="#how">How it works</a>
         </div>
         <p class="soon">Free on iPhone. Coming soon to the App Store.</p>
       </div>
       <div class="phone"><img src="assets/site/1-home.jpg" alt="The home screen: a pattern from the diary, today's pain, the next reminder, today's routine and a chart" width="900" height="1955"></div>
     </section>
 
-    <section class="steps" id="how" aria-label="How it works">
-      <div class="card"><div class="dot" style="color: var(--coral); background: var(--coral)"></div><h3>Check in</h3><p>Once a day: how much it hurts, where, and what you did. About a minute.</p></div>
-      <div class="card"><div class="dot" style="color: var(--amber); background: var(--amber)"></div><h3>See the pattern</h3><p>Pain shown alongside sitting, walking, sleep, workouts and anything else you track.</p></div>
-      <div class="card"><div class="dot" style="color: var(--teal); background: var(--teal)"></div><h3>Try a change</h3><p>Ideas from your own patterns, like less long sitting for a week, to see if anything shifts.</p></div>
-    </section>
+    <ol class="steps" id="how" aria-label="How it works">
+      <li><h3>Check in</h3><p>How much it hurts, where, and what you did today. It takes about a minute.</p></li>
+      <li><h3>See the pattern</h3><p>Your pain on a chart next to sitting, walking, sleep and whatever else you track.</p></li>
+      <li><h3>Try a change</h3><p>Sit less for a week, say, and see if anything shifts.</p></li>
+    </ol>
 
     <section class="feature">
       <div class="copy">
-        <p class="label">Patterns</p>
-        <h2>What goes with more pain, and with less.</h2>
-        <p>After a week or two, the app points out what tends to go with more pain and what goes with less, and suggests something to try. These are patterns in your own diary, not causes.</p>
+        <h2>What your bad days have in common.</h2>
+        <p>After a week or two the app shows what tends to turn up on days with more pain and on days with less, then suggests something to try. It can't tell you the cause, only what lines up in your own diary.</p>
       </div>
       <div class="phone"><img src="assets/site/2-patterns.jpg" alt="Patterns: more pain on days with more long sitting or driving, and less on days with routines or stretching" width="900" height="1955" loading="lazy"></div>
     </section>
 
     <section class="feature flip">
       <div class="copy">
-        <p class="label">Check-in</p>
         <h2>Tap where it hurts.</h2>
-        <p>A 3D body map, quick sliders for pain, stress and sleep, and one-tap tiles for the things you did today.</p>
+        <p>Mark the spot on a 3D body, slide for pain, stress and sleep, then tap the things you did today.</p>
       </div>
       <div class="phone"><img src="assets/site/3-body-map.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy"></div>
     </section>
 
     <section class="feature">
       <div class="copy">
-        <p class="label">Routines and nudges</p>
-        <h2>Keep moving, without thinking about it.</h2>
-        <p>Mobility and gym routines with reps and weights, a nudge to move that holds off when your iPhone sees you've walked, and steps and sleep from Apple Health.</p>
+        <h2>Reminders to get up and move.</h2>
+        <p>Keep your stretches and gym sessions in the app, with reps and weights. If your iPhone sees you've walked, the next reminder waits. Steps and sleep can come in from Apple Health.</p>
       </div>
       <div class="phone"><img src="assets/site/4-check-in.jpg" alt="Check-in exercise tiles for routines like Daily mobility and a gym split" width="900" height="1955" loading="lazy"></div>
     </section>
 
     <section class="private">
-      <p class="label">Private by design</p>
       <h2>Your diary stays on your phone.</h2>
-      <p>No account, no ads, no tracking. Export it any time, or share it with an AI chat for a deeper look.</p>
-      <p class="note">Back Story shows patterns, not causes. It doesn't diagnose or treat anything, so check with a doctor before making medical decisions.</p>
+      <p>You don't need an account, and there are no ads or tracking. You can export it whenever you like, or share it with an AI chat if you want a second look.</p>
+      <p class="note">Back Story doesn't diagnose or treat anything. Check with a doctor before making medical decisions.</p>
     </section>
 
     <footer>
-      <span>© 2026 Reginald Oke</span>
       <nav><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="./">Open the app</a></nav>
     </footer>
   </main>

@@ -1,7 +1,7 @@
 // On-device per-factor analysis. Pure functions, unit-tested in test/analysis.test.js.
 // Results are associations between a factor and pain, never causes.
 
-import { addDays, localDate, fmtMinutes } from './dates.js';
+import { addDays, localDate, fmtMinutes, daysBetween } from './dates.js';
 import { sleepWord } from './labels.js';
 
 export const MIN_DAYS = 5; // days with AND days without, before a result counts as an established pattern
@@ -304,4 +304,47 @@ function weekShift(pairs, today) {
   const mid = addDays(today, -6);
   const early = pairs.filter(([d]) => d < mid).map(p => p[1]), late = pairs.filter(([d]) => d >= mid).map(p => p[1]);
   return early.length && late.length ? mean(late) - mean(early) : 0;
+}
+
+// ---------- One stressor or helper, told from the first few check-ins ----------
+
+export const STORY_DAYS = 28; // window for the comparison
+export const STRIP_DAYS = 14; // days drawn on the factor page
+export const SAME_BAND = 0.5; // a gap smaller than this reads as "about the same"
+
+/**
+ * What one factor's page says: pain on check-in days with it against days without, the same day and
+ * the next, from EARLY_MIN_DAYS of each. Returns { state, best, next, nCheckins, nWith, strip, early }:
+ *   state 'none'   never logged in the window
+ *   state 'always' logged on every check-in, so nothing to compare
+ *   state 'few'    not yet EARLY_MIN_DAYS with and without
+ *   state 'up' | 'down' | 'same'   pain higher, lower or about the same with it (best: the clearer lag)
+ * strip: the last 7 to STRIP_DAYS days (since the first check-in), oldest first, { date, pain, amount }.
+ */
+export function factorStory(factor, data, today = localDate()) {
+  const since = addDays(today, -(STORY_DAYS - 1));
+  const entries = data.dailyEntries.filter(e => e.painScore != null && e.date >= since && e.date <= today);
+  const pain = painByDate(data.dailyEntries);
+  const amounts = amountsByDate(data.factorLogs, factor.id);
+  const dates = entries.map(e => e.date);
+  const nWith = dates.filter(d => (amounts.get(d) || 0) > 0).length;
+  // A week at least, growing to two weeks, so a new diary isn't mostly empty days
+  const first = data.dailyEntries.reduce((m, e) => (e.date < m ? e.date : m), today);
+  const len = Math.min(STRIP_DAYS, Math.max(7, daysBetween(first, today) + 1));
+  const strip = Array.from({ length: len }, (_, i) => {
+    const date = addDays(today, i - (len - 1));
+    return { date, pain: pain.get(date) ?? null, amount: amounts.get(date) || 0 };
+  });
+  const base = { nCheckins: dates.length, nWith, strip, best: null, next: null, early: false };
+  if (!nWith) return { ...base, state: 'none' };
+  if (nWith === dates.length) return { ...base, state: 'always' };
+
+  // Next day only counts check-ins whose next day is in the diary too
+  const [same, next] = [0, 1].map(lag => lagComparison(pain, amounts, dates.filter(d => d <= addDays(today, -lag)), lag, EARLY_MIN_DAYS));
+  const usable = [same, next].filter(l => l.enough);
+  if (!usable.length) return { ...base, state: 'few', need: { with: Math.max(0, EARLY_MIN_DAYS - same.nWith), without: Math.max(0, EARLY_MIN_DAYS - same.nWithout) } };
+  // The same day unless the next day shows a clearly bigger gap
+  const best = usable.length === 2 && Math.abs(next.delta) > Math.abs(same.delta) + 0.3 ? next : usable[0];
+  const state = Math.abs(best.delta) < SAME_BAND ? 'same' : best.delta > 0 ? 'up' : 'down';
+  return { ...base, state, best, next: next.enough && best !== next ? next : null, early: Math.min(best.nWith, best.nWithout) < MIN_DAYS };
 }

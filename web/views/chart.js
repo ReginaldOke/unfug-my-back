@@ -34,9 +34,12 @@ function smoothPath(pts, top, bottom) {
  * series: [{ key, label, palette, values: [0..1 | null] per day, format: i => string }]
  * hidden: Set of series keys to hide. onToggle(key) flips one. onAdd: opens the picker for more lines.
  * focus: index of the day the key shows by default (today). fadeLeft: the data carries on before the first day.
- * marks: [{ i, texts }] days to flag (routine changes): a soft white dot on the baseline, with a key entry. onMark(mark) on tap.
+ * marks: [{ i, texts }] days with routine changes; onMark(mark) on tap (or onMark(null) from the key).
+ * routineDays: [{ i, items: [{ label, done, changed }] }] each day's routines, drawn under the baseline:
+ * a dot for each one done, a faint larger halo of the same colour when it was also changed that day,
+ * and a grey halo on its own when it was changed but not done. Several on a day sit close together.
  */
-export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [], onMark = () => {}, animate = true }) {
+export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [], routineDays = [], onMark = () => {}, animate = true }) {
   const id = ++uid;
   // Even side padding, just enough to keep the first and last day labels whole
   const W = 340, H = 196, top = 46, bottom = 176, left = 22, right = W - 22;
@@ -92,6 +95,29 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     }));
   });
 
+  // Routines under the baseline. The spacing between days sets how many dots fit side by side; past that,
+  // a day keeps its first few (done and changed first)
+  function routineRow() {
+    const dy = bottom + 11, room = n > 1 ? (right - left) / (n - 1) : 40;
+    const r = room >= 14 ? 2.8 : 2.2, gap = Math.min(4.6, room * 0.42), fit = Math.max(1, Math.floor((room - 2) / gap));
+    const rank = it => (it.done && it.changed ? 0 : it.done ? 1 : 2);
+    return s('g', { class: 'routines' }, routineDays.map(d => {
+      const items = [...d.items].sort((a, b) => rank(a) - rank(b)).slice(0, fit);
+      const cx = j => x(d.i) + (j - (items.length - 1) / 2) * gap;
+      const mark = marks.find(m => m.i === d.i);
+      const g = s('g', mark ? { class: 'rday', 'data-i': d.i, role: 'button', tabindex: 0, 'aria-label': `Routines: ${describe(d)}. Show changes` } : { class: 'rday', 'data-i': d.i },
+        mark ? s('circle', { class: 'rd-hit', cx: x(d.i), cy: dy, r: 13 }) : null,
+        // Halos first, so every dot sits on top
+        items.map((it, j) => (it.changed ? s('circle', { class: `rd-halo${it.done ? '' : ' alone'}`, cx: cx(j), cy: dy, r: r * 2.1 }) : null)),
+        items.map((it, j) => (it.done ? s('circle', { class: 'rd-dot', cx: cx(j), cy: dy, r }) : null)));
+      if (mark) {
+        g.addEventListener('click', e => { e.stopPropagation(); onMark(mark); });
+        g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMark(mark); } });
+      }
+      return g;
+    }));
+  }
+
   const hair = s('line', { class: 'hair', y1: 30, y2: bottom + 6 });
   const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: `trend${animate ? ' animate' : ''}`, role: 'img', 'aria-label': summaryLabel(days, series) },
     defs,
@@ -102,20 +128,12 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     s('line', { class: 'baseline', x1: left, x2: right, y1: bottom, y2: bottom }),
     s('g', { class: 'plot', mask: `url(#fade-${id})` }, areas),
     hair,
-    // Routine changes: a small glowing white dot just under the baseline (clear of the selected day's knob), with a faint line up
-    marks.map(m => s('g', { class: 'mark', 'data-i': m.i, role: 'button', tabindex: 0, 'aria-label': `Routine change: ${m.texts.join(', ')}. Show details` },
-      s('line', { x1: x(m.i), x2: x(m.i), y1: 36, y2: bottom }),
-      s('circle', { class: 'mark-hit', cx: x(m.i), cy: bottom + 11, r: 14 }),
-      s('circle', { class: 'mark-glow', cx: x(m.i), cy: bottom + 11, r: 8.5 }),
-      s('circle', { class: 'mark-dot', cx: x(m.i), cy: bottom + 11, r: 4 }))));
+    routineRow());
 
   // One key: each line's name and its value on the focused day (today unless the finger is on the chart)
   const when = h('span', { class: 'when' });
-  for (const g of svg.querySelectorAll('.mark')) {
-    const m = marks.find(x => x.i === Number(g.dataset.i));
-    g.addEventListener('click', e => { e.stopPropagation(); onMark(m); });
-    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMark(m); } });
-  }
+  // The focused day's routines, in words, beside its date
+  const routineNote = h('span', { class: 'routine-note' });
   const keys = series.map(sr => {
     const val = h('strong');
     const btn = h('button', {
@@ -125,9 +143,11 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     return { sr, btn, val };
   });
   const add = onAdd ? h('button', { type: 'button', class: 'key-add', 'aria-label': 'Choose what the chart shows', title: 'Chart data', onclick: onAdd }, '•••') : null;
-  // The dot gets its own key, but only when there's one in view
-  const changeKey = marks.length ? h('button', { type: 'button', class: 'key change-key', onclick: () => onMark(null) }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Routine change')) : null;
-  const legend = h('div', { class: 'legend', role: 'group', 'aria-label': 'Lines on the chart' }, keys.map(k => k.btn), changeKey, add);
+  // The routine marks get key entries, only when there's one in view: done, and changed (which opens the changes)
+  const anyDone = routineDays.some(d => d.items.some(it => it.done));
+  const doneKey = anyDone ? h('span', { class: 'key routine-key done' }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Routine')) : null;
+  const changeKey = marks.length ? h('button', { type: 'button', class: 'key routine-key changed', onclick: () => onMark(null) }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'key-name' }, 'Changed')) : null;
+  const legend = h('div', { class: 'legend', role: 'group', 'aria-label': 'Lines on the chart' }, keys.map(k => k.btn), doneKey, changeKey, add);
 
   let current = home;
   function focus(i) {
@@ -139,6 +159,8 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     when.textContent = d.logged ? dayLabel(d.date) : `${dayLabel(d.date)} · no check-in`;
     // Days without a value just show the name; no placeholder dashes
     for (const k of keys) { const v = d.logged ? k.sr.format(i) : ''; k.val.textContent = /^–/.test(v) ? '' : v; }
+    const rd = routineDays.find(x => x.i === i);
+    routineNote.textContent = rd ? describe(rd) : '';
   }
   const dayAt = e => {
     const r = svg.getBoundingClientRect();
@@ -155,7 +177,15 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   svg.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') focus(home); });
   focus(home);
 
-  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when), legend);
+  return h('div', { class: 'trend-wrap' }, svg, h('div', { class: 'trend-readout', 'aria-live': 'polite' }, when, routineNote), legend);
+}
+
+/** "Daily mobility and Gym · Push done · Gym · Legs changed" */
+function describe(d) {
+  const list = xs => (xs.length <= 2 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
+  const done = d.items.filter(it => it.done).map(it => it.label);
+  const changed = d.items.filter(it => it.changed).map(it => it.label);
+  return [done.length ? `${list(done)} done` : '', changed.length ? `${list(changed)} changed` : ''].filter(Boolean).join(' · ');
 }
 
 function summaryLabel(days, series) {

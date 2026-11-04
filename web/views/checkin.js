@@ -37,6 +37,8 @@ function freshDraft(date) {
     pain: existing?.painScore ?? null, stress: existing?.stressScore ?? null,
     sleep: existing?.sleepQuality ?? null,
     intensity: R.checkins.intensities(date),
+    // Routines counted in times today: how many times, by their check-in item
+    times: R.routines.timesOn(date),
     notes: existing?.notes ?? '',
     selections: R.checkins.factorValues(date),
     markers: existing ? R.checkins.markersFor(existing.id).map(({ regionId, side, intensity, quality, modelPoint }) => ({ regionId, side, intensity, quality, modelPoint })) : [],
@@ -205,7 +207,8 @@ export function CheckinView(ctx) {
     const list = R.routines.all();
     const back = encodeURIComponent(date);
     const tiles = list.map(r => FactorTile({
-      factor: R.routines.factorFor(r), title: R.routineLabel(r), selections: draft.selections, intensities: draft.intensity,
+      factor: R.routines.factorFor(r), title: R.routineLabel(r), selections: draft.selections,
+      intensities: R.measureOf(r) === 'count' ? draft.times : draft.intensity, counting: R.measureOf(r) === 'count',
       action: h('a', { class: 'well action tile-action', href: `#/routine/${r.id}?date=${back}&from=checkin`, 'aria-label': `Edit ${R.routineLabel(r)} for this day`, title: 'Edit' }, PENCIL()),
     }));
     return h('div', { class: 'stack tight' },

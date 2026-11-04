@@ -174,6 +174,8 @@ export const factors = {
           S.insert('factorChanges', { factorId: id, field, from: f[field], to: patch[field], changedAt: S.nowISO() });
         }
       }
+      // A new way of tracking gets that way's unit (minutes to counts: "min" becomes "times")
+      if (patch.measureType && patch.measureType !== f.measureType && patch.unit === undefined) patch = { ...patch, unit: defaultUnit(patch.measureType) };
       return S.update('factors', id, patch);
     });
   },
@@ -251,6 +253,13 @@ export const checkins = {
           intensity: draft.intensity?.get(factorId) ?? null,
         });
       }
+      // A routine counted in times today keeps the count on that day's session
+      for (const r of routines.all()) {
+        const n = measureOf(r) === 'count' && draft.selections.has(r.linkedFactorId) ? draft.times?.get(r.linkedFactorId) : null;
+        if (!n) continue;
+        const s = routines.sessionOn(r.id, date);
+        routines.logSession(r.id, date, { log: s?.log ?? r.items.map(it => ({ name: it.name, did: it.dose || '✓' })), times: n }, { writeLog: false });
+      }
       return entry;
     });
   },
@@ -284,6 +293,9 @@ export function describeRoutineChange(before, after) {
   if (doses.length) return `Changed ${doses.length <= 2 ? `the dose of ${doses.join(' and ')}` : `${doses.length} doses`}`;
   return b.join() !== a.join() ? 'New order' : null;
 }
+
+/** How a routine's sessions are measured: as set on it, else times today for mobility and stretching, else how hard. */
+export const measureOf = r => r?.measure ?? (/mobility|stretch/i.test(`${r?.group ?? ''} ${r?.name ?? ''}`) ? 'count' : 'effort');
 
 export const routines = {
   /** In the order the user arranged them (routines made since go last, in the order they were made). */
@@ -396,6 +408,16 @@ export const routines = {
       const r = routines.get(c.routineId), name = r ? routineLabel(r) : 'Routine';
       // "Started …" and "Stopped …" already name the routine
       m.get(c.date).push({ routineId: c.routineId, name, summary: c.summary, text: /^(Started|Stopped) /.test(c.summary) ? c.summary : `${name}: ${c.summary}` });
+    }
+    return m;
+  },
+  /** How many times each counted routine was done on a day, by its check-in item. */
+  timesOn(date) {
+    const m = new Map();
+    for (const r of routines.all()) {
+      if (measureOf(r) !== 'count' || !r.linkedFactorId) continue;
+      const n = routines.completionsOn(date, r.id).reduce((k, c) => k + (c.times ?? 1), 0);
+      if (n) m.set(r.linkedFactorId, n);
     }
     return m;
   },

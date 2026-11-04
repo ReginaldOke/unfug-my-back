@@ -204,9 +204,14 @@ const lastIntensity = f => R.factors.logs(f.id).find(l => l.intensity)?.intensit
  * tile the effort isn't a button: it's set by the swipe and shown as bars and a word under the name,
  * with the fill tinted green, yellow or red.
  */
-export function FactorTile({ factor: f, selections, intensities = null, onChange = () => {}, title = f.name, action = null, onHold = null }) {
+export function FactorTile({ factor: f, selections, intensities = null, onChange = () => {}, title = f.name, action = null, onHold = null, counting = false }) {
   const scale = scaleFor(f);
   const swipeEffort = !!intensities && f.measureType === 'yesno';
+  // A routine measured in times today: the swipe counts up (once, twice, up to 10) instead of setting how hard,
+  // and `intensities` holds the times
+  const top = counting ? MAX_TIMES : 3;
+  const word = v => (counting ? timesWord(Math.round(v)) : effortWord(v));
+  const start1 = () => (counting ? 1 : 2);
   const bars = () => h('span', { class: 'bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
   const effort = !intensities ? null : swipeEffort
     ? h('span', { class: 'tile-intensity static' }, bars(), h('span', { class: 'lbl' }))
@@ -227,7 +232,7 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
     const on = selections.has(f.id), v = selections.get(f.id);
     el.classList.toggle('on', on);
     el.setAttribute('aria-pressed', String(on));
-    const frac = !on ? 0 : swipeEffort ? (intensities.get(f.id) ?? 2) / 3 : f.measureType === 'yesno' ? 1 : Math.max(0.06, scale.fraction(v));
+    const frac = !on ? 0 : swipeEffort ? (intensities.get(f.id) ?? start1()) / top : f.measureType === 'yesno' ? 1 : Math.max(0.06, scale.fraction(v));
     fill.style.transform = `scaleX(${frac})`;
     valueBtn.textContent = on ? fmtAmount(f, v) : '';
     valueBtn.hidden = !on || f.measureType === 'yesno';
@@ -237,11 +242,12 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
       const lvl = Math.round(intensities.get(f.id) ?? 0); // a routine's effort can sit between levels
       effort.hidden = !on;
       effort.dataset.level = lvl;
-      effort.lastChild.textContent = swipeEffort ? effortWord(intensities.get(f.id) ?? 2) : INTENSITY[lvl];
+      effort.lastChild.textContent = swipeEffort ? word(intensities.get(f.id) ?? start1()) : INTENSITY[lvl];
+      effort.classList.toggle('counting', counting);
       if (swipeEffort) {
         el.dataset.effort = on ? lvl : '';
         // The fill's colour follows the effort continuously: green when easy, through amber, to coral when hard
-        if (on) el.style.setProperty('--eh', String(effortHue(intensities.get(f.id) ?? 2)));
+        if (on) el.style.setProperty('--eh', String(counting ? 168 : effortHue(intensities.get(f.id) ?? 2)));
       }
       else effort.setAttribute('aria-label', `${f.name} intensity: ${INTENSITY[lvl]}. Tap to change.`);
     }
@@ -250,7 +256,7 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
   const syncIntensity = () => {
     if (!intensities) return;
     if (!selections.has(f.id)) intensities.delete(f.id);
-    else if (!intensities.has(f.id)) intensities.set(f.id, lastIntensity(f));
+    else if (!intensities.has(f.id)) intensities.set(f.id, counting ? 1 : lastIntensity(f));
   };
 
   function setValue(v) {
@@ -282,7 +288,7 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
   const HOLD_MS = 480;
   el.addEventListener('pointerdown', e => {
     if (e.target === valueBtn || e.target.closest('input, .tile-intensity, .tile-action-wrap')) return;
-    const lvl = selections.has(f.id) ? intensities?.get(f.id) ?? 2 : 0;
+    const lvl = selections.has(f.id) ? intensities?.get(f.id) ?? start1() : 0;
     start = { x: e.clientX, y: e.clientY, v: selections.get(f.id) ?? 0, lvl, w: el.getBoundingClientRect().width };
     dragging = false;
     clearTimeout(holdTimer);
@@ -302,11 +308,11 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
     if (swipeEffort) {
       // The fill follows the finger smoothly from easy (a third) to hard (full); back past a sixth un-ticks it.
       // A light tick each time the word changes, not on every pixel.
-      const raw = clamp(start.lvl / 3 + dx / start.w, 0, 1) * 3;
-      const lvl = raw < 0.5 ? 0 : Math.round(clamp(raw, 1, 3) * 20) / 20;
-      const before = selections.has(f.id) ? effortWord(intensities.get(f.id)) : '';
+      const raw = clamp(start.lvl / top + dx / start.w, 0, 1) * top;
+      const lvl = raw < 0.5 ? 0 : counting ? Math.round(clamp(raw, 1, top)) : Math.round(clamp(raw, 1, 3) * 20) / 20;
+      const before = selections.has(f.id) ? word(intensities.get(f.id)) : '';
       setEffort(lvl);
-      if ((lvl ? effortWord(lvl) : '') !== before) vibrate(3);
+      if ((lvl ? word(lvl) : '') !== before) vibrate(3);
       return;
     }
     const next = scale.fromFraction(clamp(scale.fraction(start.v) + dx / start.w, 0, 1));
@@ -323,7 +329,7 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
     if (e.target !== el) return;
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
-    if (d && swipeEffort) { e.preventDefault(); setEffort(clamp((selections.has(f.id) ? intensities.get(f.id) : 0) + d, 0, 3)); }
+    if (d && swipeEffort) { e.preventDefault(); setEffort(clamp((selections.has(f.id) ? intensities.get(f.id) : 0) + d, 0, top)); }
     else if (d && f.measureType !== 'yesno') { e.preventDefault(); setValue(scale.step(selections.get(f.id) ?? 0, d)); }
   });
 
@@ -357,6 +363,9 @@ export function FactorTile({ factor: f, selections, intensities = null, onChange
 // Five words across the effort range (1 easy to 3 hard), matching the routine page
 const EFFORT_WORDS = ['Easy', 'Light', 'Moderate', 'Tough', 'Hard'];
 const effortWord = v => EFFORT_WORDS[clamp(Math.round((v - 1) * 2), 0, 4)];
+// A routine counted in times today, as on the routine page
+const MAX_TIMES = 10;
+const timesWord = n => (n === 1 ? 'Once' : n === 2 ? 'Twice' : `${n} times`);
 /** Hue for an effort: 135 (green) at easy, 48 (amber) at moderate, 6 (coral) at hard. */
 const effortHue = v => {
   const f = clamp((v - 1) / 2, 0, 1);
@@ -398,4 +407,11 @@ export function Ruler({ value, max, alertAt = max, count = 30 }) {
   const lit = Math.round((Math.min(value, max) / max) * count);
   return h('div', { class: 'ruler', 'aria-hidden': 'true' },
     Array.from({ length: count }, (_, i) => h('i', { class: i < lit ? (value >= alertAt ? 'lit alert' : 'lit') : '' })));
+}
+
+/** Off unless switched on: whether a shared or exported diary includes Apple Health steps and sleep. Null with no Health data. */
+export function healthSwitch() {
+  if (!R.health.all().length) return null;
+  const input = h('input', { type: 'checkbox', class: 'switch', 'aria-label': 'Include Apple Health steps and sleep' });
+  return { input, row: h('label', { class: 'row between' }, h('span', {}, 'Include Apple Health steps and sleep'), input) };
 }

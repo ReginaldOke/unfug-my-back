@@ -10,7 +10,6 @@ import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
 import { HealthView } from './views/health.js';
 import { CheckinsView, CheckinDetailView } from './views/checkins.js';
-import { AcknowledgementsView } from './views/acknowledgements.js';
 import { toast } from './lib/ui.js';
 import { startTheme } from './lib/theme.js';
 
@@ -47,7 +46,6 @@ const routes = [
   [/^\/routine\/([\w-]+)$/, RoutineView, { flow: true }],
   [/^\/settings$/, SettingsView],
   [/^\/help$/, HelpView],
-  [/^\/acknowledgements$/, AcknowledgementsView],
   [/^\/health$/, HealthView],
 ];
 

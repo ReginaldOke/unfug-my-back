@@ -137,9 +137,20 @@ function renameInline(item, f, focus) {
   const btn = item.querySelector('.select-card');
   const icon = h('input', { class: 'rename-input icon-input', value: f.icon || '', 'aria-label': `Emoji for ${f.name}`, autocomplete: 'off' });
   const name = h('input', { class: 'rename-input name-input', value: f.name, maxlength: 40, enterkeyhint: 'done', 'aria-label': 'Name', autocomplete: 'off' });
+  // How it's tracked can change here too: drinking as a count of drinks rather than minutes, say
+  const measure = segmented(MEASURE_OPTIONS.slice(0, 3), f.measureType, v => {
+    R.factors.save(f.id, { measureType: v });
+    f.measureType = v;
+    btn.querySelector('.card-detail').textContent = `${MEASURE_OPTIONS.find(([m]) => m === v)[1]}${f.role === 'unsure' ? ' · not sure yet' : ''}`;
+    name.focus({ preventScroll: true });
+  }, `How to track ${f.name}`);
+  measure.classList.add('measure-pick');
   const card = h('div', { class: 'select-card rename-card', 'aria-pressed': btn.getAttribute('aria-pressed') },
     h('span', { class: 'card-top' }, icon, h('span', { class: 'tick', 'aria-hidden': 'true' }, '✓')),
-    h('span', { class: 'card-text' }, name, btn.querySelector('.card-detail')?.cloneNode(true)));
+    h('span', { class: 'card-text' }, name, measure));
+  // A tap on the choices mustn't count as leaving the card (iPhone doesn't focus buttons)
+  let tapping = false;
+  card.addEventListener('pointerdown', e => { if (e.target.closest('.measure-pick')) { tapping = true; setTimeout(() => { tapping = false; }, 600); } });
   item.classList.add('renaming');
   // Only an emoji goes in this field: anything else leaves the current one, which stays selected to type over
   let shown = f.icon || '';
@@ -155,7 +166,7 @@ function renameInline(item, f, focus) {
   const save = () => {
     // Wait a moment: focus may just be moving between the two fields
     setTimeout(() => {
-      if (card.contains(document.activeElement) || !card.isConnected) return;
+      if (tapping || card.contains(document.activeElement) || !card.isConnected) return;
       const patch = { name: name.value.replace(/\s+/g, ' ').trim() || f.name, icon: shown || f.icon };
       if (patch.name !== f.name || patch.icon !== f.icon) R.factors.save(f.id, patch);
       Object.assign(f, patch);

@@ -128,7 +128,7 @@ const MAX_TIMES = 10;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const timesWord = n => (n === 1 ? 'Once' : n === 2 ? 'Twice' : `${n} times`);
 // Mobility and stretching are counted (how many times today); everything else is how hard
-const defaultMeasure = name => (/mobility|stretch/i.test(name ?? '') ? 'count' : 'effort');
+const defaultMeasure = name => R.measureOf({ name });
 
 function sessionFor(r, date, fromCheckin) {
   const key = `${r?.id ?? 'new'}|${date}`;

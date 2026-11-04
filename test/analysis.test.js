@@ -158,3 +158,26 @@ test('trend findings turn two weeks of links into something to try', async () =>
   // Too few check-ins: nothing yet
   assert.deepEqual(trendFindings({ dailyEntries: dailyEntries.slice(0, 5), factorLogs }, factors, today), []);
 });
+
+test('factorStory compares from two days each, and says when it cannot', async () => {
+  const { factorStory } = await import('../web/lib/analysis.js');
+  const today = '2026-11-07';
+  const days = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07'];
+  const dailyEntries = days.map((date, i) => ({ date, painScore: i % 2 ? 6 : 3 }));
+  const f = { id: 'g', name: 'Guitar', role: 'trigger', measureType: 'minutes' };
+  const logs = ds => ds.map(date => ({ factorId: 'g', date, value: 30 }));
+  const story = ds => factorStory(f, { dailyEntries, factorLogs: logs(ds) }, today);
+  assert.equal(story([]).state, 'none');
+  assert.equal(story(days).state, 'always');
+  assert.equal(story([days[1]]).state, 'few');
+  // Guitar on the 6/10 days
+  const up = story([days[1], days[3], days[5]]);
+  assert.equal(up.state, 'up');
+  assert.equal(up.best.lag, 0);
+  assert.equal(up.best.meanWith, 6);
+  assert.equal(up.best.meanWithout, 3);
+  assert.equal(up.early, true);
+  assert.equal(up.strip.length, 7);
+  assert.equal(up.strip.at(-1).date, today);
+  assert.equal(up.strip.at(-2).amount, 30);
+});

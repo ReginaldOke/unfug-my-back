@@ -79,7 +79,7 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
     const el = e.target.closest('[data-id]');
     // iOS often sends no click after a long press, so a flag left over from the last press mustn't eat this tap
     swallowClick = false;
-    if (!el || e.target.closest('.del, input') || e.button > 0) return;
+    if (!el || e.target.closest('.del, input, .measure-pick') || e.button > 0) return;
     press = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
     if (editing) return; // in edit mode a drag starts as soon as the finger moves
     press.timer = setTimeout(() => {
@@ -121,7 +121,7 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
 
   // While editing, taps don't toggle cards; the click that ends a hold never does
   grid.addEventListener('click', e => {
-    if (e.target.closest('.del, input')) return;
+    if (e.target.closest('.del, input, .measure-pick')) return;
     if (swallowClick || editing) {
       e.stopPropagation();
       e.preventDefault();

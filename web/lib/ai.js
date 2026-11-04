@@ -8,22 +8,22 @@ import { copyText, shareOrDownload } from './ui.js';
 
 const NOISE = new Set(['createdAt', 'updatedAt', 'schemaVersion', 'timeZone']);
 
-/** The full diary, minus Apple Health data and per-row bookkeeping fields a chat doesn't need. */
-export function diaryForAI() {
+/** The full diary, minus per-row bookkeeping fields a chat doesn't need. Apple Health data only if asked for. */
+export function diaryForAI({ health = false } = {}) {
   const data = buildExport(R.snapshot(), { from: R.firstDataDate(), to: localDate(), regions: REGIONS });
   for (const [k, v] of Object.entries(data)) {
     if (Array.isArray(v)) data[k] = v.map(row => Object.fromEntries(Object.entries(row).filter(([f]) => !NOISE.has(f))));
   }
-  data.healthDays = [];
+  if (!health) data.healthDays = [];
   return data;
 }
 
 /** The diary file, with the analysis instructions inside, to attach to a chat. */
-export const shareDiary = () =>
-  shareOrDownload(`back-diary-${localDate()}.json`, JSON.stringify(diaryForAI(), null, 2), 'application/json');
+export const shareDiary = opts =>
+  shareOrDownload(`back-diary-${localDate()}.json`, JSON.stringify(diaryForAI(opts), null, 2), 'application/json');
 
 /** Instructions plus the diary as one block of text, to paste into a chat. */
-export function copyDiary() {
-  const { analysisPrompt, ...diary } = diaryForAI();
+export function copyDiary(opts) {
+  const { analysisPrompt, ...diary } = diaryForAI(opts);
   return copyText(`${analysisPrompt ?? ANALYSIS_PROMPT}\n\nHere is my diary:\n\`\`\`json\n${JSON.stringify(diary)}\n\`\`\``);
 }

@@ -7,6 +7,7 @@ import { readWorkoutText, readCSV } from '../lib/interpret.js';
 import { readHealthExport } from '../lib/health.js';
 import { REGIONS } from '../lib/regions.js';
 import { localDate } from '../lib/dates.js';
+import { healthSwitch } from './controls.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { themeSetting, setTheme } from '../lib/theme.js';
@@ -41,8 +42,7 @@ export function SettingsView() {
     h('section', { class: 'card glass' },
       row('#/help', 'Help & safety'),
       externalRow('https://reginaldoke.github.io/unfug-my-back/privacy.html', 'Privacy policy'),
-      externalRow('https://reginaldoke.github.io/unfug-my-back/support.html', 'Support'),
-      row('#/acknowledgements', 'Acknowledgements')));
+      externalRow('https://reginaldoke.github.io/unfug-my-back/support.html', 'Support')));
 }
 
 function appearanceSection() {
@@ -61,12 +61,17 @@ const exportAll = () => shareOrDownload(`back-story-${R.firstDataDate()}-to-${lo
 function dataSection() {
   const from = h('input', { type: 'date', class: 'glass-input', value: R.firstDataDate(), 'aria-label': 'Export from' });
   const to = h('input', { type: 'date', class: 'glass-input', value: localDate(), 'aria-label': 'Export to' });
-  const exportData = () => buildExport(R.snapshot(), { from: from.value, to: to.value, regions: REGIONS });
+  const health = healthSwitch();
+  const exportData = () => {
+    const data = buildExport(R.snapshot(), { from: from.value, to: to.value, regions: REGIONS });
+    return health?.input.checked ? data : { ...data, healthDays: [] };
+  };
 
   return h('section', { class: 'card glass stack' },
     h('h2', { class: 'row-title' }, 'Your data'),
     h('p', { class: 'hint' }, 'Saves your diary as one file. It includes instructions for AI, so you can attach it to any AI chat as is.'),
     h('div', { class: 'row' }, from, h('span', { class: 'hint' }, 'to'), to),
+    health?.row,
     h('div', { class: 'row data-actions' },
       h('button', { type: 'button', class: 'btn glass', onclick: () => shareOrDownload(`back-story-${from.value}-to-${to.value}.json`, JSON.stringify(exportData(), null, 2), 'application/json') }, 'Export'),
       h('button', { type: 'button', class: 'btn glass', onclick: openImportSheet }, 'Import')),
