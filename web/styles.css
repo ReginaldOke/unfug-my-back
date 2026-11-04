@@ -158,7 +158,7 @@ button { cursor: pointer; }
 .view { padding: calc(14px + env(safe-area-inset-top)) var(--gutter) 24px; display: flex; flex-direction: column; gap: 14px; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .top-bar h1 { font-size: 22px; }
-.top-bar .wordmark { font-family: 'Michroma', sans-serif; font-size: 22px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 4px; }
+.top-bar .wordmark { font-family: 'Michroma', sans-serif; font-size: 19px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 4px; }
 .card { position: relative; border-radius: var(--r-card); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .card.warn { border-color: rgba(255, 90, 80, 0.35); background: linear-gradient(180deg, rgba(255, 59, 48, 0.14), rgba(255, 59, 48, 0.04)); }
 
