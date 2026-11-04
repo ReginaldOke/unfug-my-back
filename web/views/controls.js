@@ -120,8 +120,9 @@ export function VSlider({ label, value = null, onChange, onCommit = () => {}, gl
     caption);
 }
 
-// 0–60 min in 5s, then 75 min–8 h in 15s, so short and long days both get usable precision.
-const MINUTE_STEPS = [...Array.from({ length: 13 }, (_, i) => i * 5), ...Array.from({ length: 28 }, (_, i) => 75 + i * 15)];
+// 0–60 min in 5s, 75 min–8 h in 15s, then up to 12 h in 30s (a day of screen time can run that long),
+// so short and long days both get usable precision.
+const MINUTE_STEPS = [...Array.from({ length: 13 }, (_, i) => i * 5), ...Array.from({ length: 28 }, (_, i) => 75 + i * 15), ...Array.from({ length: 8 }, (_, i) => 510 + i * 30)];
 const nearestIndex = v => MINUTE_STEPS.reduce((best, s, i) => (Math.abs(s - v) < Math.abs(MINUTE_STEPS[best] - v) ? i : best), 0);
 
 export function scaleFor(f) {

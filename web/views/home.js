@@ -170,7 +170,7 @@ function NoticeSlot(ctx) {
     const f = topFinding();
     if (f && (R.settings().findingSeen?.[f.key] ?? 0) > 0) {
       want.set(`f${f.key}`, () => notice(`f${f.key}`, {
-        title: f.title, body: f.body, href: `#/factor/${f.factor.id}`,
+        title: f.title, href: `#/factor/${f.factor.id}`,
         onClose: () => { markFinding(f.key, FINDING_VISITS); update(); },
       }));
     }
@@ -476,23 +476,22 @@ function patternsCard(today) {
   const shown = rows;
   const allEarly = rows.every(a => a.early);
   const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta)));
-  // Over a couple of weeks, what to try: up to two, the clearest first
+  // Over a couple of weeks, the clearest trends: up to two
   const findings = trendFindings(data, factors, today).slice(0, 2);
   return h('section', { class: 'card glass patterns' },
     findings.length ? h('div', { class: 'findings' }, head, findings.map(findingRow)) : null,
     h('div', { class: 'pat-head' }, findings.length ? h('span', {}) : head,
       h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
     h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
-    allEarly ? h('p', { class: 'hint pat-note' }, 'Early reads. They firm up as you check in.') : null,
-    h('p', { class: 'hint pat-note' }, 'Patterns from your diary, not medical advice.'));
+    allEarly ? h('p', { class: 'hint pat-note' }, 'Only a few days so far, so these could change.') : null);
 }
 
-/** "Try cutting back on desk sitting…": a dot for which way it points, the finding, then what to do. */
+/** "More pain on days with more guitar": a dot for which way it points, then the trend. No advice. */
 function findingRow(f) {
   const good = f.kind === 'keep' || f.kind === 'not-stressor';
   return h('a', { class: 'finding', href: `#/factor/${f.factor.id}` },
     h('i', { class: `finding-dot ${good ? 'good' : 'bad'}`, 'aria-hidden': 'true' }),
-    h('span', { class: 'grow' }, h('span', { class: 'finding-title' }, f.title), h('span', { class: 'hint block' }, f.body)));
+    h('span', { class: 'grow finding-title' }, f.title));
 }
 
 /** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).

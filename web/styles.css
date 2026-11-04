@@ -1,4 +1,4 @@
-@font-face { font-family: 'Michroma'; src: url('assets/fonts/michroma.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Italiana'; src: url('assets/fonts/italiana.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: 'Outfit'; src: url('assets/fonts/outfit.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
 /* Back Story — liquid glass, black and red.
    Glass recipe and radii follow the iOS 26 Control Center kit in the Figma file:
@@ -158,7 +158,12 @@ button { cursor: pointer; }
 .view { padding: calc(14px + env(safe-area-inset-top)) var(--gutter) 24px; display: flex; flex-direction: column; gap: 14px; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .top-bar h1 { font-size: 22px; }
-.top-bar .wordmark { font-family: 'Michroma', sans-serif; font-size: 19px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 4px; }
+.top-bar .wordmark {
+  font-family: 'Italiana', serif; font-size: 34px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 4px;
+  /* A hair heavier than the face, with the faint glow the chart's lines have */
+  -webkit-text-stroke: 0.45px currentColor; text-shadow: 0 0 12px rgba(255, 255, 255, 0.28);
+}
+[data-theme="light"] .top-bar .wordmark { text-shadow: 0 0 10px rgba(29, 28, 31, 0.12); }
 .card { position: relative; border-radius: var(--r-card); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .card.warn { border-color: rgba(255, 90, 80, 0.35); background: linear-gradient(180deg, rgba(255, 59, 48, 0.14), rgba(255, 59, 48, 0.04)); }
 
@@ -1496,8 +1501,9 @@ body:not(.on-home) .ambient::after {
 
 /* The details sheet */
 .change-item strong { font-weight: 500; }
-.change-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #fbfbfd; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
-[data-theme="light"] .change-dot { background: #2a292d; box-shadow: 0 0 6px rgba(29, 28, 31, 0.35); }
+/* A change looks the same everywhere: the soft halo from the chart and its key */
+.change-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: rgba(235, 235, 245, 0.16); filter: blur(0.5px); }
+[data-theme="light"] .change-dot { background: rgba(29, 28, 31, 0.13); }
 
 /* Notes: a plain list with small dots, no dividers */
 .pad-note, .pad-add, .pad-input { font-size: 14px; padding: 7px 0; }
@@ -1873,7 +1879,6 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 
 /* ---------- Stressor and helper page ---------- */
 .lead.story { font-size: 21px; line-height: 1.35; margin: 2px 0 0; }
-.advice { margin: 0; font-size: 15px; color: var(--ink-2); padding-left: 12px; border-left: 2px solid var(--line, rgba(255, 255, 255, 0.12)); }
 .cmp { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .cmp p { margin: 0; }
 .cmp-row { display: grid; grid-template-columns: 64px 1fr 34px; align-items: center; gap: 10px; }

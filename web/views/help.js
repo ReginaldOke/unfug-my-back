@@ -13,7 +13,7 @@ const ITEMS = [
   ['Capacitor and its Filesystem, Haptics, Local Notifications, Share and Status Bar plugins', 'Copyright (c) 2017-present Drifty Co.', 'MIT License', 'https://github.com/ionic-team/capacitor'],
   ['Capacitor Health', 'Cap-go. Used unmodified.', 'Mozilla Public License 2.0, with source code available at the link below', 'https://github.com/Cap-go/capacitor-health'],
   ['Outfit font', 'Copyright 2021 The Outfit Project Authors', 'SIL Open Font License 1.1', 'https://github.com/Outfitio/Outfit-Fonts'],
-  ['Michroma font', 'Copyright 2011 The Michroma Project Authors', 'SIL Open Font License 1.1', 'https://github.com/googlefonts/Michroma-font'],
+  ['Italiana font', 'Copyright (c) 2011, Santiago Orozco, with Reserved Font Name "Italiana"', 'SIL Open Font License 1.1', 'https://github.com/google/fonts/tree/main/ofl/italiana'],
 ];
 
 export const SafetyList = () => h('ul', { class: 'safety' },

@@ -74,8 +74,7 @@ export function FactorDetailView(ctx) {
     const now = R.factors.get(f.id);
     return h('section', { class: 'card glass stack' },
       h('p', { class: 'lead story' }, headline(now, story)),
-      story.best ? compare(now, story) : null,
-      advice(now, story) ? h('p', { class: 'advice' }, advice(now, story)) : null);
+      story.best ? compare(now, story) : null);
   };
   let top = summary();
 
@@ -140,21 +139,6 @@ export function headline(f, st) {
   }
 }
 
-/** What to do with it: one suggestion that fits the role and which way the pain goes. */
-export function advice(f, st) {
-  const n = lower(f.name);
-  if (st.state === 'none') return `Tap it in your check-in on days it happens.`;
-  if (st.state === 'always') return `A day or two without ${n} would show whether it makes a difference.`;
-  if (st.state === 'few') return null;
-  if (st.state === 'same') return `No sign it matters either way yet. If it keeps looking like this, you could hide it from check-ins.`;
-  if (st.state === 'up') return f.role === 'helper'
-    ? `Try easing off or doing it differently for a few days, and see if the gap closes.`
-    : `Try a few days with less ${n} and see if the gap closes.`;
-  if (f.role === 'trigger') return `It doesn't line up with more pain so far. If that holds, you could mark it as a helper.`;
-  if (f.role === 'unsure') return `So far it goes with easier days. Mark it as a helper if that matches how it feels.`;
-  return `Keep it going. It goes with easier days.`;
-}
-
 /** With and without, as two bars out of 10, then how many days that's from. */
 function compare(f, st) {
   const b = st.best;
@@ -162,15 +146,13 @@ function compare(f, st) {
     h('span', { class: 'hint' }, label),
     h('span', { class: 'cmp-track' }, h('i', { class: cls, style: `--w:${v * 10}%` })),
     h('strong', {}, v.toFixed(1)));
-  const basis = `${plural(b.nWith, 'day')} with it, ${b.nWithout} without. ${st.early ? 'An early read that will firm up as you check in.' : `${b.confidence[0].toUpperCase()}${b.confidence.slice(1)} confidence.`}`;
   const nx = st.next;
   return h('div', { class: 'cmp' },
     h('span', { class: 'eyebrow' }, b.lag ? 'Pain the next day' : 'Average pain'),
     row('With', b.meanWith, 'with'),
     row('Without', b.meanWithout, 'without'),
     nx && Math.abs(nx.delta) >= SAME_BAND && Math.sign(nx.delta) === Math.sign(b.delta)
-      ? h('p', { class: 'hint' }, `It carries into the next day too: ${nx.meanWith.toFixed(1)} after it, ${nx.meanWithout.toFixed(1)} after days without.`) : null,
-    h('p', { class: 'hint' }, basis));
+      ? h('p', { class: 'hint' }, `It carries into the next day too: ${nx.meanWith.toFixed(1)} after it, ${nx.meanWithout.toFixed(1)} after days without.`) : null);
 }
 
 /** Pain and this factor over the strip's days, drawn by the same chart as Home. */
