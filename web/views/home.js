@@ -9,7 +9,7 @@ import { quickSummary, trendFindings, factorStory } from '../lib/analysis.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
 import { fmtAmount, reminderOn } from '../lib/labels.js';
-import { TrendChart, PALETTES, EXTRA_PALETTES } from './chart.js';
+import { TrendChart, PALETTES, extraPalettes } from './chart.js';
 import { PainCalendar } from './calendar.js';
 import { Ruler, SelectCard, PENCIL, healthSwitch } from './controls.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
@@ -174,6 +174,9 @@ function NoticeSlot(ctx) {
         onClose: () => { markFinding(f.key, FINDING_VISITS); update(); },
       }));
     }
+    // One at a time: the newest banner, else the care note, else a finding. The rest wait their turn.
+    const pick = [...want.keys()].filter(k => k.startsWith('b')).at(-1) ?? [...want.keys()][0];
+    for (const k of [...want.keys()]) if (k !== pick) want.delete(k);
     // Gone: fold away, then remove
     for (const [key, w] of shown) {
       if (want.has(key)) continue;
@@ -256,10 +259,10 @@ function trendCard(today) {
   const all = R.checkins.all();
   if (!all.length) return sampleTrendCard(today);
   if (ui.view === 'calendar') return calendarCard();
-  // Ranges appear as there's enough history for them: a week, a month, two months for 3M, a year
+  // Ranges appear as there's history for them, and never just one on its own
   const first = all[0].date;
   const span = daysBetween(first, today) + 1;
-  const ranges = [[7, '1W', 7], [30, '1M', 30], [90, '3M', 60], [365, '1Y', 365]].filter(([, , need]) => span >= need);
+  const ranges = chartRanges(span);
   if (!ranges.some(([v]) => v === ui.range)) ui.range = ranges.at(-1)?.[0] ?? 7;
   // Until there's a full range of history, the range starts at the first check-in, so early data sits
   // on the left with the coming days still empty on the right
@@ -298,9 +301,10 @@ function trendCard(today) {
 
   // Lines the user added from the + in the key
   const auto = new Set([mainStressor?.factor.id, topHelper?.factor.id]);
-  const extras = (R.settings().chartExtras ?? []).filter(x => METRICS.includes(x) || (R.factors.get(x) && !R.factors.get(x).isArchived && !auto.has(x)));
-  extras.forEach((x, i) => {
-    const palette = EXTRA_PALETTES[i % EXTRA_PALETTES.length];
+  const extras = (R.settings().chartExtras ?? []).filter(x => isMetric(x) || (R.factors.get(x) && !R.factors.get(x).isArchived && !auto.has(x)));
+  const colours = extraPalettes(extras, isBadLine);
+  extras.forEach(x => {
+    const palette = colours.get(x);
     if (x === 'stress') {
       series.push({
         key: 'stress', label: 'Stress', palette,
@@ -329,6 +333,21 @@ function trendCard(today) {
         key: 'steps', label: 'Steps', palette,
         values: steps.map(v => (v == null ? null : 0.04 + (v / max) * 0.86)),
         format: i => (steps[i] == null ? '–' : steps[i].toLocaleString()),
+      });
+    } else if (x === 'food') {
+      const food = entries.map(e => e?.dietScore ?? null);
+      series.push({
+        key: 'food', label: 'Eating', palette,
+        values: food.map(v => (v == null ? null : v / 10)),
+        format: i => (food[i] == null ? '–' : `${food[i]}/10`),
+      });
+    } else if (x.startsWith('c:')) {
+      const sl = customSlider(x);
+      const vals = entries.map(e => e?.custom?.[sl.id] ?? null);
+      series.push({
+        key: x, label: sl.name, palette,
+        values: vals.map(v => (v == null ? null : v / 10)),
+        format: i => (vals[i] == null ? '–' : `${vals[i]}/10`),
       });
     } else series.push(factorSeries(`x-${x}`, R.factors.get(x), palette));
   });
@@ -371,8 +390,24 @@ function trendCard(today) {
     }));
 }
 
-// Chart lines that aren't stressors or helpers
-const METRICS = ['stress', 'sleep', 'sleepHours', 'steps'];
+/**
+ * The range buttons for this much history: none for a week or less, then 1W and 2W (so every day can be
+ * seen), adding 1M past two weeks, and longer ranges as the diary grows. Four at most: 1W and the three longest.
+ */
+export function chartRanges(span) {
+  const all = [[7, '1W', 0], [14, '2W', 8], [30, '1M', 15], [90, '3M', 31], [180, '6M', 91], [365, '1Y', 181]];
+  const fit = all.filter(([, , need]) => span >= need);
+  const shown = fit.length > 4 ? [fit[0], ...fit.slice(-3)] : fit;
+  return shown.length > 1 ? shown : [];
+}
+
+// Chart lines that aren't stressors or helpers; the user's own sliders are 'c:<id>'
+const METRICS = ['stress', 'sleep', 'sleepHours', 'steps', 'food'];
+const customSlider = key => (R.settings().customSliders ?? []).find(c => `c:${c.id}` === key) ?? null;
+const isMetric = x => METRICS.includes(x) || !!customSlider(x);
+/** Whether more of a line is bad: stressors, stress and sliders where higher is worse are drawn warm. */
+const isBadLine = x => (x === 'stress' ? true : METRICS.includes(x) ? false
+  : x.startsWith('c:') ? customSlider(x)?.good === 'low' : R.factors.get(x)?.role !== 'helper');
 
 /** Pick extra lines for the chart: stress, sleep, steps, or any stressor or helper. */
 /** Takes one of the automatic lines off the chart and its key, or puts it back (shown, not dimmed). */
@@ -398,6 +433,8 @@ function openDataSheet(autoLines, autoIds) {
   const options = [
     { id: 'stress', title: 'Stress', detail: 'From your check-ins' },
     { id: 'sleep', title: 'Sleep', detail: 'How well, out of 10' },
+    { id: 'food', title: 'Eating', detail: 'How well, out of 10' },
+    ...(R.settings().customSliders ?? []).map(c => ({ id: `c:${c.id}`, title: c.name, detail: 'Your slider, out of 10' })),
     ...(HEALTH_IMPORT && R.health.has('sleepHours') ? [{ id: 'sleepHours', title: R.health.sleepWord() === 'In bed' ? 'Time in bed' : 'Hours slept', detail: 'From Apple Health' }] : []),
     ...(HEALTH_IMPORT && R.health.has('steps') ? [{ id: 'steps', title: 'Steps', detail: 'From Apple Health' }] : []),
     ...R.factors.all().filter(f => !autoIds.includes(f.id)).map(f => ({
@@ -406,14 +443,11 @@ function openDataSheet(autoLines, autoIds) {
   ];
   const AUTO_DETAIL = { pain: 'From your check-ins', stressor: 'Main stressor', helper: 'Top helper' };
   const swatch = c => h('i', { class: `data-swatch${c ? '' : ' off'}`, style: c ? `--c:${c}` : null, 'aria-hidden': 'true' });
-  // Each added line shows the colour it has on the chart (colours go in the order lines were added)
+  // Each added line shows the colour it has on the chart: warm if more is bad, cool if more is good
   const swatches = new Map(options.map(o => [o.id, swatch(null)]));
   const paintSwatches = () => {
-    const order = [...chosen].filter(id => swatches.has(id));
-    for (const [id, el] of swatches) {
-      const i = order.indexOf(id);
-      el.replaceWith(swatches.set(id, swatch(i < 0 ? null : EXTRA_PALETTES[i % EXTRA_PALETTES.length][0])).get(id));
-    }
+    const colours = extraPalettes([...chosen].filter(id => swatches.has(id)), isBadLine);
+    for (const [id, el] of swatches) el.replaceWith(swatches.set(id, swatch(colours.get(id)?.[0] ?? null)).get(id));
   };
   const row = (lead, title, detail, on, onChange) => h('label', { class: 'data-row' },
     lead, h('span', { class: 'grow' }, title, h('span', { class: 'hint block' }, detail)),

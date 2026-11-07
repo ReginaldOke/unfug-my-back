@@ -1,5 +1,5 @@
 // Daily survey: a few quick steps, with a streak at the end.
-import { h, toast, iconButton } from '../lib/ui.js';
+import { h, toast, iconButton, sheet, segmented } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { localDate, addDays, dayLabel, weekdayLetter } from '../lib/dates.js';
 import { VSlider, FactorTile, defaultAmount, PENCIL } from './controls.js';
@@ -9,17 +9,7 @@ import { Body3D, RegionList, webglAvailable } from './body3d.js';
 import { quickAddFactor } from './factor.js';
 import { voiceSupported, startDictation } from '../lib/voice.js';
 import { askPermissions } from '../lib/native.js';
-
-const STEPS = [
-  { id: 'pain', title: 'How much does your back hurt?' },
-  { id: 'stress', title: 'How stressed were you today?' },
-  { id: 'sleep', title: 'How did you sleep last night?' },
-  { id: 'where', title: 'Where do you feel it most?', sub: 'Tap where it hurts.' },
-  { id: 'move', title: 'Exercise', sub: 'Tap what you did. Swipe for how hard or how long.' },
-  { id: 'stressors', title: 'Stressors', sub: 'Anything that might have strained your back. Swipe right to add time.' },
-  { id: 'helpers', title: 'Helpers', sub: 'Anything you did for your back.' },
-  { id: 'notes', title: 'Anything else?', sub: 'Optional.' },
-];
+import { BUILT_IN, checkinSteps, autoAdvances, isSliderStep } from '../lib/checkin-steps.js';
 
 // Drafts survive leaving the survey (e.g. to add a factor or log a routine) within this session
 const drafts = new Map();
@@ -36,6 +26,9 @@ function freshDraft(date) {
     startedAt: Date.now(), step: 0,
     pain: existing?.painScore ?? null, stress: existing?.stressScore ?? null,
     sleep: existing?.sleepQuality ?? null,
+    food: existing?.dietScore ?? null, meals: existing?.meals ?? '',
+    // The user's own sliders, by slider id
+    custom: { ...(existing?.custom ?? {}) },
     intensity: R.checkins.intensities(date),
     // Routines counted in times today: how many times, by their check-in item
     times: R.routines.timesOn(date),
@@ -54,6 +47,7 @@ export function CheckinView(ctx) {
   const fromDetail = ctx.params.get('from') === 'detail';
   if (!drafts.has(date)) drafts.set(date, freshDraft(date));
   const draft = drafts.get(date);
+  let STEPS = checkinSteps(R.settings());
   const startAt = STEPS.findIndex(st => st.id === ctx.params.get('step'));
   if (startAt >= 0) draft.step = startAt;
   const leave = () => { location.hash = fromDetail ? `#/checkins/${date}` : '#/'; };
@@ -77,7 +71,9 @@ export function CheckinView(ctx) {
       // A plain title, with the day underneath (tap it to log an earlier day)
       h('div', { class: 'flow-title' }, h('strong', {}, existing ? 'Edit check-in' : 'Check in'), h('span', { class: 'flow-day-wrap' }, dateSelect)),
       // Editing from a check-in's page: save from any step, no need to walk to the end
-      fromDetail ? h('button', { type: 'button', class: 'btn small glass head-save', onclick: () => finish() }, 'Save') : h('span', { class: 'head-spacer', 'aria-hidden': 'true' })),
+      h('div', { class: 'head-end' },
+        fromDetail ? h('button', { type: 'button', class: 'btn small glass head-save', onclick: () => finish() }, 'Save') : null,
+        iconButton('•••', 'Choose check-in steps', () => editSteps(), { class: 'icon-btn small more' }))),
     progress, body, footer);
 
   function go(step) {
@@ -90,9 +86,11 @@ export function CheckinView(ctx) {
   }
 
   function render() {
+    draft.step = Math.min(draft.step, STEPS.length - 1);
     const st = STEPS[draft.step];
     progress.replaceChildren(...STEPS.map((_, i) => h('i', { class: i < draft.step ? 'done' : i === draft.step ? 'now' : '' })));
     progress.setAttribute('aria-valuenow', draft.step + 1);
+    progress.setAttribute('aria-valuemax', STEPS.length);
     progress.setAttribute('aria-valuetext', `Step ${draft.step + 1} of ${STEPS.length}: ${st.title}`);
     body.replaceChildren(
       h('div', { class: 'step-head' }, h('h1', { tabindex: -1 }, st.title), st.sub ? h('p', { class: 'muted' }, st.sub) : null),
@@ -107,10 +105,17 @@ export function CheckinView(ctx) {
     const last = draft.step === STEPS.length - 1;
     const back = draft.step > 0 ? iconButton('‹', 'Back', () => go(draft.step - 1)) : h('span');
     // Slider steps advance on release; Next only appears when revisiting a step that already has a value
-    if (isSlider(st.id)) {
-      footer.replaceChildren(back, draft[st.id] == null
-        ? h('span', { class: 'hint grow center' }, 'Drag the bar, then let go')
+    if (autoAdvances(st.id)) {
+      footer.replaceChildren(back, valueOf(st.id) == null
+        // The user's own sliders are optional
+        ? st.slider ? h('button', { type: 'button', class: 'btn ghost wide', onclick: () => go(draft.step + 1) }, 'Skip ›')
+          : h('span', { class: 'hint grow center' }, 'Drag the bar, then let go')
         : h('button', { type: 'button', class: 'btn primary wide', onclick: () => go(draft.step + 1) }, 'Next'));
+      return;
+    }
+    // Eating is optional: skip it until there's an answer
+    if (st.id === 'food' && draft.food == null && !draft.meals.trim()) {
+      footer.replaceChildren(back, h('button', { type: 'button', class: 'btn ghost wide', onclick: () => go(draft.step + 1) }, 'Skip ›'));
       return;
     }
     // Body map advances on the first tap; with nothing marked, a quiet link skips it
@@ -123,7 +128,9 @@ export function CheckinView(ctx) {
         last ? (existing ? 'Update' : 'Finish') : 'Next'));
   }
 
-  const isSlider = id => id === 'pain' || id === 'stress' || id === 'sleep';
+  // Sliders keep their answer on the draft; the user's own sliders by id under draft.custom
+  const valueOf = id => (id.startsWith('c:') ? draft.custom[id.slice(2)] ?? null : draft[id]);
+  const setValue = (id, v) => { if (id.startsWith('c:')) draft.custom[id.slice(2)] = v; else draft[id] = v; };
 
   /** Move to the next step after a beat, so the user sees their answer land. */
   function advanceSoon(delay) {
@@ -133,9 +140,9 @@ export function CheckinView(ctx) {
 
   function sliderStep(key, label, glyph, scale = {}) {
     return h('div', { class: 'levels single' }, VSlider({
-      label, value: draft[key], glyph, tint: key, colours: key === 'sleep' ? 'highIsGood' : 'highIsBad', ...scale,
-      onChange: v => { draft[key] = v; },
-      onCommit: () => advanceSoon(320),
+      label, value: valueOf(key), glyph, tint: key, colours: key === 'sleep' ? 'highIsGood' : 'highIsBad', ...scale,
+      onChange: v => { setValue(key, v); },
+      onCommit: () => (autoAdvances(key) ? advanceSoon(320) : renderFooter()),
     }));
   }
 
@@ -144,6 +151,12 @@ export function CheckinView(ctx) {
       case 'pain': return sliderStep('pain', 'Pain', 'bolt');
       case 'stress': return sliderStep('stress', 'Stress', 'wave');
       case 'sleep': return h('div', { class: 'sleep-step' }, sliderStep('sleep', 'Sleep', 'moon', { describe: sleepWord }), healthStrip('sleep'));
+      case 'food': return h('div', { class: 'food-step' },
+        sliderStep('food', 'Eating', 'leaf', { colours: 'highIsGood', describe: sleepWord }),
+        h('textarea', {
+          class: 'notes glass meals', rows: 2, maxlength: 500, placeholder: 'Meals, if you like',
+          'aria-label': 'What you ate today (optional)', oninput: e => { draft.meals = e.target.value; renderFooter(); },
+        }, draft.meals));
       case 'where': {
         const yEntry = R.checkins.entryFor(yesterday);
         const yMarkers = yEntry ? R.checkins.markersFor(yEntry.id) : [];
@@ -166,6 +179,10 @@ export function CheckinView(ctx) {
       case 'stressors': return factorGrid(['trigger', 'unsure'], { role: 'trigger' });
       case 'helpers': return factorGrid(['helper'], { role: 'helper' });
       case 'notes': return notesStep();
+      default: {
+        const s = STEPS[draft.step].slider;
+        return sliderStep(id, s.name, 'dot', { colours: s.good === 'low' ? 'highIsBad' : 'highIsGood' });
+      }
     }
   }
 
@@ -299,6 +316,57 @@ export function CheckinView(ctx) {
       live);
   }
 
+  /**
+   * The ••• menu: switch steps on or off (pain stays), and add or remove sliders of your own.
+   * Changes apply straight away; the check-in carries on at the same step.
+   */
+  function editSteps() {
+    const here = STEPS[draft.step]?.id;
+    sheet(() => {
+      const list = h('div', { class: 'step-list' });
+      const fill = () => {
+        const s = R.settings();
+        const hidden = new Set(s.checkinHidden ?? []);
+        const toggle = (id, on) => R.setSettings({ checkinHidden: on ? [...hidden].filter(x => x !== id) : [...hidden, id] }, { quiet: true });
+        const row = (id, name, extra = null) => {
+          const sw = h('input', { type: 'checkbox', class: 'switch', 'aria-label': name, checked: !hidden.has(id), onchange: e => { toggle(id, e.target.checked); fill(); } });
+          return h('label', { class: 'row between step-row' }, h('span', { class: 'grow' }, name), extra, sw);
+        };
+        const custom = (s.customSliders ?? []).map(c => row(`c:${c.id}`, c.name, iconButton('✕', `Remove ${c.name}`, e => {
+          e.preventDefault();
+          R.setSettings({ customSliders: (R.settings().customSliders ?? []).filter(x => x.id !== c.id), checkinHidden: [...hidden].filter(x => x !== `c:${c.id}`) }, { quiet: true });
+          fill();
+        }, { class: 'icon-btn small' })));
+        list.replaceChildren(...BUILT_IN.filter(st => !st.locked).flatMap(st => [...(st.id === 'move' ? custom : []), row(st.id, st.name)]));
+      };
+      fill();
+      let good = 'high';
+      const name = h('input', { type: 'text', class: 'glass-input', maxlength: 40, placeholder: 'Energy, mood, posture…', 'aria-label': 'New slider name', enterkeyhint: 'done' });
+      const add = h('form', {
+        class: 'stack tight', onsubmit: e => {
+          e.preventDefault();
+          if (!name.value.trim()) return name.focus();
+          const id = Math.random().toString(36).slice(2, 10);
+          R.setSettings({ customSliders: [...(R.settings().customSliders ?? []), { id, name: name.value.trim(), good }] }, { quiet: true });
+          name.value = '';
+          fill();
+        },
+      },
+      h('h3', { class: 'section-label' }, 'Add a slider'),
+      name,
+      segmented([['high', 'Higher is better'], ['low', 'Higher is worse']], good, v => { good = v; }, 'Which end is good'),
+      h('button', { type: 'submit', class: 'btn glass' }, 'Add'));
+      return h('div', { class: 'stack' }, h('h2', {}, 'Check-in steps'), list, add);
+    }, {
+      onClose: () => {
+        STEPS = checkinSteps(R.settings());
+        const i = STEPS.findIndex(st => st.id === here);
+        draft.step = i >= 0 ? i : Math.min(draft.step, STEPS.length - 1);
+        render();
+      },
+    });
+  }
+
   function finish() {
     const seconds = Math.round((Date.now() - draft.startedAt) / 1000);
     R.checkins.save(date, { ...draft, durationSeconds: seconds });
@@ -318,8 +386,8 @@ export function CheckinView(ctx) {
       h('div', { class: 'week-dots', 'aria-label': 'This week' }, week.map(d => h('span', { class: R.checkins.entryFor(d) ? 'on' : '' }, h('i'), h('small', {}, weekdayLetter(d))))),
       h('div', { class: 'stats-row' },
         stat(draft.pain ?? '–', '/10', 'Pain'),
-        stat(draft.stress ?? '–', '/10', 'Stress'),
-        stat(draft.sleep ?? '–', '/10', 'Sleep')),
+        ...STEPS.filter(st => st.id !== 'pain' && isSliderStep(st.id)).slice(0, 2)
+          .map(st => stat(valueOf(st.id) ?? '–', '/10', st.name))),
       h('a', { class: 'btn primary wide', href: '#/' }, 'See your dashboard'));
   }
 

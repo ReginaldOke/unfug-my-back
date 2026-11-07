@@ -123,7 +123,10 @@ export function CheckinDetailView(ctx) {
     h('section', { class: 'detail-scores' },
       score('Pain', e.painScore, null, `--dot:${c.light};--dot2:${c.deep}`),
       score('Stress', e.stressScore),
-      score('Sleep', e.sleepQuality, e.sleepQuality != null ? sleepWord(e.sleepQuality) : null)),
+      score('Sleep', e.sleepQuality, e.sleepQuality != null ? sleepWord(e.sleepQuality) : null),
+      // Eating and the user's own sliders, only where answered
+      e.dietScore != null ? score('Eating', e.dietScore, sleepWord(e.dietScore)) : null,
+      ...(R.settings().customSliders ?? []).filter(c => e.custom?.[c.id] != null).map(c => score(c.name, e.custom[c.id]))),
 
     block('Where it hurt', date, 'where', markers.length
       ? markers.map(m => lineRow(null, regionById[m.regionId]?.displayName ?? m.regionId, m.intensity != null ? `${m.intensity}/10` : null, m.quality ? m.quality[0].toUpperCase() + m.quality.slice(1) : null))
@@ -146,6 +149,7 @@ export function CheckinDetailView(ctx) {
 
     changes.length ? block('Routine changes', date, null, changes.map(ch => lineRow(null, ch.name, null, ch.summary))) : null,
 
+    e.meals ? block('Meals', date, 'food', h('p', { class: 'detail-notes' }, e.meals)) : null,
     block('Notes', date, 'notes', e.notes ? h('p', { class: 'detail-notes' }, e.notes) : h('p', { class: 'hint' }, 'No notes')),
 
     h('button', {

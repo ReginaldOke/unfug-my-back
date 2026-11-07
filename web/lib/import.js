@@ -17,6 +17,10 @@ const MAX_ROWS = 20000;
 const str = (v, max = 200) => (typeof v === 'string' ? v.slice(0, max) : v == null ? null : String(v).slice(0, max));
 const text = (v, max) => str(v, max) ?? '';
 const num = (v, lo, hi) => { const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
+// The user's own slider answers: short plain ids to 0–10 scores, at most 20
+const scores = v => Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {})
+  .filter(([k]) => /^[a-z0-9-]{1,40}$/i.test(k)).slice(0, 20)
+  .map(([k, x]) => [k, num(x, 0, 10)]).filter(([, x]) => x != null));
 const bool = v => v === true || v === 1 || v === 'true';
 const id = v => (typeof v === 'string' && /^[\w.:-]{1,64}$/.test(v) ? v : null);
 const day = v => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
@@ -41,6 +45,7 @@ const CLEAN = {
   },
   dailyEntries: e => id(e.id) && day(e.date) && num(e.painScore, 0, 10) != null && {
     id: e.id, date: e.date, painScore: Math.round(num(e.painScore, 0, 10)), stressScore: num(e.stressScore, 0, 10), sleepQuality: num(e.sleepQuality, 0, 10),
+    dietScore: num(e.dietScore, 0, 10), meals: text(e.meals, 500), custom: scores(e.custom),
     notes: text(e.notes, 2000), completedAt: when(e.completedAt), durationSeconds: num(e.durationSeconds, 0, 86400),
   },
   painMarkers: m => id(m.id) && regionById[m.regionId] && {

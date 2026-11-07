@@ -5,6 +5,8 @@ import { ROLE_ICON, fmtAmount } from '../lib/labels.js';
 import * as R from '../lib/repos.js';
 
 const GLYPHS = {
+  leaf: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M20 4C11 4 5 8.5 5 15c0 1.6.4 3 1 4.2C8 14 11.5 11 16 9.5 12 12 9 15 7.4 20.3 8.7 21.4 10.3 22 12 22c6 0 8-7 8-18Z" fill="currentColor"/></svg>',
+  dot: '<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="5.5" fill="currentColor"/></svg>',
   bolt: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M13.5 2 5 13.5h6L10 22l9-12h-6.2L13.5 2Z" fill="currentColor"/></svg>',
   moon: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M20.5 14.6A8.5 8.5 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1Z" fill="currentColor"/></svg>',
   wave: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M2 12c2.2-4.5 4.3-4.5 6.5 0s4.3 4.5 6.5 0 4.3-4.5 6.5 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',

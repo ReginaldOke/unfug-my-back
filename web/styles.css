@@ -39,7 +39,8 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* An app, not a page: a double tap never zooms (taps also stop waiting to see if a second one follows) */
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
 body {
   margin: 0;
   min-height: 100dvh;
@@ -121,7 +122,11 @@ input, textarea, [contenteditable], .url-box { -webkit-user-select: text; user-s
    content is scrolled beneath the clock, so Home's glow stays clear at rest. */
 body::before {
   content: ''; position: fixed; inset: 0 0 auto; height: calc(env(safe-area-inset-top) * 1.3); z-index: 30; pointer-events: none;
-  background: linear-gradient(180deg, var(--bg) 55%, transparent); opacity: 0; transition: opacity .2s ease;
+  /* A soft blur under the clock rather than a solid band */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent); mask-image: linear-gradient(180deg, #000 45%, transparent);
+  opacity: 0; transition: opacity .25s ease;
 }
 body.scrolled::before { opacity: 1; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -159,7 +164,7 @@ button { cursor: pointer; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .top-bar h1 { font-size: 22px; }
 .top-bar .wordmark {
-  font-family: 'Italiana', serif; font-size: 34px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 4px;
+  font-family: 'Italiana', serif; font-size: 34px; font-weight: 400; letter-spacing: 0; line-height: 1.1; padding-top: 14px;
   /* A hair heavier than the face, with the faint glow the chart's lines have */
   -webkit-text-stroke: 0.45px currentColor; text-shadow: 0 0 12px rgba(255, 255, 255, 0.28);
 }
@@ -717,11 +722,14 @@ details.more[open] summary { margin-bottom: 10px; }
 .trend .day-label.on text { fill: #fff; font-weight: 600; }
 .trend .area { mix-blend-mode: screen; transition: opacity .3s; }
 .trend .line { fill: none; stroke-width: 1.8; stroke-linecap: round; mix-blend-mode: screen; }
+/* Pain sits in front, a touch bolder, without blending into the lines behind it */
+.trend .line.pain { stroke-width: 2.4; mix-blend-mode: normal; }
+.trend .line:not(.pain) { opacity: 0.8; }
+.trend .area:not(.pain) { opacity: 0.6; }
 .trend .hair { stroke: #fff; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5)); }
-.trend.animate .series { animation: series-in .9s var(--ease-out) both; transform-origin: 50% 100%; }
-.trend.animate .series:nth-of-type(2) { animation-delay: 80ms; }
-.trend.animate .series:nth-of-type(3) { animation-delay: 160ms; }
-.trend .series { transform-origin: 50% 100%; }
+.trend.animate .areas > *, .trend.animate .lines > * { animation: series-in .9s var(--ease-out) both; transform-origin: 50% 100%; transform-box: view-box; }
+.trend.animate .areas > :nth-child(2), .trend.animate .lines > :nth-child(2) { animation-delay: 80ms; }
+.trend.animate .areas > :nth-child(3), .trend.animate .lines > :nth-child(3) { animation-delay: 160ms; }
 @keyframes series-in { from { opacity: 0; transform: scaleY(0.6); } }
 .trend-readout { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 8px; font-size: 13px; color: var(--ink-2); min-height: 20px; }
 .trend-readout .when { color: var(--ink); }
@@ -1318,6 +1326,7 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] .chart .axis-today { fill: #fff; }
 [data-theme="light"] .trend .day-label.on text { fill: #1d1c1f; }
 [data-theme="light"] .trend .line { mix-blend-mode: multiply; }
+[data-theme="light"] .trend .line.pain { mix-blend-mode: normal; }
 [data-theme="light"] .trend .hair { stroke: #1d1c1f; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.15)); }
 [data-theme="light"] .cal-cell.changed::after, [data-theme="light"] .cal-key-change::before { background: rgba(0, 0, 0, 0.4); }
 
@@ -1893,3 +1902,12 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 @media (prefers-reduced-motion: reduce) { .cmp-track i { animation: none; } }
 .factor-page .dose-bar i, [data-theme="light"] .factor-page .dose-bar i { background: linear-gradient(0deg, #e2687f, #f4908a); border-radius: 13px 13px 0 0; }
 [data-theme="light"] .factor-page .dose-bar { background: rgba(0, 0, 0, 0.06); }
+
+/* Check-in ••• menu: a quiet control at the top right, and the list of steps it opens */
+.head-end { display: flex; align-items: center; gap: 4px; min-width: 44px; justify-content: flex-end; }
+.icon-btn.more { font-size: 11px; letter-spacing: 1px; color: var(--ink-3); }
+.step-list { display: flex; flex-direction: column; }
+.step-row { padding: 10px 0; border-bottom: 1px solid var(--line); gap: 8px; }
+.step-row:last-child { border-bottom: 0; }
+.food-step { display: flex; flex-direction: column; gap: 16px; }
+.notes.meals { min-height: 0; resize: none; }

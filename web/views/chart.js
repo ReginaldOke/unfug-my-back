@@ -8,13 +8,22 @@ const DASH = 18;
 
 // Muted palettes that read well on charcoal. The line and its key are drawn in the first colour, so
 // a line looks the same wherever it sits; the second only deepens the area fill underneath.
+// Things that go with more pain are warm, things that help are cool, so at a glance warm lines
+// rising read as bad and cool lines rising as good. The first of each goes to the main stressor and top helper.
+// Kept clear of pain's coral, so no stressor is mistaken for it
+export const WARM = [['#f3b46e', '#e8875a'], ['#f2d36b', '#d4a73a'], ['#ff9f45', '#e07a22'], ['#e98ae0', '#c45bbb'], ['#ffd2a1', '#e9a86a']];
+export const COOL = [['#74d4c0', '#4fb3a6'], ['#8fc4ff', '#5a8cf0'], ['#a4e38f', '#5fb85a'], ['#b9a0ff', '#8f6cf0'], ['#7fdcef', '#3fb2c9']];
 export const PALETTES = {
   pain: ['#f4908a', '#e2687f'],
-  stressor: ['#f3b46e', '#e8875a'],
-  helper: ['#74d4c0', '#4fb3a6'],
+  stressor: WARM[0],
+  helper: COOL[0],
 };
-// For extra series the user adds to the chart, in order; each a hue none of the above use
-export const EXTRA_PALETTES = [['#b9a0ff', '#8f6cf0'], ['#8fc4ff', '#5a8cf0'], ['#ff9fcf', '#e46aa6'], ['#dfe07a', '#b8b84a']];
+
+/** Colours for added lines, in order: warm for the bad ones, cool for the good, skipping the first of each. */
+export function extraPalettes(ids, isBad) {
+  let warm = 1, cool = 1;
+  return new Map(ids.map(id => [id, isBad(id) ? WARM[warm++ % WARM.length] : COOL[cool++ % COOL.length]]));
+}
 
 /** Catmull-Rom spline through points, as cubic Béziers, with control points clamped to the plot. */
 function smoothPath(pts, top, bottom) {
@@ -81,19 +90,20 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     taken.push(out);
     return out;
   };
-  const areas = visible.map(sr => {
+  // Every area first, then every line on top of them, pain's last so it sits in front of the rest
+  const shapes = visible.map(sr => {
     let pts = sr.values.flatMap((v, i) => (v == null || !days[i].logged ? [] : [{ x: x(i), y: y(v) }]));
     if (pts.length === 1) pts = [{ ...pts[0], y: apart(pts[0].y) }];
-    const runs = pts.length ? [pts] : [];
-    return s('g', { class: 'series' }, runs.map(pts => {
-      const line = smoothPath(pts, top, bottom);
-      return [
-        // A lone first day is just its level line; the area starts once there's a curve
-        pts.length > 1 ? s('path', { class: 'area', fill: `url(#fill-${sr.key}-${id})`, d: `${line} L${pts.at(-1).x},${bottom} L${pts[0].x},${bottom} Z` }) : null,
-        s('path', { class: 'line', stroke: sr.palette[0], filter: `url(#glow-${id})`, d: line }),
-      ];
-    }));
+    const line = pts.length ? smoothPath(pts, top, bottom) : null;
+    return {
+      key: sr.key,
+      // A lone first day is just its level line; the area starts once there's a curve
+      area: pts.length > 1 ? s('path', { class: `area${sr.key === 'pain' ? ' pain' : ''}`, fill: `url(#fill-${sr.key}-${id})`, d: `${line} L${pts.at(-1).x},${bottom} L${pts[0].x},${bottom} Z` }) : null,
+      line: line ? s('path', { class: `line${sr.key === 'pain' ? ' pain' : ''}`, stroke: sr.palette[0], filter: `url(#glow-${id})`, d: line }) : null,
+    };
   });
+  const front = [...shapes.filter(sh => sh.key !== 'pain'), ...shapes.filter(sh => sh.key === 'pain')];
+  const areas = [s('g', { class: 'areas' }, shapes.map(sh => sh.area)), s('g', { class: 'lines' }, front.map(sh => sh.line))];
 
   // Routines under the baseline. The spacing between days sets how many dots fit side by side; past that,
   // a day keeps its first few (done and changed first)

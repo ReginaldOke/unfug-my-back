@@ -157,7 +157,7 @@ addEventListener('click', e => {
   if (!p?.ended || Date.now() - p.ended > 600 || !e.target.closest?.('a[href]')) return;
   if (p.moved || p.ended - p.at > 600) { e.preventDefault(); e.stopPropagation(); }
 }, true);
-addEventListener('scroll', () => document.body.classList.toggle('scrolled', scrollY > 6), { passive: true });
+addEventListener('scroll', () => document.body.classList.toggle('scrolled', scrollY > 24), { passive: true });
 
 window.addEventListener('hashchange', render);
 render();

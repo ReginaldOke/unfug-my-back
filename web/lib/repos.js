@@ -233,6 +233,7 @@ export const checkins = {
       const existing = checkins.entryFor(date);
       const fields = {
         date, painScore: draft.pain, stressScore: draft.stress, sleepQuality: draft.sleep ?? null,
+        dietScore: draft.food ?? null, meals: (draft.meals ?? '').trim(), custom: { ...(draft.custom ?? {}) },
         notes: draft.notes.trim(), completedAt: S.nowISO(), durationSeconds: draft.durationSeconds ?? null,
       };
       const entry = existing ? S.update('dailyEntries', existing.id, fields) : S.insert('dailyEntries', fields);
