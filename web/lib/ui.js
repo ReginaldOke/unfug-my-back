@@ -100,6 +100,8 @@ export function sheet(build, { onClose, tall = false } = {}) {
     const ms = velocity > 0 ? Math.max(140, Math.min(300, dist / velocity)) : 300;
     dlg.animate([{ transform: `translateY(${from}px)` }, { transform: 'translateY(100%)' }], { duration: ms, easing: velocity ? 'cubic-bezier(.2, .6, .4, 1)' : SHEET_EASE, fill: 'forwards' })
       .finished.then(() => dlg.close(), () => dlg.close());
+    // If the animation never runs (a hidden page pauses them), close anyway, so a choice is never lost
+    setTimeout(() => { if (dlg.open) dlg.close(); }, ms + 200);
   }
 
   dlg.append(h('div', { class: 'sheet-grabber', 'aria-hidden': 'true' }), build(close));

@@ -1,11 +1,13 @@
-// Import: merges an exported diary (Settings › Export, from this app or the website) into this one.
-// Pure, unit-tested in test/import.test.js; repos.importDiary applies the plan.
+// Import: merges an exported diary (Settings › Export, from this app or the website) into this one, or,
+// into a diary with no check-ins yet, restores it exactly (planRestore). Pure, unit-tested in
+// test/import.test.js; repos.importDiary and repos.restoreDiary apply the plans.
 //
 // Nothing already here is changed or removed. Each diary was seeded separately, so stressors, helpers
 // and routines are matched by name rather than id. A day already checked in here keeps this diary's
 // version: the imported check-in for that day, with its body map spots and logs, is left out.
 
 import { regionById } from './regions.js';
+import { cleanSlider } from './checkin-steps.js';
 
 const norm = s => (s ?? '').trim().toLowerCase();
 
@@ -174,5 +176,50 @@ export function planImport(current, raw, { replaceDays = false } = {}) {
       checkins: n('dailyEntries'), skippedDays: skippedDays.size, replacedDays: replace.length, factors: n('factors'), routines: n('routines'),
       sessions: n('routineCompletions'), healthDays: n('healthDays'),
     },
+  };
+}
+
+// ---------- Restoring a whole diary ----------
+
+const ids = v => list(v, 60).filter(x => id(x));
+const hhmm = v => (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v) ? v : null);
+// The settings that make a diary yours, each checked like the rows above; the rest stay as they are
+const SETTINGS = {
+  checkinTime: hhmm,
+  theme: v => oneOf(v, ['auto', 'light', 'dark'], null),
+  tilesFirst: v => (typeof v === 'boolean' ? v : null),
+  customSliders: v => list(v, 20).map(cleanSlider).filter(Boolean),
+  checkinHidden: ids, chartExtras: ids, chartRemoved: ids, chartHidden: ids, homeOrder: ids, healthOnChart: ids,
+  reminder: r => r && typeof r === 'object' ? Object.fromEntries(Object.entries({
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : null,
+    intervalMin: num(r.intervalMin, 5, 240), minWalkMin: num(r.minWalkMin, 0, 60), minSteps: num(r.minSteps, 0, 5000), snoozeMin: num(r.snoozeMin, 1, 120),
+    activeHours: Array.isArray(r.activeHours) && r.activeHours.length === 7
+      ? r.activeHours.map(d => ({ on: bool(d?.on), start: hhmm(d?.start) ?? '09:00', end: hhmm(d?.end) ?? '17:00' })) : null,
+  }).filter(([, v]) => v != null)) : null,
+};
+
+/** The file's own settings, checked; anything missing or malformed is left out. */
+export function cleanSettings(raw) {
+  const out = {};
+  for (const [key, clean] of Object.entries(SETTINGS)) {
+    if (raw?.[key] === undefined) continue;
+    const v = clean(raw[key]);
+    if (v != null) out[key] = v;
+  }
+  return out;
+}
+
+/**
+ * Restoring into a diary with no check-ins: the file replaces everything, so the routines, stressors,
+ * helpers and settings come back exactly as they were, instead of sitting beside a new diary's starters.
+ * Older exports carried custom sliders at the top level; newer ones carry them in settings.
+ */
+export function planRestore(raw) {
+  const tables = cleanDiary(raw);
+  const settings = cleanSettings({ customSliders: raw?.customSliders?.map(c => ({ ...c, good: c.higherIsBetter === false ? 'low' : c.good })), ...raw?.settings });
+  const live = name => tables[name].filter(r => !r.isArchived).length;
+  return {
+    tables, settings,
+    summary: { checkins: tables.dailyEntries.length, factors: live('factors') - tables.factors.filter(f => f.routineId && !f.isArchived).length, routines: live('routines'), sessions: tables.routineCompletions.length, healthDays: tables.healthDays.length },
   };
 }

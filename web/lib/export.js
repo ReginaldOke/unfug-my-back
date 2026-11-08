@@ -1,5 +1,6 @@
 // Export for analysis in an AI chat. Pure, unit-tested in test/export.test.js.
 import { localDate } from './dates.js';
+import { cleanSettings } from './import.js';
 
 export const ANALYSIS_PROMPT = `You are analysing a personal back pain diary exported as JSON.
 Pain, stress, sleepQuality and dietScore are 0 to 10 (sleepQuality is the night before; 10 is slept well; dietScore 10 is ate well, with meals as optional text). custom holds the user's own 0 to 10 sliders, named in customSliders. healthDays has daily steps and sleep from Apple Health.
@@ -44,6 +45,8 @@ export function buildExport(data, { from, to, regions = [] }) {
     healthDays: (data.healthDays ?? []).filter(d => inRange(d.date)),
     routineChanges: (data.routineChanges ?? []).filter(c => inRange(c.date)),
     customSliders: (data.settings?.customSliders ?? []).map(({ id, name, good }) => ({ id, name, higherIsBetter: good !== 'low' })),
+    // Your setup (check-in steps, chart lines, reminders, theme), so a restore brings it back exactly
+    settings: cleanSettings(data.settings),
   };
 }
 

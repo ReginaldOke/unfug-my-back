@@ -5,7 +5,7 @@ import { SEED_FACTORS, SEED_ROUTINE, SEED_GYM } from './seed.js';
 import { defaultUnit, emojiFor } from './labels.js';
 import { regionAt, H } from './regions3d.js';
 import { regionById } from './regions.js';
-import { planImport } from './import.js';
+import { planImport, planRestore } from './import.js';
 
 export const settings = S.settings;
 export const setSettings = S.setSettings;
@@ -105,6 +105,23 @@ export function importDiary(data, plan = planImport(S.snapshot(), data)) {
   for (const date of plan.replace ?? []) checkins.remove(date);
   S.batch(() => {
     for (const [name, rows] of Object.entries(plan.add)) S.table(name)?.push(...rows);
+  });
+  giveRoutinesFactors();
+  return plan.summary;
+}
+
+/**
+ * Puts a whole exported diary back, replacing this one: every table, and the settings the file carries.
+ * The starter routines and stressors a fresh diary comes with are replaced too.
+ */
+export function restoreDiary(data, plan = planRestore(data)) {
+  S.batch(() => {
+    for (const [name, rows] of Object.entries(plan.tables)) {
+      const t = S.table(name);
+      if (t) t.splice(0, t.length, ...rows);
+    }
+    for (const name of ['reminderEvents', 'aiSummaries']) S.table(name)?.splice(0);
+    Object.assign(S.settings(), plan.settings);
   });
   giveRoutinesFactors();
   return plan.summary;

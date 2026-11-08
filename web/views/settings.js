@@ -2,7 +2,7 @@
 import { h, shareOrDownload, sheet, vibrate, toast, segmented } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { buildExport } from '../lib/export.js';
-import { planImport, isDiaryExport } from '../lib/import.js';
+import { planImport, planRestore, isDiaryExport } from '../lib/import.js';
 import { readWorkoutText, readCSV } from '../lib/interpret.js';
 import { readHealthExport } from '../lib/health.js';
 import { REGIONS } from '../lib/regions.js';
@@ -141,9 +141,10 @@ async function readFile(file, onProgress) {
 /** Pasted or plain text: a table if it looks like one, otherwise a workout. */
 const readText = raw => (/^[^\n]*[,\t;][^\n]*\n[^\n]*[,\t;]/.test(raw.trim()) && readCSV(raw)) || readWorkoutText(raw);
 
-/** What an import would add, then merge it in on Import. */
+/** What an import would add, then merge it in on Import. Into a diary with no check-ins, it restores instead. */
 function previewImport(data) {
   const n = (k, one, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
+  if (!R.checkins.all().length) return previewRestore(data, n);
   // Days checked in both here and in the file: the file's version can replace this phone's
   let replaceDays = false;
   const summaryOf = plan => {
@@ -181,6 +182,30 @@ function previewImport(data) {
         toast(`Added ${list[0]}${list.length > 1 ? ' and more' : ''}`);
       },
     }, 'Add'),
+    h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Cancel')), { tall: true });
+}
+
+/**
+ * A diary with no check-ins yet (new, or just deleted): the file replaces it, so its routines, stressors,
+ * helpers and check-in steps come back exactly, without the starter ones a new diary comes with.
+ */
+function previewRestore(data, n) {
+  const plan = planRestore(data);
+  const { checkins, factors, routines } = plan.summary;
+  const parts = [n(checkins, 'check-in'), n(factors, 'stressor or helper', 'stressors and helpers'), n(routines, 'routine')];
+  sheet(close => h('div', { class: 'stack' },
+    h('h2', {}, 'Restore this diary?'),
+    h('p', { class: 'muted' }, `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}, set up as they were.`),
+    h('p', { class: 'hint' }, 'It replaces the starter routines and stressors this phone has now.'),
+    h('button', {
+      type: 'button', class: 'btn primary', onclick: () => {
+        R.restoreDiary(data, plan);
+        close();
+        toast('Diary restored');
+        location.hash = '#/';
+        setTimeout(() => location.reload(), 300);
+      },
+    }, 'Restore'),
     h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Cancel')), { tall: true });
 }
 

@@ -95,3 +95,26 @@ test('a doctored file is cleaned: bad rows dropped, values bounded, unknown fiel
   assert.equal(add.painMarkers, undefined);
   assert.equal(add.factorLogs[0].value, 100000);
 });
+
+test('a restore brings back exactly the file’s routines, stressors and setup', async () => {
+  const { planRestore } = await import('../web/lib/import.js');
+  const file = {
+    ...web(),
+    routines: [...web().routines, { id: 'w-gym', group: 'Gym', name: 'Push', isArchived: true, items: [] }],
+    settings: { checkinHidden: ['stress'], customSliders: [{ id: 'energy', name: 'Energy', good: 'high' }], theme: 'dark', reminder: { intervalMin: 60 }, onboarded: false, evil: '<script>' },
+  };
+  const { tables, settings, summary } = planRestore(file);
+  // Everything in the file, deleted routines staying deleted
+  assert.deepEqual(tables.routines.map(r => [r.id, r.isArchived]), [['w-r1', false], ['w-gym', true]]);
+  assert.deepEqual(tables.factors.map(f => f.id), ['w-sit', 'w-guitar', 'w-mob']);
+  assert.equal(summary.routines, 1);
+  assert.equal(summary.checkins, 2);
+  // Only the settings that make it yours, checked
+  assert.deepEqual(settings, { theme: 'dark', customSliders: [{ id: 'energy', name: 'Energy', good: 'high' }], checkinHidden: ['stress'], reminder: { intervalMin: 60 } });
+});
+
+test('older exports with sliders at the top level still restore them', async () => {
+  const { planRestore } = await import('../web/lib/import.js');
+  const { settings } = planRestore({ ...web(), customSliders: [{ id: 'mood', name: 'Mood', higherIsBetter: false }] });
+  assert.deepEqual(settings.customSliders, [{ id: 'mood', name: 'Mood', good: 'low' }]);
+});
