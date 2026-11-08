@@ -154,7 +154,7 @@ export function CheckinView(ctx) {
       case 'food': return h('div', { class: 'food-step' },
         sliderStep('food', 'Eating', 'leaf', { colours: 'highIsGood', describe: sleepWord }),
         h('textarea', {
-          class: 'notes glass meals', rows: 2, maxlength: 500, placeholder: 'Meals, if you like',
+          class: 'notes glass meals', rows: 2, maxlength: 500, placeholder: 'What did you eat? (optional)',
           'aria-label': 'What you ate today (optional)', oninput: e => { draft.meals = e.target.value; renderFooter(); },
         }, draft.meals));
       case 'where': {
