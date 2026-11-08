@@ -379,7 +379,7 @@ function trendCard(today) {
     h('div', { class: 'row between' }, h('h2', {}, 'Trends'),
       h('div', { class: 'row tight' },
         viewToggle(),
-        ranges.length > 1 ? segmented(ranges.map(([v, label]) => [v, label]), ui.range, v => { ui.range = v; rerender(); }, 'Range') : null)),
+        rangeControl(ranges))),
     // The lines draw in when Home opens or the range changes, not on every quiet redraw
     TrendChart({
       animate: ui.drawn !== ui.range && !!(ui.drawn = ui.range), days, series: shownSeries, hidden: hiddenLines(),
@@ -399,6 +399,22 @@ export function chartRanges(span) {
   const fit = all.filter(([, , need]) => span >= need);
   const shown = fit.length > 4 ? [fit[0], ...fit.slice(-3)] : fit;
   return shown.length > 1 ? shown : [];
+}
+
+const RANGE_WORDS = { 7: '1 week', 14: '2 weeks', 30: '1 month', 90: '3 months', 180: '6 months', 365: '1 year' };
+
+/**
+ * Up to three ranges are buttons; past that, one quiet pill that opens the phone's own picker,
+ * showing the range in words. Nothing at all while there's only one range.
+ */
+function rangeControl(ranges) {
+  const pick = v => { ui.range = Number(v); rerender(); };
+  if (ranges.length < 2) return null;
+  if (ranges.length <= 3) return segmented(ranges.map(([v, label]) => [v, label]), ui.range, pick, 'Range');
+  const select = h('select', { 'aria-label': 'Range', onchange: e => pick(e.target.value) },
+    ranges.map(([v]) => h('option', { value: v }, RANGE_WORDS[v])));
+  select.value = String(ui.range);
+  return h('label', { class: 'range-pick glass' }, select, h('span', { class: 'range-chev', 'aria-hidden': 'true' }));
 }
 
 // Chart lines that aren't stressors or helpers; the user's own sliders are 'c:<id>'
