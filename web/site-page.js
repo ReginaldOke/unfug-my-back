@@ -54,8 +54,8 @@
     const narrow = () => innerWidth <= 820;
     const POSES = {
       hero: () => ({ x: 0, y: 0, s: narrow() ? 0.84 : 0.8, rx: 14, ry: -26, rz: 8, fade: 0 }),
-      right: () => (narrow() ? { x: 0, y: -0.2, s: 0.84, rx: 4, ry: -12, rz: 0, fade: 0 } : { x: 0.24, y: 0, s: 1.02, rx: 2, ry: -16, rz: 1.5, fade: 0 }),
-      left: () => (narrow() ? { x: 0, y: -0.2, s: 0.84, rx: 4, ry: 12, rz: 0, fade: 0 } : { x: -0.24, y: 0, s: 1.02, rx: 2, ry: 16, rz: -1.5, fade: 0 }),
+      right: () => (narrow() ? { x: 0, y: -0.18, s: 0.86, rx: 4, ry: -12, rz: 0, fade: 0 } : { x: 0.24, y: 0, s: 1.02, rx: 2, ry: -16, rz: 1.5, fade: 0 }),
+      left: () => (narrow() ? { x: 0, y: -0.18, s: 0.86, rx: 4, ry: 12, rz: 0, fade: 0 } : { x: -0.24, y: 0, s: 1.02, rx: 2, ry: 16, rz: -1.5, fade: 0 }),
     };
     // Leaving: it tips back, sinks away and fades, rather than being cut off by the next section
     POSES.exit = () => ({ ...POSES[sections.at(-2).dataset.pose](), y: narrow() ? -0.34 : -0.16, s: 0.72, rx: 26, fade: 1 });
@@ -176,15 +176,15 @@
       row: { name: 'Plank', unit: 'hold', at: i => smoothWeeks(plank, i), min: 20, max: 80, fmt: clock, from: plank[0], c: '#74d4c0' } },
   ];
   const CHAPTERS = [
-    { from: 0, to: 18, key: 'sitting', pill: 'What goes with pain', text: 'Pain is worse on days you sit for long' },
-    { from: 18, to: 37, key: 'walking', pill: 'What eases it', text: 'You have less pain on days you walk more' },
-    { from: 37, to: N, key: 'driving', pill: 'What hurts later', text: 'Pain gets worse the day after a long drive' },
-    { key: 'routine', pill: 'Your progress', text: 'Your pain has eased since you started deadlifts' },
+    { from: 0, to: 18, key: 'sitting', pill: 'What goes with pain', text: 'Your back hurts more on days you sit a lot' },
+    { from: 18, to: 37, key: 'walking', pill: 'What eases it', text: 'Your back feels better on days you walk more' },
+    { from: 37, to: N, key: 'driving', pill: 'What hurts later', text: 'A long drive leaves you sore the next day' },
+    { key: 'routine', pill: 'Your progress', text: 'Your pain has eased since you started deadlifting' },
   ];
   const CALLOUTS = [
     { ch: 0, a: ['sitting', 8], b: ['pain', 8], text: 'A long day at the desk, and a sore back' },
     { ch: 1, a: ['walking', 26], b: ['pain', 26], text: 'A long walk, and an easier day' },
-    { ch: 2, a: ['driving', 44], b: ['pain', 45], text: 'Two and a half hours driving, sore the next day' },
+    { ch: 2, a: ['driving', 44], b: ['pain', 45], text: 'Two and a half hours in the car' },
   ];
 
   const NS = 'http://www.w3.org/2000/svg';
@@ -297,6 +297,12 @@
       return n;
     }));
     notes.append(parts.tag);
+    // Resting points for the scroll on phones (where the page snaps): each chapter's example, then the progress view
+    track.querySelectorAll('.snap').forEach(m => m.remove());
+    const span = track.offsetHeight - innerHeight;
+    [8, 26, 44.5].map(d => (d / (N - 1)) * SPLIT).concat(1).forEach(p => {
+      const m = document.createElement('div'); m.className = 'snap'; m.style.top = `${Math.round(p * span)}px`; track.append(m);
+    });
     built = true;
     paint();
   }
@@ -375,8 +381,18 @@
       const lift = Math.min(p1[1], p2[1]) - 34;
       el('path', { d: p1[0] === p2[0] ? `M${p1[0]},${p1[1]} L${p2[0]},${p2[1]}` : `M${p1[0]},${p1[1]} C${p1[0]},${lift} ${p2[0]},${lift} ${p2[0]},${p2[1]}`, fill: 'none', stroke: sa.c, 'stroke-width': 1.5, 'stroke-dasharray': '4 4' }, parts.links);
       [[p1, sa.c], [p2, sb.c]].forEach(([[cx, cy], col]) => el('circle', { cx, cy, r: 5, fill: col, stroke: light ? '#fff' : '#0d0d0f', 'stroke-width': 2 }, parts.links));
-      n.style.left = `${clamp((p1[0] + p2[0]) / 2, 120, W - 120)}px`;
-      n.style.top = `${Math.max(40, Math.min(p1[1], p2[1]) - 92)}px`;
+      // Above the points when there's room under the day names; otherwise beside them, so the dots stay clear
+      const tag = n.firstChild, tw = tag.offsetWidth, th = tag.offsetHeight, gap = 22, floor = 48;
+      const lo = Math.min(p1[1], p2[1]), hiY = Math.max(p1[1], p2[1]);
+      const minX = Math.min(p1[0], p2[0]), maxX = Math.max(p1[0], p2[0]);
+      const archTop = p1[0] === p2[0] ? lo : lo - 34;
+      let cx = clamp((p1[0] + p2[0]) / 2, tw / 2 + 8, W - tw / 2 - 8), ty = archTop - gap - th;
+      if (ty < floor) {
+        cx = maxX + gap + tw / 2 <= W - 8 ? maxX + gap + tw / 2 : minX - gap - tw / 2;
+        ty = clamp((lo + hiY) / 2 - th / 2, floor, H - th - 8);
+      }
+      n.style.left = `${cx}px`;
+      n.style.top = `${ty}px`;
     });
 
     // Row labels for the routine view

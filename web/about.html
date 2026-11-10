@@ -28,6 +28,7 @@
       --shade: rgba(0, 0, 0, 0.9); --hair: rgba(255, 255, 255, 0.07); --pill: rgba(255, 255, 255, 0.05);
       /* The phone: graphite, with a lit edge */
       --body-a: #2a2a2e; --body-b: #0f0f11; --rim: rgba(255, 255, 255, 0.22); --screen: #0d0d0f;
+      --glass-hi: rgba(255, 255, 255, 0.16); --glass-lo: rgba(255, 255, 255, 0.04); --glass-rim: rgba(255, 255, 255, 0.22); --glass-shine: rgba(255, 255, 255, 0.35);
     }
     @media (prefers-color-scheme: light) {
       :root:not([data-theme="dark"]) {
@@ -37,6 +38,7 @@
         --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
         --shade: rgba(60, 40, 30, 0.35); --hair: rgba(0, 0, 0, 0.07); --pill: rgba(255, 255, 255, 0.5);
         --body-a: #e9e7e4; --body-b: #b9b6b2; --rim: rgba(255, 255, 255, 0.9); --screen: #efebe6;
+        --glass-hi: rgba(255, 255, 255, 0.55); --glass-lo: rgba(255, 255, 255, 0.18); --glass-rim: rgba(255, 255, 255, 0.7); --glass-shine: rgba(255, 255, 255, 0.9);
       }
     }
     :root[data-theme="light"] {
@@ -46,6 +48,7 @@
       --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
       --shade: rgba(60, 40, 30, 0.35); --hair: rgba(0, 0, 0, 0.07); --pill: rgba(255, 255, 255, 0.5);
       --body-a: #e9e7e4; --body-b: #b9b6b2; --rim: rgba(255, 255, 255, 0.9); --screen: #efebe6;
+      --glass-hi: rgba(255, 255, 255, 0.55); --glass-lo: rgba(255, 255, 255, 0.18); --glass-rim: rgba(255, 255, 255, 0.7); --glass-shine: rgba(255, 255, 255, 0.9);
     }
 
     * { box-sizing: border-box; }
@@ -146,7 +149,14 @@
     .key:focus-visible { outline: 1px solid var(--c); outline-offset: 4px; border-radius: 4px; }
     .notes { position: absolute; inset: 0; pointer-events: none; }
     .callout { position: absolute; width: 230px; margin-left: -115px; transition: opacity .35s; text-align: center; }
-    .callout .tag { display: inline-block; padding: 8px 14px; border-radius: 14px; font-size: 14px; line-height: 1.35; color: var(--ink); background: var(--pill); border: 1px solid var(--edge); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 14px 34px -18px var(--shade); }
+    .callout .tag { max-width: 230px; }
+    /* Liquid glass: mostly clear, blurred and brightened behind, a lit top edge and a soft sheen */
+    .callout .tag {
+      display: inline-block; padding: 9px 16px; border-radius: 18px; font-size: 14px; line-height: 1.35; color: var(--ink);
+      background: linear-gradient(160deg, var(--glass-hi), var(--glass-lo)); border: 1px solid var(--glass-rim);
+      -webkit-backdrop-filter: blur(16px) saturate(170%); backdrop-filter: blur(16px) saturate(170%);
+      box-shadow: inset 0 1px 0 var(--glass-shine), inset 0 -8px 16px -12px var(--glass-shine), 0 18px 40px -22px var(--shade);
+    }
     /* The routine view: one row per line, like the app's progress page */
     .rows { position: absolute; inset: 0; pointer-events: none; max-width: 100%; }
     .vis .plot { touch-action: pan-y; }
@@ -180,16 +190,22 @@
       header { padding: 12px; }
       .brand span { font-size: 20px; }
       .btn.head { display: none; }
-      .phone3d { --w: min(230px, 27vh); }
+      .phone3d { --w: min(200px, 22vh); }
       .scene { align-items: flex-end; padding: 0 20px 7vh; }
-      .scene .copy { width: 100%; padding-top: 28px; background: linear-gradient(transparent, var(--bg) 28px); }
+      .scene .copy { width: 100%; position: relative; }
+      /* A soft wash up from the bottom of the screen, edge to edge, so the words read over the phone without a box */
+      .scene::before {
+        content: ''; position: absolute; left: 50%; bottom: 0; width: 100vw; height: 64%; margin-left: -50vw; z-index: -1; pointer-events: none;
+        background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 72%, transparent) 34%, color-mix(in srgb, var(--bg) 94%, transparent) 70%, var(--bg));
+      }
+      .scene h2, .scene p { text-shadow: 0 1px 18px var(--bg); }
       .scene h2 { font-size: 30px; margin-bottom: 12px; }
       .scene p { font-size: 17px; }
       .scene .copy.long p:nth-of-type(n+2) { display: none; }
       .legend { gap: 0 16px; padding: 0 12px; }
       .key { font-size: 13px; gap: 7px; }
       .callout { width: 170px; margin-left: -85px; }
-      .callout .tag { font-size: 12.5px; padding: 6px 10px; }
+      .callout .tag { font-size: 12.5px; padding: 7px 11px; max-width: 170px; }
       .message { min-height: 150px; margin-top: 1vh; }
       .msg { font-size: 30px; }
       .day { font-size: 12.5px; }
@@ -197,6 +213,16 @@
       .chapter { height: 38px; font-size: 10.5px; letter-spacing: .1em; }
       .row { font-size: 13px; align-items: flex-start; padding-top: 6px; }
       footer { padding: 24px 20px 40px; }
+    }
+    /* Phones: each swipe settles on the next section, with the phone at rest above its words, and the chart stops
+       on each chapter, like the pauses on a wide screen. The chart's stops are placed by site-page.js. */
+    .snap { position: absolute; left: 0; width: 1px; height: 1px; pointer-events: none; }
+    @media (max-width: 820px) {
+      html { scroll-snap-type: y mandatory; }
+      .hero, .scene { scroll-snap-align: start; scroll-snap-stop: always; }
+      .snap { scroll-snap-align: start; scroll-snap-stop: always; }
+      .private { scroll-snap-align: center; }
+      footer { scroll-snap-align: end; }
     }
     @media (prefers-reduced-motion: reduce) {
       .drop, .sky i { animation: none; }
@@ -224,7 +250,6 @@
             <div class="face"><div class="screen">
               <video data-clip="patterns" muted loop playsinline preload="none"></video>
               <video data-clip="track" muted loop playsinline preload="none"></video>
-              <video data-clip="insight" muted loop playsinline preload="none"></video>
               <video data-clip="routine" muted loop playsinline preload="none"></video>
             </div></div>
           </div>
@@ -255,18 +280,9 @@
         </div>
       </section>
 
-      <section class="scene" data-pose="right" data-clip="insight">
+      <section class="scene" data-pose="right" data-clip="routine" data-move="slide">
         <div class="copy reveal long">
-          <span class="num">02 · Patterns</span>
-          <h2>Find out what's causing your pain</h2>
-          <p>Back Story looks at everything you log and shows which activities go with more pain, and which go with less.</p>
-          <p>It also spots things that hurt a day or two later, like a long drive, and only flags a pattern when it's unlikely to be chance.</p>
-        </div>
-      </section>
-
-      <section class="scene right" data-pose="left" data-clip="routine" data-move="slide">
-        <div class="copy reveal long">
-          <span class="num">03 · Routines</span>
+          <span class="num">02 · Routines</span>
           <h2>Keep track of your stretching, mobility and gym routines</h2>
           <p>Save your routines once, then press play and follow along one move at a time, with an animated guide for each stretch. Log sets, reps and weights as you go.</p>
           <p>Every move gets its own progress line, and your routines show up on the pain chart, so you can see if they're helping.</p>
