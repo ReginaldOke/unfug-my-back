@@ -189,15 +189,13 @@
       row: { name: 'Plank', unit: 'hold', at: i => smoothWeeks(plank, i), min: 20, max: 80, fmt: clock, from: plank[0], c: '#74d4c0' } },
   ];
   const CHAPTERS = [
-    { from: 0, to: 18, key: 'sitting', pill: 'What goes with pain', text: 'Your back hurts more on days you sit a lot' },
-    { from: 18, to: 37, key: 'walking', pill: 'What eases it', text: 'Your back feels better on days you walk more' },
+    { from: 0, to: 37, key: 'walking', pill: 'What eases it', text: 'Your back feels better on days you walk more' },
     { from: 37, to: N, key: 'driving', pill: 'What hurts later', text: 'A long drive leaves you sore the next day' },
     { key: 'routine', pill: 'Your progress', text: 'Your pain has eased since you started deadlifting' },
   ];
   const CALLOUTS = [
-    { ch: 0, a: ['sitting', 8], b: ['pain', 8], text: 'A long day at the desk, and a sore back' },
-    { ch: 1, a: ['walking', 26], b: ['pain', 26], text: 'A long walk, and an easier day' },
-    { ch: 2, a: ['driving', 44], b: ['pain', 45], text: 'Two and a half hours in the car' },
+    { ch: 0, a: ['walking', 26], b: ['pain', 26], text: 'A long walk, and an easier day' },
+    { ch: 1, a: ['driving', 44], b: ['pain', 45], text: 'Two and a half hours in the car' },
   ];
 
   const NS = 'http://www.w3.org/2000/svg';
@@ -231,8 +229,9 @@
     return b;
   });
   // The scroll is shared out: three chapters of days moving past, then the change to the routine view
-  const SPLIT = 0.72;
-  const chapterStart = k => (k < 3 ? (CHAPTERS[k].from / (N - 1)) * SPLIT : SPLIT + 0.02);
+  const SPLIT = 0.7, LAST = CHAPTERS.length - 1;
+  // Where each chapter rests: its example, or the finished progress view
+  const chapterStart = k => (k < LAST ? (CALLOUTS[k].b[1] / (N - 1)) * SPLIT : SPLIT + 0.17);
 
   // Hovering the chart picks the day under the pointer (mouse only: on a touch screen the scroll does it)
   // In the routine view the pointer (or a finger) runs along the weeks instead, as on the app's progress page
@@ -313,7 +312,7 @@
     // Resting points for the scroll on phones (where the page snaps): each chapter's example, then the progress view
     track.querySelectorAll('.snap').forEach(m => m.remove());
     const span = track.offsetHeight - innerHeight;
-    [8, 26, 44.5].map(d => (d / (N - 1)) * SPLIT).concat(1).forEach(p => {
+    CHAPTERS.map((_, k) => chapterStart(k)).forEach(p => {
       const m = document.createElement('div'); m.className = 'snap'; m.style.top = `${Math.round(p * span)}px`; track.append(m);
     });
     built = true;
@@ -324,8 +323,8 @@
     const r = track.getBoundingClientRect();
     const p = clamp(-r.top / (r.height - innerHeight));
     pos = clamp(p / SPLIT) * (N - 1);
-    morphT = ease(clamp((p - SPLIT - 0.03) / 0.2));
-    chapter = p >= SPLIT ? 3 : CHAPTERS.findIndex(c => c.to > Math.round(pos));
+    morphT = ease(clamp((p - SPLIT - 0.02) / 0.14));
+    chapter = p >= SPLIT ? LAST : CHAPTERS.findIndex(c => c.to > Math.round(pos));
   }
 
   function paint() {
@@ -441,7 +440,7 @@
       msg.text.animate?.([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: still ? 0 : 450, easing: 'ease-out' });
       msg.text.textContent = c.text;
     }
-    if (showCh === 3) msg.day.textContent = scrub != null ? `Week ${week(scrub) + 1}` : `Deadlifts from week 4. Average pain ${avgPain(0, LIFTS_FROM).toFixed(1)} before, ${avgPain(LIFTS_FROM, N).toFixed(1)} since`;
+    if (showCh === LAST) msg.day.textContent = scrub != null ? `Week ${week(scrub) + 1}` : `Deadlifts from week 4. Average pain ${avgPain(0, LIFTS_FROM).toFixed(1)} before, ${avgPain(LIFTS_FROM, N).toFixed(1)} since`;
     else {
       const d = days[day];
       msg.day.textContent = '';

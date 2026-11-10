@@ -139,7 +139,7 @@
 
     /* ---- The example diary as a big chart. It stays put while the page scrolls, and the days slide past the
        line in the middle. Drawn by site-page.js. */
-    .vis-track { position: relative; height: 520vh; }
+    .vis-track { position: relative; height: 400vh; }
     .vis { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; padding-bottom: max(32px, 5vh); }
     .message { text-align: center; margin: 3vh auto 1vh; min-height: 110px; padding: 0 20px; max-width: 900px; }
     .msg { font: 400 clamp(34px, 4.4vw, 58px)/1.08 'Italiana', serif; -webkit-text-stroke: .5px currentColor; margin: 10px 0 12px; text-wrap: balance; }
@@ -176,12 +176,12 @@
     .row .name small { font-size: .78em; color: var(--ink-3); margin-left: 4px; }
     .row b { font-weight: 500; }
     .start-tag { position: absolute; transform: translateX(-50%); padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap; color: #16161a; background: #74d4c0; box-shadow: 0 8px 22px -10px #74d4c0; transition: opacity .3s; pointer-events: none; }
-    .chapters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 1100px; margin: 2.6vh auto 0; padding: 0 20px; width: 100%; }
+    .chapters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 860px; margin: 2.6vh auto 0; padding: 0 20px; width: 100%; }
     .chapter { all: unset; position: relative; cursor: pointer; height: 46px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); background: var(--pill); border: 1px solid var(--edge); overflow: hidden; transition: color .3s; text-align: center; padding: 0 10px; }
     .chapter::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #e2687f, #f3b46e); opacity: 0; transition: opacity .45s; }
-    .chapter:nth-child(2)::before { background: linear-gradient(90deg, #74d4c0, #8fc4ff); }
-    .chapter:nth-child(3)::before { background: linear-gradient(90deg, #c27be0, #e2687f); }
-    .chapter:nth-child(4)::before { background: linear-gradient(90deg, #74d4c0, #f3b46e); }
+    .chapter:nth-child(1)::before { background: linear-gradient(90deg, #74d4c0, #8fc4ff); }
+    .chapter:nth-child(2)::before { background: linear-gradient(90deg, #c27be0, #e2687f); }
+    .chapter:nth-child(3)::before { background: linear-gradient(90deg, #74d4c0, #f3b46e); }
     .chapter span { position: relative; }
     .chapter.on { color: #1d1c1f; }
     .chapter.on::before { opacity: 1; }
@@ -220,7 +220,7 @@
       .message { min-height: 150px; margin-top: 1vh; }
       .msg { font-size: 30px; }
       .day { font-size: 12.5px; }
-      .chapters { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .chapters { grid-template-columns: repeat(3, 1fr); gap: 6px; }
       .chapter { height: 38px; font-size: 10.5px; letter-spacing: .1em; }
       .row { font-size: 13px; align-items: flex-start; padding-top: 6px; }
       footer { padding: 24px 20px 40px; }
