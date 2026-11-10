@@ -511,12 +511,15 @@ function patternsCard(today) {
       h('p', { class: 'hint' }, 'Check in to start seeing what moves your pain.'));
   }
 
-  // Only factors whose pain differs with and without, by the same numbers as their own page
-  const rows = factors.map(f => ({ factor: f, st: factorStory(f, data, today) }))
+  // Whatever goes most with pain, whatever its role: the three biggest rises, then the three biggest
+  // falls, by the same numbers as each one's own page
+  const all = factors.map(f => ({ factor: f, st: factorStory(f, data, today) }))
     .filter(x => x.st.state === 'up' || x.st.state === 'down')
-    .map(x => ({ factor: x.factor, delta: x.st.best.delta, early: x.st.early }))
-    .sort((a, b) => (a.early - b.early) || Math.abs(b.delta) - Math.abs(a.delta))
-    .slice(0, 5);
+    .map(x => ({ factor: x.factor, delta: x.st.best.delta, early: x.st.early }));
+  const rows = [
+    ...all.filter(a => a.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3),
+    ...all.filter(a => a.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3),
+  ];
   if (!rows.length) {
     return h('section', { class: 'card glass patterns' }, head,
       h('div', { class: 'pat-list ghost', 'aria-hidden': 'true' }, [0.55, -0.4, 0.22].map(w => patRow(null, w))),

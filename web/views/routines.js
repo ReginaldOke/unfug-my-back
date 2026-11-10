@@ -1,8 +1,10 @@
 // Routines: your list, one page per routine (edit it and log a day's session in the same place),
 // and a one-move-at-a-time player that shares the session in progress.
-import { h, toast, iconButton, confirmSheet, vibrate } from '../lib/ui.js';
+import { h, s as svg, toast, iconButton, confirmSheet, vibrate } from '../lib/ui.js';
+import { progressRows, moveText } from '../lib/progress.js';
+import { smoothPath } from './chart.js';
 import * as R from '../lib/repos.js';
-import { localDate, dayLabel } from '../lib/dates.js';
+import { localDate, dayLabel, parseDate } from '../lib/dates.js';
 import { bumpLastNumber, parseReminder, formatReminder } from '../lib/labels.js';
 import { checkinDraft } from './checkin.js';
 import { MoveFigure } from './figure.js';
@@ -149,6 +151,8 @@ function sessionFor(r, date, fromCheckin) {
     intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
     measure: r?.measure ?? defaultMeasure(`${r?.group ?? ''} ${r?.name ?? ''}`),
     times: logged?.times ?? 1,
+    // Timed with the stopwatch on this day, beyond the routine's own moves (today's log only)
+    timed: (logged?.log ?? []).filter(x => x.timed && !(r?.items ?? []).some(it => it.name === x.name)).map(x => ({ name: x.name, did: x.did })),
   };
   sessions.set(key, s);
   return s;
@@ -190,7 +194,10 @@ function saveOne(s, { markDone = false } = {}) {
   // variations edited on the way only log if something was entered for them.
   const logIt = (markDone && !!s.id) || s.touched || items.some(it => it.done);
   if (logIt) {
-    const log = items.map(it => ({ name: it.name.trim(), did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}) }));
+    const log = [
+      ...items.map(it => ({ name: it.name.trim(), did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}) })),
+      ...(s.timed ?? []).map(t => ({ name: t.name, did: t.did, timed: true })),
+    ];
     // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
     const live = checkinDraft(s.date);
     R.routines.logSession(r.id, s.date, s.measure === 'count' ? { log, times: s.times } : { log, intensity: s.intensity }, { writeLog: !live });
@@ -199,6 +206,143 @@ function saveOne(s, { markDone = false } = {}) {
   sessions.delete(s.key);
   s.logged = logIt;
   return r;
+}
+
+/** 0:07, 1:45, 1:02:10 */
+export function fmtClock(ms) {
+  const t = Math.floor(ms / 1000), hr = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = String(t % 60).padStart(2, '0');
+  return hr ? `${hr}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
+const CLOCK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M10 2.5h4"/></svg>';
+
+/**
+ * A small stopwatch at the foot of a routine, for timed holds like a dead hang. Tap to start, tap to
+ * stop, name it, save. A name that matches a move fills that move's box (so it's tracked like reps);
+ * any other name joins today's session only, listed under the timer. The clock lives in the session,
+ * so it keeps running while you switch variations or open the player.
+ */
+function stopwatch(s, repaintMoves, ctx) {
+  s.clock ??= { start: null, held: 0, label: '' };
+  const c = s.clock;
+  const el = h('div', { class: 'stopwatch' });
+  const now = () => c.held + (c.start ? Date.now() - c.start : 0);
+  let tick = 0;
+  const run = () => { clearInterval(tick); if (c.start) tick = setInterval(() => { const t = el.querySelector('.sw-time'); if (t) t.textContent = fmtClock(now()); }, 250); };
+  ctx.onCleanup(() => clearInterval(tick));
+
+  const save = label => {
+    const name = label.trim();
+    if (!name) return toast('Name it first');
+    const did = fmtClock(now());
+    const move = s.items.find(it => it.name.trim().toLowerCase() === name.toLowerCase());
+    if (move) { move.did = did; move.done = true; repaintMoves(); }
+    else s.timed = [...(s.timed ?? []).filter(t => t.name !== name), { name, did }];
+    s.touched = true;
+    Object.assign(c, { start: null, held: 0, label: name });
+    vibrate(8);
+    paint();
+  };
+
+  function paint() {
+    const ms = now();
+    const pill = (cls, label, onclick, inner) => {
+      const b = h('button', { type: 'button', class: `sw-pill glass ${cls}`, 'aria-label': label, onclick }, ...inner);
+      return b;
+    };
+    let row;
+    if (c.start) {
+      // Running: the time, and a tap stops it
+      row = pill('running', 'Stop the timer', () => { c.held = now(); c.start = null; vibrate(6); paint(); },
+        [h('span', { class: 'sw-dot', 'aria-hidden': 'true' }), h('span', { class: 'sw-time' }, fmtClock(ms))]);
+    } else if (ms > 0) {
+      // Stopped: name it and save, carry on, or let it go
+      const name = h('input', {
+        type: 'text', class: 'sw-name', value: c.label, placeholder: 'What was it?', maxlength: 40, 'aria-label': 'What you timed', enterkeyhint: 'done',
+        onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); save(name.value); } },
+      });
+      row = h('div', { class: 'sw-stopped glass' },
+        h('button', { type: 'button', class: 'sw-time', 'aria-label': 'Carry on timing', onclick: () => { c.start = Date.now(); paint(); } }, fmtClock(ms)),
+        name,
+        h('button', { type: 'button', class: 'sw-save', onclick: () => save(name.value) }, 'Save'),
+        h('button', { type: 'button', class: 'sw-x', 'aria-label': 'Discard this time', onclick: () => { c.held = 0; paint(); } }, '✕'));
+      setTimeout(() => { if (!c.label) name.focus({ preventScroll: true }); }, 30);
+    } else {
+      const b = pill('idle', 'Start a timer', () => { c.start = Date.now(); vibrate(6); paint(); }, [h('span', { class: 'sw-icon' }), h('span', {}, 'Timer')]);
+      b.querySelector('.sw-icon').innerHTML = CLOCK;
+      row = b;
+    }
+    // What's been timed today that isn't one of the moves
+    const saved = (s.timed ?? []).map(t => h('div', { class: 'sw-saved' },
+      h('span', { class: 'grow' }, t.name), h('span', { class: 'sw-saved-time' }, t.did),
+      h('button', { type: 'button', class: 'sw-x', 'aria-label': `Remove ${t.name}`, onclick: () => { s.timed = s.timed.filter(x => x !== t); s.touched = true; paint(); } }, '✕')));
+    el.replaceChildren(row, ...saved);
+    run();
+  }
+  paint();
+  return el;
+}
+
+const CHART = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>';
+
+/**
+ * How each move has gone over the last dozen sessions, in the routine's order: its name and what you
+ * did on the chosen day, over a small glowing line like Home's chart. Touch or drag along any line to
+ * choose a day; every row follows. Starts on the latest session.
+ */
+function progressView(session, past) {
+  const shown = past.slice(-12);
+  const rows = progressRows(session.items.map(it => it.name), shown);
+  const W = 300, H = 44, pad = 6, n = shown.length;
+  const x = i => pad + (n === 1 ? (W - 2 * pad) / 2 : (i * (W - 2 * pad)) / (n - 1));
+  let sel = n - 1;
+  const el = h('div', { class: 'prog' });
+
+  // Every line spans the view's full width, so the view itself is the ruler (lines are redrawn as you drag)
+  const choose = e => {
+    const box = el.getBoundingClientRect();
+    const f = (e.clientX - box.left) / box.width;
+    const i = Math.max(0, Math.min(n - 1, Math.round(((f * W - pad) / (W - 2 * pad)) * (n - 1))));
+    if (i !== sel) { sel = i; vibrate(3); paint(); }
+  };
+
+  function line(row) {
+    const pts = row.values.map((v, i) => (v ? { i, v: v.value } : null)).filter(Boolean);
+    if (pts.length < 2) return h('div', { class: 'prog-chart empty' });
+    const lo = Math.min(...pts.map(p => p.v)), hi = Math.max(...pts.map(p => p.v));
+    const y = v => (hi === lo ? H / 2 : H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad));
+    const xy = pts.map(p => ({ x: x(p.i), y: y(p.v) }));
+    const d = smoothPath(xy, pad, H - pad);
+    const here = pts.find(p => p.i === sel);
+    const chart = svg('svg', { class: 'prog-chart', viewBox: `0 0 ${W} ${H}`, 'aria-hidden': 'true' },
+      svg('path', { class: 'prog-area', d: `${d} L${xy.at(-1).x},${H} L${xy[0].x},${H} Z` }),
+      svg('line', { class: 'prog-hair', x1: x(sel), x2: x(sel), y1: 0, y2: H }),
+      svg('path', { class: 'prog-line', d }),
+      here ? svg('circle', { class: 'prog-dot', cx: x(sel), cy: y(here.v), r: 3.2 }) : null);
+    return chart;
+  }
+
+  function paint() {
+    const day = shown[sel].date;
+    el.replaceChildren(
+      h('div', { class: 'prog-head' },
+        h('span', {}, parseDate(day).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })),
+        h('span', { class: 'hint' }, `${sel + 1} of ${n}`)),
+      ...rows.map(row => {
+        const e = row.entries[sel];
+        return h('div', { class: 'prog-row' },
+          h('div', { class: 'prog-top' }, h('span', { class: 'prog-name' }, row.name), h('span', { class: `prog-val${e ? '' : ' none'}` }, e ? moveText(e) : 'Not done')),
+          line(row));
+      }));
+  }
+  // One gesture for the whole view: touch a line, drag along it
+  let dragging = false;
+  el.addEventListener('pointerdown', e => { if (!e.target.closest('.prog-chart')) return; dragging = true; el.setPointerCapture?.(e.pointerId); choose(e); });
+  el.addEventListener('pointermove', e => { if (dragging) choose(e); });
+  el.addEventListener('pointerup', () => { dragging = false; });
+  el.addEventListener('pointercancel', () => { dragging = false; });
+  paint();
+  return el;
 }
 
 const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>';
@@ -453,17 +597,41 @@ export function RoutineView(ctx) {
   }
 
   if (!r) setTimeout(() => title.focus(), 50);
+  // Progress: once there are two sessions, a chart button swaps the moves for how each has changed
+  const past = r ? R.routines.history(r.id) : [];
+  const body = h('div', { class: 'routine-body' });
+  const progress = h('div', { class: 'routine-progress', hidden: true });
+  const chartBtn = past.length >= 2 ? h('button', {
+    type: 'button', class: 'icon-btn glass chart-btn', 'aria-pressed': 'false', 'aria-label': 'Show progress', title: 'Progress',
+    onclick: () => {
+      const on = progress.hidden;
+      if (on) progress.replaceChildren(progressView(s, past));
+      progress.hidden = !on; body.hidden = on;
+      chartBtn.classList.toggle('on', on);
+      chartBtn.setAttribute('aria-pressed', String(on));
+      chartBtn.setAttribute('aria-label', on ? 'Back to the routine' : 'Show progress');
+      vibrate(4);
+    },
+  }) : null;
+  if (chartBtn) chartBtn.innerHTML = CHART;
   return h('div', { class: 'view routine-page' },
     h('header', { class: 'top-bar' },
       iconButton('‹', 'Back', () => history.back()),
       date === localDate() ? h('span') : h('span', { class: 'eyebrow' }, dayLabel(date)),
-      h('div', { class: 'row tight' }, play,
+      h('div', { class: 'row tight' }, chartBtn, play,
         h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
     title,
     variationTabs(),
+    progress,
+    fillBody());
+
+  // The routine itself: moves, how it went, the timer, reminders
+  function fillBody() {
+    body.append(
     list,
     add,
     field,
+    stopwatch(s, paint, ctx),
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
     r ? h('button', {
       type: 'button', class: 'link-danger', onclick: async () => {
@@ -476,6 +644,8 @@ export function RoutineView(ctx) {
         }
       },
     }, r.group ? 'Delete this variation' : 'Delete routine') : null);
+    return body;
+  }
 }
 
 const SCRUB_STEP = 14; // px of finger travel per step

@@ -8,11 +8,11 @@ const DASH = 18;
 
 // Muted palettes that read well on charcoal. The line and its key are drawn in the first colour, so
 // a line looks the same wherever it sits; the second only deepens the area fill underneath.
-// Things that go with more pain are warm, things that help are cool, so at a glance warm lines
-// rising read as bad and cool lines rising as good. The first of each goes to the main stressor and top helper.
-// Kept clear of pain's coral, so no stressor is mistaken for it
-export const WARM = [['#f3b46e', '#e8875a'], ['#f2d36b', '#d4a73a'], ['#ff9f45', '#e07a22'], ['#e98ae0', '#c45bbb'], ['#ffd2a1', '#e9a86a']];
-export const COOL = [['#74d4c0', '#4fb3a6'], ['#8fc4ff', '#5a8cf0'], ['#a4e38f', '#5fb85a'], ['#b9a0ff', '#8f6cf0'], ['#7fdcef', '#3fb2c9']];
+// The original palette, loosely sorted: things that go with more pain lean warm (amber, lime, pink,
+// orchid), things that help lean cool (teal, blue, violet, green). Neighbours in each set are far apart
+// in hue, so three stressors never read as three oranges; none comes close to pain's coral.
+export const WARM = [['#f3b46e', '#e8875a'], ['#dfe07a', '#b8b84a'], ['#ff9fcf', '#e46aa6'], ['#e3a6f5', '#c27be0']];
+export const COOL = [['#74d4c0', '#4fb3a6'], ['#8fc4ff', '#5a8cf0'], ['#b9a0ff', '#8f6cf0'], ['#a3e19a', '#5fb85a']];
 export const PALETTES = {
   pain: ['#f4908a', '#e2687f'],
   stressor: WARM[0],
@@ -26,7 +26,7 @@ export function extraPalettes(ids, isBad) {
 }
 
 /** Catmull-Rom spline through points, as cubic Béziers, with control points clamped to the plot. */
-function smoothPath(pts, top, bottom) {
+export function smoothPath(pts, top, bottom) {
   // A single day is drawn as a short level line, so the first check-in reads as the start of a trend
   if (pts.length === 1) return `M${pts[0].x - DASH},${pts[0].y} L${pts[0].x + DASH},${pts[0].y}`;
   const cy = y => Math.min(bottom, Math.max(top, y));
@@ -51,12 +51,16 @@ function smoothPath(pts, top, bottom) {
 export function TrendChart({ days, series, hidden = new Set(), onToggle = () => {}, onAdd = null, focus: home = days.length - 1, fadeLeft = true, marks = [], routineDays = [], onMark = () => {}, animate = true }) {
   const id = ++uid;
   // Even side padding, just enough to keep the first and last day labels whole
-  const W = 340, H = 196, top = 46, bottom = 176, left = 22, right = W - 22;
+  // The plot runs nearly edge to edge, so it lines up with the card's text; the end labels hang inward
+  const W = 340, H = 196, top = 46, bottom = 176, left = 4, right = W - 4;
   const n = days.length;
   const x = i => left + (n === 1 ? (right - left) / 2 : (i / (n - 1)) * (right - left));
   const y = v => bottom - v * (bottom - top);
   const labelEvery = n <= 14 ? 1 : n <= 31 ? 7 : n <= 92 ? 14 : 61; // about six labels at most past a fortnight
   const showLabel = i => (n - 1 - i) % labelEvery === 0;
+  // A label at either edge sits inside the plot, flush with it, rather than centred over the edge
+  const anchor = i => (n > 1 && i === 0 && x(i) < 14 ? 'start' : n > 1 && i === n - 1 ? 'end' : 'middle');
+  const labelX = i => x(i) + (anchor(i) === 'start' ? -left : anchor(i) === 'end' ? W - right : 0);
   const visible = series.filter(sr => !hidden.has(sr.key));
 
   const defs = s('defs', {},
@@ -133,8 +137,8 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
     defs,
     days.map((d, i) => (showLabel(i) ? s('line', { class: 'day-line', x1: x(i), x2: x(i), y1: 34, y2: bottom }) : null)),
     days.map((d, i) => (showLabel(i) ? s('g', { class: `day-label${d.logged ? '' : ' missing'}`, 'data-i': i },
-      s('text', { x: x(i), y: 10, 'text-anchor': 'middle', class: 'dow' }, parseDate(d.date).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3).toUpperCase()),
-      s('text', { x: x(i), y: 24, 'text-anchor': 'middle', class: 'dom' }, String(parseDate(d.date).getDate()))) : null)),
+      s('text', { x: labelX(i), y: 10, 'text-anchor': anchor(i), class: 'dow' }, parseDate(d.date).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3).toUpperCase()),
+      s('text', { x: labelX(i), y: 24, 'text-anchor': anchor(i), class: 'dom' }, String(parseDate(d.date).getDate()))) : null)),
     s('line', { class: 'baseline', x1: left, x2: right, y1: bottom, y2: bottom }),
     s('g', { class: 'plot', mask: `url(#fade-${id})` }, areas),
     hair,

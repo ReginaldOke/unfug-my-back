@@ -64,7 +64,7 @@ const CLEAN = {
   routineCompletions: c => id(c.id) && id(c.routineId) && (day(c.date) || when(c.timestamp)) && {
     id: c.id, routineId: c.routineId, date: day(c.date), timestamp: when(c.timestamp) ?? new Date(`${c.date}T12:00:00`).toISOString(), completed: c.completed !== false,
     intensity: num(c.intensity, 1, 3), times: num(c.times, 1, 10),
-    log: list(c.log, 100).filter(x => x && text(x.name, 80)).map(x => ({ name: text(x.name, 80), did: text(x.did, 40), ...(x.extra ? { extra: text(x.extra, 40) } : {}) })),
+    log: list(c.log, 100).filter(x => x && text(x.name, 80)).map(x => ({ name: text(x.name, 80), did: text(x.did, 40), ...(x.extra ? { extra: text(x.extra, 40) } : {}), ...(x.timed ? { timed: true } : {}) })),
   },
   routineChanges: c => id(c.id) && id(c.routineId) && day(c.date) && { id: c.id, routineId: c.routineId, date: c.date, summary: text(c.summary, 200) },
   healthDays: d => day(d.date) && {

@@ -377,6 +377,9 @@ export const routines = {
     .map(c => c.date ?? localDate(new Date(c.timestamp))).sort().at(-1) ?? null,
 
   /** That day's logged session, if any: { log: [{ name, did }], intensity }. */
+  /** Every logged session of a routine, oldest first, as { date, log }. */
+  history: id => S.table('routineCompletions').filter(c => c.routineId === id && c.completed && c.log?.length)
+    .map(c => ({ date: c.date ?? localDate(new Date(c.timestamp)), log: c.log })).sort((a, b) => a.date.localeCompare(b.date)),
   sessionOn: (id, date) => S.table('routineCompletions').find(c => c.routineId === id && c.completed && (c.date ?? localDate(new Date(c.timestamp))) === date),
   /** The extra box (weight, a note…) for each move last time (before `date`), by move name. */
   lastExtra(id, date = localDate()) {

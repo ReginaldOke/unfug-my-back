@@ -1,6 +1,8 @@
 import UIKit
 import Capacitor
 import CoreMotion
+import UserNotifications
+import BackgroundTasks
 
 /// The app's web view, with the plugins below registered on it.
 class AppViewController: CAPBridgeViewController {
@@ -199,8 +201,15 @@ public class MotionHistoryPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "MotionHistory"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "query", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "query", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNudge", returnType: CAPPluginReturnPromise)
     ]
+
+    /// The web code's nudge rules and when the next nudge is due, kept so a background check can move it.
+    @objc func setNudge(_ call: CAPPluginCall) {
+        NudgeKeeper.save(call.options as? [String: Any] ?? [:])
+        call.resolve()
+    }
     private let activity = CMMotionActivityManager()
     private let pedometer = CMPedometer()
     private let iso = ISO8601DateFormatter()
@@ -246,4 +255,111 @@ public class MotionHistoryPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
     }
+}
+
+
+/// Moves the "Time to move" nudge back while the app is closed. iOS wakes the app in the background now
+/// and then (BGAppRefreshTask); this reads the motion record and steps since the nudge was set, and if
+/// you've really moved, sets it again from then, within your nudge hours. Same rules as reminders-core.js.
+enum NudgeKeeper {
+    static let taskId = "com.reginaldoke.unfugmyback.nudge"
+    private static let key = "nudgeRules"
+    private static let moveId = "1" // MOVE_ID in native.js
+    private static let activity = CMMotionActivityManager()
+    private static let pedometer = CMPedometer()
+
+    static func save(_ rules: [String: Any]) {
+        if let data = try? JSONSerialization.data(withJSONObject: rules) { UserDefaults.standard.set(data, forKey: key) }
+    }
+
+    private static func load() -> [String: Any]? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    static func register() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskId, using: nil) { task in
+            schedule()
+            check { task.setTaskCompleted(success: true) }
+            task.expirationHandler = { task.setTaskCompleted(success: false) }
+        }
+    }
+
+    /// Asks iOS for the next background check; it decides when, often within the hour.
+    static func schedule() {
+        let request = BGAppRefreshTaskRequest(identifier: taskId)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 10 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    static func check(done: @escaping () -> Void) {
+        guard let rules = load(), let atText = rules["moveAt"] as? String,
+              let due = ISO8601DateFormatter.withFraction.date(from: atText) ?? ISO8601DateFormatter().date(from: atText),
+              let interval = rules["intervalMin"] as? Double, CMMotionActivityManager.authorizationStatus() == .authorized
+        else { return done() }
+        let now = Date()
+        guard due > now else { return done() }
+        let since = due.addingTimeInterval(-interval * 60)
+        lastMoved(since: since, now: now, rules: rules) { movedAt in
+            guard let movedAt, let next = nextActive(movedAt.addingTimeInterval(interval * 60), rules: rules), next > due else { return done() }
+            let center = UNUserNotificationCenter.current()
+            center.getPendingNotificationRequests { requests in
+                guard let old = requests.first(where: { $0.identifier == moveId }) else { return done() }
+                let when = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: next)
+                let request = UNNotificationRequest(identifier: moveId, content: old.content, trigger: UNCalendarNotificationTrigger(dateMatching: when, repeats: false))
+                center.add(request) { _ in
+                    var updated = rules
+                    updated["moveAt"] = ISO8601DateFormatter.withFraction.string(from: next)
+                    save(updated)
+                    done()
+                }
+            }
+        }
+    }
+
+    /// When real movement last ended since `since`: a walk, run or ride long enough, or enough steps lately.
+    private static func lastMoved(since: Date, now: Date, rules: [String: Any], done: @escaping (Date?) -> Void) {
+        let minWalk = (rules["minWalkMin"] as? Double ?? 2) * 60, minSteps = rules["minSteps"] as? Int ?? 150
+        activity.queryActivityStarting(from: since, to: now, to: .main) { rows, _ in
+            let list = rows ?? []
+            var last: Date?
+            for (i, row) in list.enumerated() where row.confidence != .low && (row.walking || row.running || row.cycling) {
+                let end = i + 1 < list.count ? list[i + 1].startDate : now
+                if end.timeIntervalSince(row.startDate) >= minWalk { last = max(last ?? end, end) }
+            }
+            guard CMPedometer.isStepCountingAvailable() else { return done(last) }
+            pedometer.queryPedometerData(from: max(since, now.addingTimeInterval(-10 * 60)), to: now) { data, _ in
+                let steps = data?.numberOfSteps.intValue ?? 0
+                DispatchQueue.main.async { done(steps >= minSteps ? now : last) }
+            }
+        }
+    }
+
+    /// The earliest time at or after `date` inside the nudge hours (indexed by weekday, Sunday first).
+    private static func nextActive(_ date: Date, rules: [String: Any]) -> Date? {
+        guard let hours = rules["activeHours"] as? [[String: Any]], hours.count == 7 else { return date }
+        let cal = Calendar.current
+        let minutes = { (hm: String) -> Int in let p = hm.split(separator: ":").compactMap { Int($0) }; return p.count == 2 ? p[0] * 60 + p[1] : 0 }
+        for i in 0..<8 {
+            guard let day = cal.date(byAdding: .day, value: i, to: cal.startOfDay(for: date)) else { continue }
+            let h = hours[cal.component(.weekday, from: day) - 1]
+            guard h["on"] as? Bool == true, let s = h["start"] as? String, let e = h["end"] as? String else { continue }
+            let start = day.addingTimeInterval(Double(minutes(s)) * 60), end = day.addingTimeInterval(Double(minutes(e)) * 60)
+            if i == 0 {
+                if date < start { return start }
+                if date < end { return date }
+                continue
+            }
+            return start
+        }
+        return nil
+    }
+}
+
+extension ISO8601DateFormatter {
+    static let withFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

@@ -118,6 +118,10 @@ async function plan() {
   // Ticks run every 20 seconds; only touch iOS when the plan changes
   const sig = JSON.stringify(list.map(n => [n.title, +n.schedule.at]));
   if (sig === lastPlan) return notifyCareIfAllowed(s, now);
+  // The rules and the nudge's time go to the native side too, so a background check can push it
+  // back after a walk while the app is closed (NudgeKeeper in AppViewController.swift)
+  const { intervalMin, minWalkMin, minSteps, activeHours } = s.reminder;
+  Motion.setNudge?.({ moveAt: move && new Date(move.scheduledFor) > now ? move.scheduledFor : null, intervalMin, minWalkMin, minSteps, activeHours }).catch(() => {});
   // Scheduling would raise iPhone's permission prompt, so nothing is planned until it's been allowed
   const { display } = await Notes.checkPermissions();
   if (display !== 'granted') return;
