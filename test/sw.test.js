@@ -17,7 +17,8 @@ function filesIn(dir) {
 test('service worker precaches every file the app needs offline', () => {
   const src = readFileSync(join(web, 'sw.js'), 'utf8');
   const list = JSON.parse(src.match(/const ASSETS = (\[[\s\S]*?\]);/)[1].replace(/'/g, '"').replace(/,\s*\]/, ']'));
-  const needed = filesIn(web).filter(f => f !== 'sw.js');
+  // The marketing page's clips and stills are for the website only, not the app
+  const needed = filesIn(web).filter(f => f !== 'sw.js' && !f.startsWith('assets/site/'));
   const missing = needed.filter(f => !list.includes(f));
   assert.deepEqual(missing, [], `Add these to ASSETS in web/sw.js: ${missing.join(', ')}`);
 });

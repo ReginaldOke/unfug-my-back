@@ -6,6 +6,8 @@ cd "$(dirname "$0")/.."
 rm -rf dist
 cp -R web dist
 rm -rf dist/vendor
+# The marketing page's clips stay on the website, out of the app
+rm -rf dist/assets/site
 mkdir -p dist/vendor/three/build dist/vendor/three/examples/jsm/controls dist/vendor/three/examples/jsm/loaders dist/vendor/three/examples/jsm/utils
 cp node_modules/three/build/three.module.js node_modules/three/build/three.core.js dist/vendor/three/build/
 cp node_modules/three/examples/jsm/controls/OrbitControls.js dist/vendor/three/examples/jsm/controls/

@@ -12,9 +12,14 @@ const AppLaunch = native ? Cap.registerPlugin('AppLaunch') : null; // the loadin
 /** 'auto' | 'light' | 'dark', as chosen in Settings. */
 export const themeSetting = () => R.settings().theme ?? 'auto';
 
+// The look picked on the marketing page, which carries into the web app until one is picked in Settings
+const siteTheme = () => { try { const t = localStorage.getItem('back-story-site-theme'); return t === 'light' || t === 'dark' ? t : null; } catch { return null; } };
+
 export function currentTheme(now = new Date()) {
   const s = themeSetting();
   if (s !== 'auto') return s;
+  const site = native ? null : siteTheme();
+  if (site) return site;
   const hr = now.getHours();
   return hr >= LIGHT_FROM && hr < DARK_FROM ? 'light' : 'dark';
 }

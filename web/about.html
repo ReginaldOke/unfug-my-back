@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Back Story</title>
-  <meta name="description" content="A one-minute daily check-in that finds what your bad back days have in common, including things that catch up with you a day or two later. Free, private, on your iPhone.">
+  <meta name="description" content="Track your back pain, see what lines up with it, and log your stretching, mobility and gym routines. Back Story analyses your diary for patterns, and you can share it with an AI chat for another view.">
   <meta property="og:title" content="Back Story">
-  <meta property="og:description" content="A one-minute daily check-in that finds what your bad back days have in common.">
-  <meta property="og:image" content="https://reginaldoke.github.io/unfug-my-back/assets/site/home-dark.jpg">
+  <meta property="og:description" content="Track your back pain, see the patterns behind it, and log your routines.">
+  <meta property="og:image" content="https://reginaldoke.github.io/unfug-my-back/assets/site/patterns-dark.jpg">
   <meta name="theme-color" content="#0d0d0f">
   <link rel="icon" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -42,7 +42,7 @@
       --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
       --frame: rgba(0, 0, 0, 0.08); --shade: rgba(40, 30, 20, 0.28);
     }
-    /* Each screenshot comes in both looks; only the one matching the page shows (the hidden one never loads) */
+    /* Each clip comes in both looks; only the one matching the page shows, and site.js only loads that one */
     .shot.light { display: none; }
     @media (prefers-color-scheme: light) {
       :root:not([data-theme="dark"]) .shot.dark { display: none; }
@@ -79,6 +79,7 @@
     .theme-switch[data-mode="light"] .moon { display: block; }
 
     .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; padding: 48px 0 80px; }
+    h1, h2 { text-wrap: balance; }
     h1 { font-size: clamp(44px, 7vw, 76px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.02; margin: 0 0 22px; }
     .lead { font-size: clamp(19px, 2.2vw, 23px); font-weight: 300; color: var(--ink-2); margin: 0 0 32px; max-width: 32ch; }
     .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
@@ -91,7 +92,7 @@
     .soon { font-size: 14px; color: var(--ink-3); margin-top: 14px; }
 
     .phone { width: 100%; max-width: 340px; justify-self: center; border-radius: 46px; overflow: hidden; border: 1px solid var(--frame); box-shadow: 0 50px 120px -40px var(--shade), 0 0 0 8px var(--edge); }
-    .phone img { display: block; width: 100%; height: auto; }
+    .phone video { display: block; width: 100%; height: auto; aspect-ratio: 600 / 1304; object-fit: cover; background: var(--bg); }
 
     h2 { font-size: clamp(30px, 4vw, 42px); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 16px; }
     .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; padding: 64px 0; }
@@ -99,13 +100,11 @@
     .feature p { color: var(--ink-2); margin: 0 0 12px; max-width: 42ch; }
     .feature .phone { max-width: 300px; }
 
-    /* The three steps, and the three extras: columns on a shared rule, not boxes */
-    .steps { list-style: none; counter-reset: step; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin: 0; padding: 32px 0 72px; border-top: 1px solid var(--edge); }
-    .steps li { counter-increment: step; }
-    .steps li::before { content: counter(step); display: block; font: 400 56px/1 'Italiana', serif; color: var(--ink-3); margin-bottom: 18px; }
-    .steps h3, .extras h3 { font-size: 19px; font-weight: 500; margin: 0 0 6px; }
-    .steps p, .extras p { color: var(--ink-2); font-size: 16px; margin: 0; max-width: 30ch; }
-    .extras { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin: 16px 0 0; padding: 40px 0 24px; border-top: 1px solid var(--edge); }
+    /* The four things the app does, as links down the page, on a shared rule */
+    .pillars { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin: 0; padding: 28px 0 40px; border-top: 1px solid var(--edge); }
+    .pillars a { text-decoration: none; display: block; }
+    .pillars strong { display: block; font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+    .pillars span { color: var(--ink-2); font-size: 15px; }
 
     .private { text-align: center; padding: 72px 0 80px; }
     .private p { color: var(--ink-2); margin: 0 auto; max-width: 52ch; }
@@ -120,7 +119,7 @@
       .hero { padding-top: 24px; text-align: left; }
       .feature { padding: 40px 0; }
       .feature.flip .copy { order: 0; }
-      .steps, .extras { grid-template-columns: 1fr; gap: 28px; }
+      .pillars { grid-template-columns: 1fr 1fr; gap: 24px; }
       .phone { max-width: 300px; }
     }
   </style>
@@ -138,85 +137,83 @@
 
     <section class="hero">
       <div>
-        <h1>Keep a diary of your back pain. Find out what's behind it.</h1>
-        <p class="lead">Check in once a day. Back Story shows what your bad days have in common, even things that catch up with you a day or two later.</p>
+        <h1>Track your back pain and find out what affects it</h1>
+        <p class="lead">Log how your back feels each day, along with sleep, stress, sitting, exercise and anything else you want. Back Story charts it all and shows you the patterns.</p>
         <div class="cta">
-          <a class="btn" href="./">Try it in your browser</a>
-          <a class="btn quiet" href="#how">How it works</a>
+          <a class="btn" href="try.html">Try it in your browser</a>
+          <a class="btn quiet" href="#track">How it works</a>
         </div>
         <p class="soon">Free on iPhone. Coming soon to the App Store.</p>
       </div>
       <div class="phone">
-        <img class="shot dark" src="assets/site/home-dark.jpg" alt="The home screen: today's pain, the next nudge, today's routine and a chart" width="900" height="1955">
-        <img class="shot light" src="assets/site/home-light.jpg" alt="The home screen: today's pain, the next nudge, today's routine and a chart" width="900" height="1955" loading="lazy">
+        <video class="shot dark" data-src="assets/site/patterns-dark.mp4" poster="assets/site/patterns-dark.jpg" muted loop playsinline preload="none" aria-label="Scrolling the home screen: today's pain, a chart of pain against sleep and steps, then the patterns found in the diary"></video>
+        <video class="shot light" data-src="assets/site/patterns-light.mp4" poster="assets/site/patterns-light.jpg" muted loop playsinline preload="none" aria-label="Scrolling the home screen: today's pain, a chart of pain against sleep and steps, then the patterns found in the diary"></video>
       </div>
     </section>
 
-    <ol class="steps" id="how" aria-label="How it works">
-      <li><h3>Check in</h3><p>How much it hurts, where, and what you did today. It takes about a minute.</p></li>
-      <li><h3>See the pattern</h3><p>Your pain on a chart next to sitting, walking, sleep and whatever else you track.</p></li>
-      <li><h3>Try a change</h3><p>Sit less for a week, say, and watch what happens to the pattern.</p></li>
-    </ol>
-
-    <section class="feature">
-      <div class="copy">
-        <h2>What your bad days have in common.</h2>
-        <p>Back Story compares your days with more of something against days with less. More sitting, more driving, a poor night's sleep. You see what goes with more pain and what goes with less, side by side.</p>
-      </div>
-      <div class="phone">
-        <img class="shot dark" src="assets/site/patterns-dark.jpg" alt="Patterns: pain is worse two days after more long sitting, with what goes with more pain and less" width="900" height="1955" loading="lazy">
-        <img class="shot light" src="assets/site/patterns-light.jpg" alt="Patterns: pain is worse two days after more long sitting, with what goes with more pain and less" width="900" height="1955" loading="lazy">
-      </div>
-    </section>
-
-    <section class="feature flip">
-      <div class="copy">
-        <h2>Some things hurt later.</h2>
-        <p>A long day at a desk might not hurt until two days on. Sitting and driving might be fine apart but not together. Back Story looks for both, and tells you in plain words.</p>
-        <p>Tap a pattern to see the days behind it. It only calls something a pattern when it's unlikely to be chance.</p>
-      </div>
-      <div class="phone">
-        <img class="shot dark" src="assets/site/insight-dark.jpg" alt="A pattern up close: pain two days after a long sitting day, against after other days" width="900" height="1955" loading="lazy">
-        <img class="shot light" src="assets/site/insight-light.jpg" alt="A pattern up close: pain two days after a long sitting day, against after other days" width="900" height="1955" loading="lazy">
-      </div>
-    </section>
-
-    <section class="feature">
-      <div class="copy">
-        <h2>Tap where it hurts.</h2>
-        <p>Mark the spot on a 3D body, slide for pain, stress, sleep and how well you ate, then tap the things you did today. Add your own sliders, or hide the steps you don't need.</p>
-      </div>
-      <div class="phone">
-        <img class="shot dark" src="assets/site/body-map-dark.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy">
-        <img class="shot light" src="assets/site/body-map-light.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy">
-      </div>
-    </section>
-
-    <section class="feature flip">
-      <div class="copy">
-        <h2>Your routines, getting stronger.</h2>
-        <p>Keep your stretches and gym sessions in the app, with reps and weights. Time a plank or a dead hang. A chart for each move shows what's going up and what isn't.</p>
-      </div>
-      <div class="phone">
-        <img class="shot dark" src="assets/site/progress-dark.jpg" alt="A gym routine's progress: each move's weight or time over the last sessions" width="900" height="1955" loading="lazy">
-        <img class="shot light" src="assets/site/progress-light.jpg" alt="A gym routine's progress: each move's weight or time over the last sessions" width="900" height="1955" loading="lazy">
-      </div>
-    </section>
-
-    <ul class="extras" aria-label="Also in Back Story">
-      <li><h3>Nudges that know you've moved</h3><p>Sit still too long and you get a nudge. Walk about and the next one waits, even with the app closed.</p></li>
-      <li><h3>Apple Health</h3><p>Steps and sleep come straight in, so there's less to type.</p></li>
-      <li><h3>A second opinion</h3><p>Export your diary any time, or share it with an AI chat for another look.</p></li>
+    <ul class="pillars" aria-label="What Back Story does">
+      <li><a href="#track"><strong>Track</strong><span>Pain, sleep, stress and activity, every day</span></a></li>
+      <li><a href="#patterns"><strong>See patterns</strong><span>What comes before your good and bad days</span></a></li>
+      <li><a href="#routines"><strong>Log routines</strong><span>Stretching, mobility and gym sessions</span></a></li>
+      <li><a href="#ai"><strong>Analyse with AI</strong><span>Share your diary with an AI chat</span></a></li>
     </ul>
 
+    <section class="feature" id="track">
+      <div class="copy">
+        <h2>Log your day in under a minute</h2>
+        <p>Rate your pain, then stress and sleep, then tap what you did. Sitting, driving, walking, stretching, or anything you add yourself.</p>
+        <p>Steps and sleep can come in from Apple Health, and a reminder each evening helps you keep the streak going.</p>
+      </div>
+      <div class="phone">
+        <video class="shot dark" data-src="assets/site/track-dark.mp4" poster="assets/site/track-dark.jpg" muted loop playsinline preload="none" aria-label="A check-in: pain set to 4, stress and sleep set, the day's exercise and stressors tapped, then the streak"></video>
+        <video class="shot light" data-src="assets/site/track-light.mp4" poster="assets/site/track-light.jpg" muted loop playsinline preload="none" aria-label="A check-in: pain set to 4, stress and sleep set, the day's exercise and stressors tapped, then the streak"></video>
+      </div>
+    </section>
+
+    <section class="feature flip" id="patterns">
+      <div class="copy">
+        <h2>See what your pain follows</h2>
+        <p>Back Story compares your worse days with your better ones and tells you what tends to come first. Some things show up a day or two later, and some only hurt in combination. It checks for both.</p>
+        <p>Each pattern is tested against your own history, so you only see the ones that are unlikely to be chance. Open one to see the numbers and the days behind it.</p>
+      </div>
+      <div class="phone">
+        <video class="shot dark" data-src="assets/site/insight-dark.mp4" poster="assets/site/insight-dark.jpg" muted loop playsinline preload="none" aria-label="Opening a pattern: pain is worse two days after more long sitting, with average pain after long sitting days against other days, and a chart lining them up"></video>
+        <video class="shot light" data-src="assets/site/insight-light.mp4" poster="assets/site/insight-light.jpg" muted loop playsinline preload="none" aria-label="Opening a pattern: pain is worse two days after more long sitting, with average pain after long sitting days against other days, and a chart lining them up"></video>
+      </div>
+    </section>
+
+    <section class="feature" id="routines">
+      <div class="copy">
+        <h2>Keep track of your stretching, mobility and gym routines</h2>
+        <p>Save your routines once and tick them off in your check-in. Log sets, reps and weights, and time holds like a plank or a dead hang.</p>
+        <p>Every move gets its own progress line, and your routines show up on the pain chart, so you can see if they're helping.</p>
+      </div>
+      <div class="phone">
+        <video class="shot dark" data-src="assets/site/routine-dark.mp4" poster="assets/site/routine-dark.jpg" muted loop playsinline preload="none" aria-label="A gym routine: timing a dead hang, saving it, then each move's progress over recent sessions"></video>
+        <video class="shot light" data-src="assets/site/routine-light.mp4" poster="assets/site/routine-light.jpg" muted loop playsinline preload="none" aria-label="A gym routine: timing a dead hang, saving it, then each move's progress over recent sessions"></video>
+      </div>
+    </section>
+
+    <section class="feature flip" id="ai">
+      <div class="copy">
+        <h2>Get a second view from AI</h2>
+        <p>Send your diary to the AI chat app you already use. It goes with instructions, so you can ask straight away what lines up with your pain and what to try next.</p>
+        <p>You choose when to share it and which app it goes to.</p>
+      </div>
+      <div class="phone">
+        <video class="shot dark" data-src="assets/site/ai-dark.mp4" poster="assets/site/ai-dark.jpg" muted loop playsinline preload="none" aria-label="The home screen's Analyse with AI button, opening the sheet that shares the diary with an AI chat app"></video>
+        <video class="shot light" data-src="assets/site/ai-light.mp4" poster="assets/site/ai-light.jpg" muted loop playsinline preload="none" aria-label="The home screen's Analyse with AI button, opening the sheet that shares the diary with an AI chat app"></video>
+      </div>
+    </section>
+
     <section class="private">
-      <h2>Your diary stays on your phone.</h2>
-      <p>You don't need an account, and there are no ads or tracking.</p>
+      <h2>Your diary stays on your phone</h2>
+      <p>There's no account to make, and no ads or tracking.</p>
       <p class="note">Back Story doesn't diagnose or treat anything. Check with a doctor before making medical decisions.</p>
     </section>
 
     <footer>
-      <nav><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="./">Open the app</a></nav>
+      <nav><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="try.html">Open the app</a></nav>
     </footer>
   </main>
 </body>

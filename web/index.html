@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
-  <script>try{var s=(JSON.parse(localStorage.getItem('unfug-my-back/v1'))||{}).settings||{},t=s.theme,h=new Date().getHours();document.documentElement.dataset.theme=t&&t!=='auto'?t:h>=6&&h<17?'light':'dark'}catch(e){}</script>
+  <script>try{var s=(JSON.parse(localStorage.getItem('unfug-my-back/v1'))||{}).settings||{},t=s.theme,h=new Date().getHours();if(!t||t==='auto')t=window.Capacitor?null:localStorage.getItem('back-story-site-theme');document.documentElement.dataset.theme=t&&t!=='auto'?t:h>=6&&h<17?'light':'dark'}catch(e){}</script>
   <style>
     /* The loading spine in a browser (the app draws its own). Here so it paints before anything else has loaded. */
     #boot { --boot-bg: #0d0d0f; --boot-1: #fff; --boot-2: #f9ddd8; --boot-glow: rgba(249, 221, 216, 0.6); position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--boot-bg); transition: opacity .34s ease-in-out; animation: boot-giveup .3s 10s forwards; }
