@@ -5,6 +5,7 @@ import { HomeView } from './views/home.js';
 import { CheckinView } from './views/checkin.js';
 import { SetupView } from './views/setup.js';
 import { FactorDetailView, ScoreView } from './views/factor.js';
+import { InsightView } from './views/insight.js';
 import { RoutinesView, RoutineView, RoutineRunView } from './views/routines.js';
 import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
@@ -40,6 +41,7 @@ const routes = [
   [/^\/setup$/, SetupView, { flow: true }],
   [/^\/factor\/([\w-]+)$/, FactorDetailView],
   [/^\/score\/(\w+)$/, ScoreView],
+  [/^\/insight\/([\w.-]+)$/, InsightView],
   [/^\/routines$/, RoutinesView],
   [/^\/routine\/(new)$/, RoutineView, { flow: true }],
   [/^\/routine\/([\w-]+)\/edit$/, RoutineView, { flow: true }],

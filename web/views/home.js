@@ -6,6 +6,7 @@ import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
 import { quickSummary, trendFindings, factorStory, scoreSplits } from '../lib/analysis.js';
+import { findInsights } from '../lib/insights.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
 import { fmtAmount, reminderOn } from '../lib/labels.js';
@@ -537,12 +538,15 @@ function patternsCard(today) {
   const shown = rows;
   const allEarly = rows.every(a => a.early);
   const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta)));
-  // The headline is the longest bar below, in words, once it's a real difference
+  // Up top: delays and combinations that cleared the bar (each opens its own page). Without any, the
+  // longest bar below, in words, once it's a real difference
+  const insights = findInsights(data, factors, today).map(x => ({ title: x.title, href: `#/insight/${x.id}`, bad: x.delta > 0 }));
   const top = [...shown].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
-  const lead = Math.abs(top.delta) >= 0.5 ? top : null;
+  const leads = insights.length ? insights
+    : Math.abs(top.delta) >= 0.5 ? [{ title: `${top.delta > 0 ? 'More' : 'Less'} pain ${top.phrase}`, href: top.href, bad: top.delta > 0 }] : [];
   return h('section', { class: 'card glass patterns' },
-    lead ? h('div', { class: 'findings' }, head, findingRow(lead)) : null,
-    h('div', { class: 'pat-head' }, lead ? h('span', {}) : head,
+    leads.length ? h('div', { class: 'findings' }, head, leads.map(findingRow)) : null,
+    h('div', { class: 'pat-head' }, leads.length ? h('span', {}) : head,
       h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
     h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
     allEarly ? h('p', { class: 'hint pat-note' }, 'Only a few days so far, so these could change.') : null);
@@ -553,11 +557,12 @@ const SCORE_PHRASE = { stressScore: 'on days with more stress', sleepQuality: 'a
 // "Long sitting" reads "long sitting" mid-sentence; names that start with an acronym ("TV time") stay as they are
 const midName = n => (/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n);
 
-/** "More pain on days with more long sitting": a dot for which way it points, then the trend. No advice. */
-function findingRow(a) {
-  return h('a', { class: 'finding', href: a.href },
-    h('i', { class: `finding-dot ${a.delta > 0 ? 'bad' : 'good'}`, 'aria-hidden': 'true' }),
-    h('span', { class: 'grow finding-title' }, `${a.delta > 0 ? 'More' : 'Less'} pain ${a.phrase}`));
+/** "Pain is worse two days after more long sitting": a dot for which way it points, the pattern, a chevron. */
+function findingRow(x) {
+  return h('a', { class: 'finding', href: x.href },
+    h('i', { class: `finding-dot ${x.bad ? 'bad' : 'good'}`, 'aria-hidden': 'true' }),
+    h('span', { class: 'grow finding-title' }, x.title),
+    h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
 }
 
 /** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).

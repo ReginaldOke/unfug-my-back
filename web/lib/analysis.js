@@ -321,14 +321,30 @@ export const SAME_BAND = 0.5; // a gap smaller than this reads as "about the sam
  */
 export function amountSplit(pain, amounts, dates, { scores = false } = {}) {
   const days = dates.map(d => ({ a: scores ? amounts.get(d) ?? null : amounts.get(d) || 0, p: pain.get(d) })).filter(x => x.p != null && x.a != null);
-  const sorted = days.map(x => x.a).sort((a, b) => a - b);
-  if (new Set(sorted).size < 2) return null;
-  const cut = sorted[Math.floor((sorted.length - 1) / 2)];
+  const cut = balancedCut(days.map(x => x.a));
+  if (cut == null) return null;
   const more = days.filter(x => x.a > cut).map(x => x.p), less = days.filter(x => x.a <= cut).map(x => x.p);
   if (more.length < EARLY_MIN_DAYS || less.length < EARLY_MIN_DAYS) return null;
   const meanMore = mean(more), meanLess = mean(less);
   const { slope, r } = fit(days.map(x => x.a), days.map(x => x.p));
   return { delta: meanMore - meanLess, meanMore, meanLess, nMore: more.length, nLess: less.length, cut, perUnit: slope, r, early: Math.min(more.length, less.length) < MIN_DAYS };
+}
+
+/**
+ * Where to split amounts into "less" (at or under) and "more" (over): the value that divides the days
+ * most evenly. Plain median fails when many days share an amount (if most were 8 hours, nothing would be
+ * over the median). Null when every amount is the same.
+ */
+export function balancedCut(values) {
+  const distinct = [...new Set(values)].sort((a, b) => a - b);
+  if (distinct.length < 2) return null;
+  let best = null, bestGap = Infinity;
+  for (const v of distinct.slice(0, -1)) {
+    const under = values.filter(x => x <= v).length;
+    const gap = Math.abs(under - values.length / 2);
+    if (gap < bestGap) { best = v; bestGap = gap; }
+  }
+  return best;
 }
 
 /** Least-squares line through the points: its slope, and the correlation. */

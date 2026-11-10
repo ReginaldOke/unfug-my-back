@@ -1971,3 +1971,9 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 
 /* A score's page (stress, sleep, eating): its name as a plain title, where a stressor's page has its name field */
 .score-title { font-size: 26px; font-weight: 300; padding: 6px 0; }
+
+/* An insight's page: four bars for a combination need a wider label column */
+.cmp.wide .cmp-row { grid-template-columns: 9.5em 1fr 34px; }
+.cmp-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.insight-page .score-title { font-size: 24px; line-height: 1.25; }
+.finding .chev { color: var(--ink-3); align-self: center; }
