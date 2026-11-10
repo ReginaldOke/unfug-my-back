@@ -101,7 +101,6 @@
     .phone3d .screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
     .phone3d .screen video { transition: opacity .35s ease; }
     .phone3d .screen video.on { opacity: 1; }
-    .phone3d .screen::after { content: ''; position: absolute; inset: 0; background: var(--bg); opacity: var(--veil, 0); pointer-events: none; }
     .phone3d .slab { background: linear-gradient(90deg, var(--body-b), var(--body-a) 30%, var(--body-b) 70%, var(--body-a)); }
     .phone3d .back { background: radial-gradient(60% 40% at 50% 30%, rgba(226, 104, 127, .35), transparent 70%), linear-gradient(160deg, var(--body-a), var(--body-b)); box-shadow: inset 0 0 0 1.5px var(--rim); display: grid; place-items: center; }
     .phone3d .back img { width: 22%; border-radius: 22%; opacity: .9; }
@@ -110,11 +109,7 @@
     .hero { position: relative; z-index: 2; height: 100vh; height: 100svh; display: grid; place-items: center; text-align: center; pointer-events: none; }
     .hero h1 { margin: 0; font: 400 clamp(84px, 15vw, 230px)/0.9 'Italiana', serif; letter-spacing: -0.01em; -webkit-text-stroke: 1px currentColor; text-shadow: 0 10px 60px var(--shade), 0 0 40px var(--bg); }
     .hero-copy { position: relative; }
-    /* A soft pool of the page colour behind the words, so they sit clear of the phone */
-    .hero-copy::before { content: ''; position: absolute; inset: -12% -8%; z-index: -1; background: radial-gradient(closest-side, var(--bg), transparent); opacity: .55; }
     .tagline { margin: 22px 0 0; font-size: clamp(18px, 1.9vw, 24px); font-weight: 400; color: var(--ink); letter-spacing: 0.01em; text-shadow: 0 2px 24px var(--bg), 0 0 2px var(--bg); }
-    .scroll-hint { position: absolute; bottom: 5vh; left: 50%; width: 1px; height: 52px; background: linear-gradient(var(--ink-3), transparent); animation: hint 2.2s ease-in-out infinite; }
-    @keyframes hint { 50% { transform: translateY(8px); opacity: .4; } }
 
     /* The sections the phone travels beside: each a screen tall, text on the side the phone isn't */
     .scene { position: relative; z-index: 2; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; max-width: 1180px; margin: 0 auto; padding: 0 40px; }
@@ -131,27 +126,35 @@
     /* ---- The example diary as a big chart. It stays put while the page scrolls, and the days slide past the
        line in the middle. Drawn by site-page.js. */
     .vis-track { position: relative; height: 520vh; }
-    .vis { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; }
-    .vis-head { text-align: center; padding: 0 20px; }
-    .vis-head h2 { font-size: clamp(30px, 3.8vw, 50px); font-weight: 300; letter-spacing: -0.02em; margin: 0 0 6px; }
-    .vis-head p { color: var(--ink-2); margin: 0; }
-    .message { text-align: center; margin: 3vh auto 1vh; min-height: 132px; padding: 0 20px; max-width: 900px; }
-    .msg-eyebrow { font-size: 13px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; color: var(--ink-2); }
+    .vis { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; padding-bottom: max(32px, 5vh); }
+    .message { text-align: center; margin: 3vh auto 1vh; min-height: 110px; padding: 0 20px; max-width: 900px; }
     .msg { font: 400 clamp(34px, 4.4vw, 58px)/1.08 'Italiana', serif; -webkit-text-stroke: .5px currentColor; margin: 10px 0 12px; text-wrap: balance; }
     .day { font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
     .plot { position: relative; height: min(42vh, 400px); }
     .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-    .legend { position: absolute; left: 24px; top: 64px; z-index: 3; display: flex; flex-direction: column; gap: 6px; transition: opacity .4s; }
-    .legend button { all: unset; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--c); transition: opacity .2s; }
-    .legend button[aria-pressed="false"] { opacity: .3; }
-    .legend button:focus-visible { outline: 1px solid var(--c); outline-offset: 4px; }
+    /* The chart fades out at both sides, so the days slide in and out of view and the key stays clear */
+    .plot svg { --edge: 0; -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, var(--edge)), #000 16%, #000 84%, rgba(0, 0, 0, var(--edge))); mask-image: linear-gradient(90deg, rgba(0, 0, 0, var(--edge)), #000 16%, #000 84%, rgba(0, 0, 0, var(--edge))); }
+    /* The key, as in the app: a short glowing bar, the name, and the day's value */
+    .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 26px; margin-top: 1.6vh; transition: opacity .3s; }
+    .key { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 9px; min-height: 32px; font-size: 15px; color: var(--ink-3); transition: color .25s; }
+    .key i { flex: none; width: 18px; height: 3px; border-radius: 2px; background: var(--c); opacity: .35; transition: opacity .25s, box-shadow .25s; }
+    .key strong { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+    .key.on { color: var(--ink-2); }
+    .key.on i { opacity: 1; box-shadow: 0 0 8px var(--c); }
+    .key.on strong { color: var(--ink); }
+    .key:not(.on) .key-name { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+    .key:focus-visible { outline: 1px solid var(--c); outline-offset: 4px; border-radius: 4px; }
     .notes { position: absolute; inset: 0; pointer-events: none; }
     .callout { position: absolute; width: 230px; margin-left: -115px; transition: opacity .35s; text-align: center; }
     .callout .tag { display: inline-block; padding: 8px 14px; border-radius: 14px; font-size: 14px; line-height: 1.35; color: var(--ink); background: var(--pill); border: 1px solid var(--edge); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 14px 34px -18px var(--shade); }
     /* The routine view: one row per line, like the app's progress page */
     .rows { position: absolute; inset: 0; pointer-events: none; max-width: 100%; }
+    .vis .plot { touch-action: pan-y; }
     .row { position: absolute; left: 4%; right: 4%; display: flex; align-items: center; justify-content: space-between; font-size: 17px; border-bottom: 1px solid var(--edge); }
     .row .end { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+    .row .name small { font-size: .78em; color: var(--ink-3); margin-left: 4px; }
+    .row b { font-weight: 500; }
+    .start-tag { position: absolute; transform: translateX(-50%); padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap; color: #16161a; background: #74d4c0; box-shadow: 0 8px 22px -10px #74d4c0; transition: opacity .3s; pointer-events: none; }
     .chapters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 1100px; margin: 2.6vh auto 0; padding: 0 20px; width: 100%; }
     .chapter { all: unset; position: relative; cursor: pointer; height: 46px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); background: var(--pill); border: 1px solid var(--edge); overflow: hidden; transition: color .3s; text-align: center; padding: 0 10px; }
     .chapter::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #e2687f, #f3b46e); opacity: 0; transition: opacity .45s; }
@@ -183,9 +186,8 @@
       .scene h2 { font-size: 30px; margin-bottom: 12px; }
       .scene p { font-size: 17px; }
       .scene .copy.long p:nth-of-type(n+2) { display: none; }
-      .legend { top: auto; bottom: -30px; left: 0; right: 0; flex-direction: row; justify-content: center; gap: 14px; }
-      .legend button { font-size: 10.5px; }
-      .chapters { margin-top: 44px; }
+      .legend { gap: 0 16px; padding: 0 12px; }
+      .key { font-size: 13px; gap: 7px; }
       .callout { width: 170px; margin-left: -85px; }
       .callout .tag { font-size: 12.5px; padding: 6px 10px; }
       .message { min-height: 150px; margin-top: 1vh; }
@@ -193,11 +195,11 @@
       .day { font-size: 12.5px; }
       .chapters { grid-template-columns: 1fr 1fr; gap: 6px; }
       .chapter { height: 38px; font-size: 10.5px; letter-spacing: .1em; }
-      .row { font-size: 13px; }
+      .row { font-size: 13px; align-items: flex-start; padding-top: 6px; }
       footer { padding: 24px 20px 40px; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .drop, .sky i, .scroll-hint { animation: none; }
+      .drop, .sky i { animation: none; }
       .js .reveal { opacity: 1; transform: none; transition: none; }
     }
   </style>
@@ -224,7 +226,6 @@
               <video data-clip="track" muted loop playsinline preload="none"></video>
               <video data-clip="insight" muted loop playsinline preload="none"></video>
               <video data-clip="routine" muted loop playsinline preload="none"></video>
-              <video data-clip="ai" muted loop playsinline preload="none"></video>
             </div></div>
           </div>
         </div>
@@ -235,7 +236,6 @@
           <h1>Back Story</h1>
           <p class="tagline">Track your back pain. See what drives it.</p>
         </div>
-        <span class="scroll-hint" aria-hidden="true"></span>
       </section>
 
       <section class="scene" id="intro" data-pose="right" data-clip="patterns">
@@ -273,25 +273,14 @@
         </div>
       </section>
 
-      <section class="scene" data-pose="right" data-clip="ai" data-move="slide">
-        <div class="copy reveal long">
-          <span class="num">04 · AI</span>
-          <h2>Get a second view from AI</h2>
-          <p>Send your diary to the AI chat app you already use. It goes with instructions, so you can ask straight away what lines up with your pain and what to try next.</p>
-          <p>You choose when to share it and which app it goes to.</p>
-        </div>
-      </section>
       <div class="journey-end" data-pose="exit" aria-hidden="true"></div>
     </div>
 
     <div class="vis-track">
       <section class="vis" aria-label="An example diary, eight weeks long">
-        <div class="vis-head reveal">
-          <h2>Eight weeks of an example diary</h2>
-          <p>Scroll to move through it.</p>
-        </div>
-        <div class="message" aria-live="polite"><div class="msg-eyebrow"></div><h3 class="msg"></h3><div class="day"></div></div>
-        <div class="plot"><div class="legend" role="group" aria-label="Lines on the chart"></div></div>
+        <div class="message" aria-live="polite"><h2 class="msg"></h2><div class="day"></div></div>
+        <div class="plot"></div>
+        <div class="legend" role="group" aria-label="Lines on the chart"></div>
         <div class="chapters" role="group" aria-label="Chapters"></div>
       </section>
     </div>

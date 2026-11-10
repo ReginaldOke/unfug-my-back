@@ -51,12 +51,11 @@
     onTheme(() => { const c = showing; showing = null; videos.forEach(v => { v.dataset.loaded = ''; }); show(c); });
 
     // Where the phone sits beside each section. On a phone screen it stays central, above the words.
-    // veil: how much the screen is softened, so the big name in front of it reads first.
     const narrow = () => innerWidth <= 820;
     const POSES = {
-      hero: () => ({ x: 0, y: narrow() ? 0.02 : 0.05, s: narrow() ? 0.9 : 0.86, rx: 14, ry: -26, rz: 8, veil: 0.5, fade: 0 }),
-      right: () => (narrow() ? { x: 0, y: -0.2, s: 0.84, rx: 4, ry: -12, rz: 0, veil: 0, fade: 0 } : { x: 0.24, y: 0, s: 1.02, rx: 2, ry: -16, rz: 1.5, veil: 0, fade: 0 }),
-      left: () => (narrow() ? { x: 0, y: -0.2, s: 0.84, rx: 4, ry: 12, rz: 0, veil: 0, fade: 0 } : { x: -0.24, y: 0, s: 1.02, rx: 2, ry: 16, rz: -1.5, veil: 0, fade: 0 }),
+      hero: () => ({ x: 0, y: 0, s: narrow() ? 0.84 : 0.8, rx: 14, ry: -26, rz: 8, fade: 0 }),
+      right: () => (narrow() ? { x: 0, y: -0.2, s: 0.84, rx: 4, ry: -12, rz: 0, fade: 0 } : { x: 0.24, y: 0, s: 1.02, rx: 2, ry: -16, rz: 1.5, fade: 0 }),
+      left: () => (narrow() ? { x: 0, y: -0.2, s: 0.84, rx: 4, ry: 12, rz: 0, fade: 0 } : { x: -0.24, y: 0, s: 1.02, rx: 2, ry: 16, rz: -1.5, fade: 0 }),
     };
     // Leaving: it tips back, sinks away and fades, rather than being cut off by the next section
     POSES.exit = () => ({ ...POSES[sections.at(-2).dataset.pose](), y: narrow() ? -0.34 : -0.16, s: 0.72, rx: 26, fade: 1 });
@@ -68,7 +67,8 @@
         // A section can ask for a slide instead of a turn: the phone glides across and the screen fades over
         const turn = i > 0 && el.dataset.clip && el.dataset.clip !== sections[i - 1].dataset.clip && el.dataset.move !== 'slide';
         if (turn) turns++;
-        const at = el.offsetTop + el.offsetHeight / 2 - innerHeight / 2;
+        // The exit finishes just as the phone's layer starts to scroll away, so it's gone before it could be cut off
+        const at = el.dataset.pose === 'exit' ? el.offsetTop + el.offsetHeight - innerHeight : el.offsetTop + el.offsetHeight / 2 - innerHeight / 2;
         return { at: i ? at : 0, clip: el.dataset.clip || sections[i - 1].dataset.clip, pose: POSES[el.dataset.pose](), spin: turns * 360, slide: el.dataset.move === 'slide' };
       });
     };
@@ -76,13 +76,17 @@
     addEventListener('resize', measure);
     addEventListener('load', measure);
 
-    let lastY = -1;
+    // The phone follows the scroll with a little give, so a wheel's steps turn into one smooth movement
+    let follow = scrollY, lastNow = 0;
     const frame = now => {
       requestAnimationFrame(frame);
-      const y = scrollY;
+      const dt = Math.min(64, now - (lastNow || now)); lastNow = now;
+      const target = scrollY;
+      follow = still ? target : follow + (target - follow) * (1 - Math.exp(-dt / 110));
+      if (Math.abs(target - follow) < 0.5) follow = target;
+      const y = follow;
       const journey = stage.parentElement;
-      if (y > journey.offsetTop + journey.offsetHeight || (still && y === lastY)) return;
-      lastY = y;
+      if (y > journey.offsetTop + journey.offsetHeight) return;
       let i = 0;
       while (i < anchors.length - 1 && y >= anchors[i + 1].at) i++;
       const a = anchors[i], b = anchors[Math.min(i + 1, anchors.length - 1)];
@@ -91,16 +95,31 @@
       const t = ease(clamp((raw - 0.18) / 0.64));
       const mix = k => lerp(a.pose[k], b.pose[k], t);
       const spin = still ? 0 : lerp(a.spin, b.spin, t);
-      // On a slide it leans into the way it's going, and straightens as it arrives
-      const lean = b.slide && !still ? Math.sin(Math.PI * t) * Math.sign(b.pose.x - a.pose.x) : 0;
+      let x = mix('x') * innerWidth, yy = mix('y') * innerHeight, s = mix('s'), rx = mix('rx'), ry = mix('ry') + spin, rz = mix('rz');
+      // A slide drifts like a car through a bend: an S-shaped path, the phone turning to follow it a beat late,
+      // banking into the move, dipping slightly in size, then running a touch long and settling
+      const dx = (b.pose.x - a.pose.x) * innerWidth;
+      if (b.slide && dx && !still) {
+        const dir = Math.sign(dx), amp = 0.03 * innerHeight;
+        const back = u => { const c = 0.35; return 1 + (c + 1) * (u - 1) ** 3 + c * (u - 1) ** 2; };
+        const u = clamp((raw - 0.15) / 0.7), e = ease(u);
+        x = lerp(a.pose.x, b.pose.x, back(u)) * innerWidth;
+        yy += amp * Math.sin(2 * Math.PI * e);
+        const heading = k => Math.atan2(amp * 2 * Math.PI * Math.cos(2 * Math.PI * k), Math.abs(dx)) * 180 / Math.PI;
+        const lag = clamp(e - 0.08);
+        const bend = Math.sin(Math.PI * e);
+        rz += dir * heading(lag) * 0.4 * bend ** 0.6;
+        ry += dir * 10 * Math.sin(Math.PI * clamp(e - 0.04));
+        rx += -heading(e) * 0.06;
+        s *= 1 - 0.025 * bend;
+      }
       // The screen changes halfway: on a turn that's when the back is showing, on a slide it fades across
       const clip = t < 0.5 ? a.clip : b.clip;
       show(clip, t < 0.5 ? b.clip : (anchors[i + 2] ?? b).clip);
       const sway = still ? 0 : Math.sin(now / 1400) * 1.6;
-      phone.style.setProperty('--veil', mix('veil').toFixed(3));
       stage.style.opacity = (1 - mix('fade')).toFixed(3);
-      phone.style.transform = `translate3d(${mix('x') * innerWidth}px, ${mix('y') * innerHeight}px, 0) scale(${mix('s')})
-        rotateX(${mix('rx') + sway * 0.6}deg) rotateY(${mix('ry') + spin + sway + lean * 22}deg) rotateZ(${mix('rz') - lean * 4}deg)`;
+      phone.style.transform = `translate3d(${x.toFixed(1)}px, ${yy.toFixed(1)}px, 0) scale(${s.toFixed(4)})
+        rotateX(${(rx + sway * 0.6).toFixed(2)}deg) rotateY(${(ry + sway).toFixed(2)}deg) rotateZ(${rz.toFixed(2)}deg)`;
     };
     show('patterns', 'track');
     requestAnimationFrame(frame);
@@ -111,11 +130,12 @@
   if (!vis) return;
   const track = vis.parentElement;
   const plot = vis.querySelector('.plot'), legend = vis.querySelector('.legend'), pills = vis.querySelector('.chapters');
-  const msg = { eyebrow: vis.querySelector('.msg-eyebrow'), text: vis.querySelector('.msg'), day: vis.querySelector('.day') };
+  const msg = { text: vis.querySelector('.msg'), day: vis.querySelector('.day') };
 
   // Eight weeks, made up but built the way diaries behave: more pain on long sitting days, less on days with a
   // good walk, a sore day after each long drive, and pain easing overall as the deadlifts go up.
   const N = 56, START = new Date(2026, 8, 7); // a Monday
+  const LIFTS_FROM = 21; // deadlifts join the routine at the start of week 4
   let seed = 11;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const days = Array.from({ length: N }, (_, i) => {
@@ -133,30 +153,33 @@
   [[39, 165], [44, 150], [50, 175]].forEach(([i, m]) => { days[i].driving = m; });
   days.forEach((d, i) => {
     const drove = days[i - 1]?.driving ?? 20;
-    const pain = 3.4 + 0.55 * (d.sitting - 4) - 0.035 * (d.walking - 35) + (drove > 120 ? 2.6 : 0) + 1.2 - 2.2 * (i / (N - 1)) + (rnd() - 0.5) * 0.6;
+    const pain = 3.4 + 0.55 * (d.sitting - 4) - 0.035 * (d.walking - 35) + (drove > 120 ? 2.6 : 0) + 1.1 - (i < LIFTS_FROM ? 0 : 2.4 * clamp((i - LIFTS_FROM) / 21)) + (rnd() - 0.5) * 0.6;
     d.pain = Math.round(clamp(pain, 1, 9));
   });
   // The routine, week by week, for the last chapter: deadlifts going up while weekly pain comes down
   const week = i => Math.min(7, Math.floor(i / 7));
   const weekPain = Array.from({ length: 8 }, (_, w) => days.slice(w * 7, w * 7 + 7).reduce((s, d) => s + d.pain, 0) / 7);
   const smoothWeeks = (vals, i) => { const f = i / 7 - 0.5, a = clamp(Math.floor(f), 0, 7), b = clamp(a + 1, 0, 7), u = clamp(f - a); return lerp(vals[a], vals[b], ease(u)); };
-  const deadlift = [60, 65, 70, 70, 77.5, 82.5, 90, 95], birdDog = [6, 6, 8, 8, 10, 10, 12, 12], plank = [30, 35, 40, 45, 50, 60, 65, 75];
+  const deadlift = [60, 60, 60, 60, 70, 77.5, 87.5, 95], birdDog = [6, 6, 8, 8, 10, 10, 12, 12], plank = [30, 35, 40, 45, 50, 60, 65, 75];
+  const avgPain = (a, b) => days.slice(a, b).reduce((t, d) => t + d.pain, 0) / (b - a);
+  const clock = v => `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;
 
   const SERIES = [
     { key: 'pain', label: 'Pain', c: '#f4908a', min: 0, max: 10, fmt: v => `${v}/10`, front: true,
-      row: { name: 'Pain, weekly average', vals: weekPain, min: 1, max: 7, end: v => `${v.toFixed(1)}/10`, c: '#f4908a' } },
+      row: { name: 'Pain', unit: 'weekly average', at: i => smoothWeeks(weekPain, i), min: 2, max: 6, fmt: v => `${v.toFixed(1)}/10`, from: avgPain(0, LIFTS_FROM), c: '#f4908a' } },
     { key: 'sitting', label: 'Long sitting', c: '#f3b46e', min: 0, max: 11, fmt: v => `${v.toFixed(1)} h`,
-      row: { name: 'Deadlift', vals: deadlift, min: 50, max: 100, end: v => `3 × 5 · ${v} kg`, c: '#74d4c0' } },
+      // Nothing, then deadlifts from week 4: the line jumps up from flat
+      row: { name: 'Deadlift', unit: 'kg', at: i => (i < LIFTS_FROM ? 0 : smoothWeeks(deadlift, i)), min: 0, max: 100, fmt: v => `${Math.round(v / 2.5) * 2.5} kg`, from: deadlift[3], c: '#74d4c0' } },
     { key: 'walking', label: 'Walking', c: '#74d4c0', min: 0, max: 120, fmt: v => `${Math.round(v)} min`,
-      row: { name: 'Bird dog', vals: birdDog, min: 4, max: 13, end: v => `× ${v} each side`, c: '#74d4c0' } },
+      row: { name: 'Bird dog', unit: 'reps', at: i => smoothWeeks(birdDog, i), min: 4, max: 13, fmt: v => `${Math.round(v)} reps`, from: birdDog[0], c: '#74d4c0' } },
     { key: 'driving', label: 'Driving', c: '#e3a6f5', min: 0, max: 200, fmt: v => `${Math.round(v)} min`,
-      row: { name: 'Plank', vals: plank, min: 20, max: 80, end: v => (v >= 60 ? `1:${String(v - 60).padStart(2, '0')}` : `0:${v}`), c: '#74d4c0' } },
+      row: { name: 'Plank', unit: 'hold', at: i => smoothWeeks(plank, i), min: 20, max: 80, fmt: clock, from: plank[0], c: '#74d4c0' } },
   ];
   const CHAPTERS = [
-    { from: 0, to: 18, key: 'sitting', pill: 'What goes with pain', eyebrow: 'What goes with pain', text: 'Pain is worse on days you sit for long' },
-    { from: 18, to: 37, key: 'walking', pill: 'What eases it', eyebrow: 'What eases it', text: 'You have less pain on days you walk more' },
-    { from: 37, to: N, key: 'driving', pill: 'What hurts later', eyebrow: 'What hurts later', text: 'Pain gets worse the day after a long drive' },
-    { key: 'routine', pill: 'Your progress', eyebrow: 'Your progress', text: 'Your pain has eased since you started deadlifts' },
+    { from: 0, to: 18, key: 'sitting', pill: 'What goes with pain', text: 'Pain is worse on days you sit for long' },
+    { from: 18, to: 37, key: 'walking', pill: 'What eases it', text: 'You have less pain on days you walk more' },
+    { from: 37, to: N, key: 'driving', pill: 'What hurts later', text: 'Pain gets worse the day after a long drive' },
+    { key: 'routine', pill: 'Your progress', text: 'Your pain has eased since you started deadlifts' },
   ];
   const CALLOUTS = [
     { ch: 0, a: ['sitting', 8], b: ['pain', 8], text: 'A long day at the desk, and a sore back' },
@@ -173,13 +196,16 @@
   // Legend: hover to bring a line forward, tap to hide it
   const hidden = new Set();
   let hoverSeries = null, hoverDay = null, hoverChapter = null;
-  SERIES.forEach(s => {
+  const keyEls = SERIES.map(s => {
     const b = document.createElement('button');
-    b.type = 'button'; b.textContent = s.label; b.style.setProperty('--c', s.c); b.setAttribute('aria-pressed', 'true');
-    b.onclick = () => { hidden.has(s.key) ? hidden.delete(s.key) : hidden.add(s.key); b.setAttribute('aria-pressed', String(!hidden.has(s.key))); paint(); };
+    b.type = 'button'; b.className = 'key on'; b.style.setProperty('--c', s.c); b.setAttribute('aria-pressed', 'true');
+    b.innerHTML = '<i aria-hidden="true"></i><span class="key-name"></span><strong></strong>';
+    b.querySelector('.key-name').textContent = s.label;
+    b.onclick = () => { hidden.has(s.key) ? hidden.delete(s.key) : hidden.add(s.key); b.classList.toggle('on', !hidden.has(s.key)); b.setAttribute('aria-pressed', String(!hidden.has(s.key))); paint(); };
     b.onpointerenter = () => { hoverSeries = s.key; paint(); };
     b.onpointerleave = () => { hoverSeries = null; paint(); };
     legend.append(b);
+    return b;
   });
   // Chapter pills: hover to preview a chapter, tap to scroll to it
   const pillEls = CHAPTERS.map((c, k) => {
@@ -196,13 +222,17 @@
   const chapterStart = k => (k < 3 ? (CHAPTERS[k].from / (N - 1)) * SPLIT : SPLIT + 0.02);
 
   // Hovering the chart picks the day under the pointer (mouse only: on a touch screen the scroll does it)
+  // In the routine view the pointer (or a finger) runs along the weeks instead, as on the app's progress page
   plot.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse' || morphT > 0.3) return;
-    const r = plot.getBoundingClientRect();
-    hoverDay = clamp(Math.round((e.clientX - r.left - offset) / dayW - 0.5), 0, N - 1);
+    const r = plot.getBoundingClientRect(), x = e.clientX - r.left;
+    if (morphT > 0.9) {
+      scrub = x < sx[0] - 20 || x > sx[1] + 20 ? null : Math.round(clamp((x - sx[0]) / (sx[1] - sx[0])) * (N - 1));
+    } else if (e.pointerType === 'mouse' && morphT < 0.3) {
+      hoverDay = clamp(Math.round((x - offset) / dayW - 0.5), 0, N - 1);
+    } else return;
     paint();
   });
-  plot.addEventListener('pointerleave', () => { hoverDay = null; paint(); });
+  plot.addEventListener('pointerleave', () => { hoverDay = null; scrub = null; paint(); });
 
   const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
   const mixColour = (a, b, t) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',')})`; };
@@ -216,7 +246,7 @@
   };
   const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short' }), DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
 
-  let W = 0, H = 0, dayW = 0, offset = 0, pos = 0, morphT = 0, chapter = 0, built = false;
+  let W = 0, H = 0, dayW = 0, offset = 0, pos = 0, morphT = 0, chapter = 0, built = false, scrub = null, sx = [0, 0];
   const parts = {};
 
   /** Builds the chart's pieces once per size or look; paint() moves them. */
@@ -227,7 +257,6 @@
     svg.replaceChildren();
     const defs = el('defs', {}, svg);
     el('feGaussianBlur', { stdDeviation: 7 }, el('filter', { id: 'glow', x: '-10%', y: '-40%', width: '120%', height: '180%' }, defs));
-    parts.band = el('rect', { y: 40, height: H - 40, rx: 18, fill: 'currentColor', opacity: 0 }, svg);
     parts.grid = el('g', {}, svg);
     parts.days = days.map((d, i) => {
       const g = el('g', {}, parts.grid);
@@ -246,19 +275,28 @@
     // Pain on top
     svg.append(parts.series[0].g);
     parts.links = el('g', {}, svg);
+    // Where deadlifts start: a dashed line down through every row and a dot where the line jumps
+    parts.mark = el('g', { opacity: 0 }, svg);
+    parts.markLine = el('line', { stroke: '#74d4c0', 'stroke-opacity': 0.6, 'stroke-dasharray': '3 5' }, parts.mark);
+    parts.markDot = el('circle', { r: 5.5, fill: '#74d4c0' }, parts.mark);
+    parts.scrub = el('g', { opacity: 0 }, svg);
+    parts.scrubLine = el('line', { stroke: 'currentColor', 'stroke-opacity': 0.5 }, parts.scrub);
+    parts.scrubDots = SERIES.map(s => el('circle', { r: 4.5, fill: s.row.c }, parts.scrub));
     parts.cursor = el('line', { y1: 44, y2: H - 4, stroke: 'currentColor', 'stroke-width': 1.5 }, svg);
     // The routine view's rows: a name on the left, the trend in the middle, the latest on the right
     rowsEl.replaceChildren(...SERIES.map(s => {
       const r = document.createElement('div'); r.className = 'row';
-      r.innerHTML = '<span class="name"></span><span class="end"></span>';
-      r.firstChild.textContent = s.row.name;
+      r.innerHTML = '<span class="name"><b></b> <small></small></span><span class="end"></span>';
+      r.querySelector('b').textContent = s.row.name; r.querySelector('small').textContent = s.row.unit;
       return r;
     }));
+    parts.tag = document.createElement('div'); parts.tag.className = 'start-tag'; parts.tag.textContent = 'Started deadlifts';
     notes.replaceChildren(...CALLOUTS.map(c => {
       const n = document.createElement('div'); n.className = 'callout';
       n.innerHTML = '<span class="tag"></span>'; n.firstChild.textContent = c.text;
       return n;
     }));
+    notes.append(parts.tag);
     built = true;
     paint();
   }
@@ -282,7 +320,9 @@
     const top = 58, bottom = H - 8;
     // Routine layout: a header, then a row per line
     const rowTop = 44, rowH = (H - rowTop) / SERIES.length;
-    const sx0 = W * (W > 700 ? 0.3 : 0.45), sx1 = W * (W > 700 ? 0.74 : 0.69);
+    // Wide: name, line, value side by side. Narrow: name and value above a full-width line
+    const stacked = W < 700, labelRoom = stacked ? 30 : 8;
+    const sx0 = W * (stacked ? 0.05 : 0.3), sx1 = W * (stacked ? 0.95 : 0.74);
     const focus = CHAPTERS[showCh].key;
 
     // Days, grid and cursor fade out as the routine view comes in
@@ -295,21 +335,14 @@
     });
     parts.cursor.setAttribute('x1', xh(day)); parts.cursor.setAttribute('x2', xh(day));
     parts.cursor.setAttribute('stroke-opacity', ((1 - t) * 0.85).toFixed(3));
-    // The chapter's stretch of days, lit softly; brighter while a pill is hovered
-    const ch = CHAPTERS[showCh];
-    if (ch.from != null && t < 1) {
-      parts.band.setAttribute('x', xh(ch.from) - dayW / 2 + 2); parts.band.setAttribute('width', (ch.to - ch.from) * dayW - 4);
-      parts.band.setAttribute('opacity', ((hoverChapter != null ? 0.07 : 0.035) * (1 - t)).toFixed(3));
-    } else parts.band.setAttribute('opacity', 0);
-
     parts.series.forEach(({ s, s0, s1, area, glow, line, g }, k) => {
       if (hidden.has(s.key)) { g.setAttribute('opacity', 0); return; }
       // Each line leaves for its row a moment after the one above, so the change reads as a cascade
       const tk = ease(clamp(t * 1.4 - k * 0.12));
-      const lo = rowTop + rowH * k + 8, hi = rowTop + rowH * (k + 1) - 8;
+      const lo = rowTop + rowH * k + labelRoom, hi = rowTop + rowH * (k + 1) - 8;
       const pts = days.map((d, i) => {
         const yh = bottom - ((d[s.key] - s.min) / (s.max - s.min)) * (bottom - top);
-        const rv = smoothWeeks(s.row.vals, i);
+        const rv = s.row.at(i);
         const yr = hi - ((rv - s.row.min) / (s.row.max - s.row.min)) * (hi - lo);
         const xr = sx0 + (i / (N - 1)) * (sx1 - sx0);
         return [lerp(xh(i), xr, tk), lerp(yh, yr, tk)];
@@ -331,7 +364,7 @@
 
     // Callouts for the chapter on show: a dashed link between the two points, and a note above
     parts.links.replaceChildren();
-    [...notes.children].forEach((n, k) => {
+    [...notes.querySelectorAll(".callout")].forEach((n, k) => {
       const c = CALLOUTS[k];
       const on = c.ch === showCh && t < 0.05 && !hidden.has(c.a[0]) && !hidden.has(c.b[0]);
       n.style.opacity = on ? 1 : 0;
@@ -351,24 +384,43 @@
       const s = SERIES[k], tk = ease(clamp(t * 1.4 - k * 0.12));
       r.style.top = `${rowTop + rowH * k}px`; r.style.height = `${rowH}px`;
       r.style.opacity = hidden.has(s.key) ? 0 : tk;
-      r.lastChild.textContent = s.row.end(s.row.vals[7]);
+      // The change over the eight weeks, or the week under the pointer
+      r.lastChild.textContent = scrub != null ? s.row.fmt(s.row.at(scrub)) : `${s.row.fmt(s.row.from)} → ${s.row.fmt(s.row.at(N - 1))}`;
     });
-    rowsEl.style.setProperty('--hairline', t);
+    sx = [sx0, sx1];
+    const xr = i => sx0 + (i / (N - 1)) * (sx1 - sx0);
+    const yr = (k, i) => { const r = SERIES[k].row, lo = rowTop + rowH * k + labelRoom, hi = rowTop + rowH * (k + 1) - 8; return hi - ((r.at(i) - r.min) / (r.max - r.min)) * (hi - lo); };
+    const ready = clamp((t - 0.85) / 0.15);
+    parts.mark.setAttribute('opacity', ready.toFixed(3));
+    const mx = xr(LIFTS_FROM);
+    parts.markLine.setAttribute('x1', mx); parts.markLine.setAttribute('x2', mx);
+    parts.markLine.setAttribute('y1', rowTop + 4); parts.markLine.setAttribute('y2', H - 4);
+    parts.markDot.setAttribute('cx', mx); parts.markDot.setAttribute('cy', yr(1, LIFTS_FROM));
+    parts.markDot.setAttribute('stroke', light ? '#fff' : '#0d0d0f'); parts.markDot.setAttribute('stroke-width', 2.5);
+    parts.tag.style.opacity = ready; parts.tag.style.left = `${mx}px`; parts.tag.style.top = `${yr(1, LIFTS_FROM) - 44}px`;
+    parts.scrub.setAttribute('opacity', scrub != null && t > 0.9 ? 1 : 0);
+    if (scrub != null) {
+      const x = xr(scrub);
+      parts.scrubLine.setAttribute('x1', x); parts.scrubLine.setAttribute('x2', x); parts.scrubLine.setAttribute('y1', rowTop + 4); parts.scrubLine.setAttribute('y2', H - 4);
+      parts.scrubDots.forEach((c, k) => { c.setAttribute('cx', x); c.setAttribute('cy', yr(k, scrub)); c.setAttribute('stroke', light ? '#fff' : '#0d0d0f'); c.setAttribute('stroke-width', 2); });
+    }
 
     // The message for the chapter, and the day under the line
     const c = CHAPTERS[showCh];
     if (msg.text.dataset.k !== String(showCh)) {
       msg.text.dataset.k = showCh;
       msg.text.animate?.([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: still ? 0 : 450, easing: 'ease-out' });
-      msg.eyebrow.textContent = c.eyebrow; msg.text.textContent = c.text;
+      msg.text.textContent = c.text;
     }
-    if (showCh === 3) msg.day.textContent = `Week 1 to week 8 · deadlift ${deadlift[0]} kg to ${deadlift[7]} kg · pain ${weekPain[0].toFixed(1)} to ${weekPain[7].toFixed(1)}`;
+    if (showCh === 3) msg.day.textContent = scrub != null ? `Week ${week(scrub) + 1}` : `Deadlifts from week 4. Average pain ${avgPain(0, LIFTS_FROM).toFixed(1)} before, ${avgPain(LIFTS_FROM, N).toFixed(1)} since`;
     else {
       const d = days[day];
-      msg.day.textContent = `${DAY.format(d.date)} ${DATE.format(d.date)} · Pain ${d.pain}/10 · ${SERIES.slice(1).map(s => `${s.label} ${s.fmt(d[s.key])}`).join(' · ')}`;
+      msg.day.textContent = '';
+      keyEls.forEach((b, k) => { b.lastChild.textContent = SERIES[k].fmt(d[SERIES[k].key]); });
     }
     pillEls.forEach((p, k) => { p.classList.toggle('on', k === chapter); p.classList.toggle('peek', k === hoverChapter && k !== chapter); });
     legend.style.opacity = (1 - clamp(t * 3)).toFixed(3);
+    svg.style.setProperty('--edge', t.toFixed(3));
     legend.style.pointerEvents = t > 0.2 ? 'none' : '';
   }
 
