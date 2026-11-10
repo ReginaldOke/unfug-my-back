@@ -229,9 +229,11 @@
     return b;
   });
   // The scroll is shared out: three chapters of days moving past, then the change to the routine view
-  const SPLIT = 0.7, LAST = CHAPTERS.length - 1;
+  // The days start a little before the walking example, so the first note is on screen straight away
+  const SPLIT = 0.7, LAST = CHAPTERS.length - 1, FIRST_DAY = 23;
+  const dayAt = p => FIRST_DAY + clamp(p / SPLIT) * (N - 1 - FIRST_DAY);
   // Where each chapter rests: its example, or the finished progress view
-  const chapterStart = k => (k < LAST ? (CALLOUTS[k].b[1] / (N - 1)) * SPLIT : SPLIT + 0.17);
+  const chapterStart = k => (k < LAST ? ((CALLOUTS[k].b[1] - FIRST_DAY) / (N - 1 - FIRST_DAY)) * SPLIT : SPLIT + 0.17);
 
   // Hovering the chart picks the day under the pointer (mouse only: on a touch screen the scroll does it)
   // In the routine view the pointer (or a finger) runs along the weeks instead, as on the app's progress page
@@ -322,7 +324,7 @@
   function read() {
     const r = track.getBoundingClientRect();
     const p = clamp(-r.top / (r.height - innerHeight));
-    pos = clamp(p / SPLIT) * (N - 1);
+    pos = dayAt(p);
     morphT = ease(clamp((p - SPLIT - 0.02) / 0.14));
     chapter = p >= SPLIT ? LAST : CHAPTERS.findIndex(c => c.to > Math.round(pos));
   }
