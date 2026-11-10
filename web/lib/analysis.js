@@ -313,10 +313,28 @@ export const STRIP_DAYS = 14; // days drawn on the factor page
 export const SAME_BAND = 0.5; // a gap smaller than this reads as "about the same"
 
 /**
+ * Pain on the days with more of something against the days with less, for something logged too often to
+ * compare with and without: the logged days split at the middle amount. Needs EARLY_MIN_DAYS on each
+ * side and at least two different amounts; otherwise null. { delta, meanMore, meanLess, nMore, nLess, early }
+ */
+export function amountSplit(pain, amounts, dates, { scores = false } = {}) {
+  // A score (stress, sleep) counts at 0 too; an amount of 0 means it wasn't done, so that day sits out
+  const days = dates.map(d => ({ a: amounts.get(d) ?? (scores ? null : 0), p: pain.get(d) })).filter(x => x.p != null && (scores ? x.a != null : x.a > 0));
+  const sorted = days.map(x => x.a).sort((a, b) => a - b);
+  if (new Set(sorted).size < 2) return null;
+  const mid = sorted[Math.floor((sorted.length - 1) / 2)];
+  const more = days.filter(x => x.a > mid).map(x => x.p), less = days.filter(x => x.a <= mid).map(x => x.p);
+  if (more.length < EARLY_MIN_DAYS || less.length < EARLY_MIN_DAYS) return null;
+  const meanMore = mean(more), meanLess = mean(less);
+  return { delta: meanMore - meanLess, meanMore, meanLess, nMore: more.length, nLess: less.length, early: Math.min(more.length, less.length) < MIN_DAYS };
+}
+
+/**
  * What one factor's page says: pain on check-in days with it against days without, the same day and
  * the next, from EARLY_MIN_DAYS of each. Returns { state, best, next, nCheckins, nWith, strip, early }:
  *   state 'none'   never logged in the window
- *   state 'always' logged on every check-in, so nothing to compare
+ *   state 'always' logged on every check-in, so nothing to compare with and without; byAmount compares
+ *                  its days with more against its days with less, where it can
  *   state 'few'    not yet EARLY_MIN_DAYS with and without
  *   state 'up' | 'down' | 'same'   pain higher, lower or about the same with it (best: the clearer lag)
  * strip: the last 7 to STRIP_DAYS days (since the first check-in), oldest first, { date, pain, amount }.
@@ -335,16 +353,32 @@ export function factorStory(factor, data, today = localDate()) {
     const date = addDays(today, i - (len - 1));
     return { date, pain: pain.get(date) ?? null, amount: amounts.get(date) || 0 };
   });
-  const base = { nCheckins: dates.length, nWith, strip, best: null, next: null, early: false };
+  const base = { nCheckins: dates.length, nWith, strip, best: null, next: null, early: false, byAmount: null };
   if (!nWith) return { ...base, state: 'none' };
-  if (nWith === dates.length) return { ...base, state: 'always' };
+  // Logged (nearly) every day: no days without it to compare, but its days with more and with less can be
+  const byAmount = factor.measureType === 'yesno' ? null : amountSplit(pain, amounts, dates);
+  if (nWith === dates.length) return { ...base, state: 'always', byAmount };
 
   // Next day only counts check-ins whose next day is in the diary too
   const [same, next] = [0, 1].map(lag => lagComparison(pain, amounts, dates.filter(d => d <= addDays(today, -lag)), lag, EARLY_MIN_DAYS));
   const usable = [same, next].filter(l => l.enough);
-  if (!usable.length) return { ...base, state: 'few', need: { with: Math.max(0, EARLY_MIN_DAYS - same.nWith), without: Math.max(0, EARLY_MIN_DAYS - same.nWithout) } };
+  if (!usable.length) return { ...base, state: 'few', byAmount, need: { with: Math.max(0, EARLY_MIN_DAYS - same.nWith), without: Math.max(0, EARLY_MIN_DAYS - same.nWithout) } };
   // The same day unless the next day shows a clearly bigger gap
   const best = usable.length === 2 && Math.abs(next.delta) > Math.abs(same.delta) + 0.3 ? next : usable[0];
   const state = Math.abs(best.delta) < SAME_BAND ? 'same' : best.delta > 0 ? 'up' : 'down';
   return { ...base, state, best, next: next.enough && best !== next ? next : null, early: Math.min(best.nWith, best.nWithout) < MIN_DAYS };
+}
+
+/**
+ * The check-in's own scores against pain, over the same four weeks as factorStory: days with higher
+ * stress (or sleep, or eating) against days with lower. [{ key, name, split }] where there's enough.
+ */
+export function scoreSplits(data, today = localDate()) {
+  const since = addDays(today, -(STORY_DAYS - 1));
+  const entries = data.dailyEntries.filter(e => e.painScore != null && e.date >= since && e.date <= today);
+  const pain = painByDate(entries), dates = entries.map(e => e.date);
+  return [['stressScore', 'Stress'], ['sleepQuality', 'Sleep'], ['dietScore', 'Eating']].map(([key, name]) => {
+    const values = new Map(entries.filter(e => e[key] != null).map(e => [e.date, e[key]]));
+    return { key, name, split: amountSplit(pain, values, dates, { scores: true }) };
+  }).filter(x => x.split);
 }

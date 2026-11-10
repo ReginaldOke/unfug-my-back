@@ -5,7 +5,7 @@ import * as reminders from '../lib/reminders.js';
 import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
-import { quickSummary, trendFindings, factorStory } from '../lib/analysis.js';
+import { quickSummary, trendFindings, factorStory, scoreSplits } from '../lib/analysis.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
 import { fmtAmount, reminderOn } from '../lib/labels.js';
@@ -511,12 +511,18 @@ function patternsCard(today) {
       h('p', { class: 'hint' }, 'Check in to start seeing what moves your pain.'));
   }
 
-  // Whatever goes most with pain, whatever its role: the three biggest rises, then the three biggest
-  // falls, by the same numbers as each one's own page. Small differences count too, so there are three
-  // of each whenever the diary has them; their short bars show they're slight.
-  const all = factors.map(f => ({ factor: f, st: factorStory(f, data, today) }))
-    .filter(x => x.st.best && x.st.best.delta !== 0)
-    .map(x => ({ factor: x.factor, delta: x.st.best.delta, early: x.st.early }));
+  // Whatever goes most with pain: the three biggest rises, then the three biggest falls. Stressors and
+  // helpers compare days with and without (as on their own page), or, when logged nearly every day, days
+  // with more against less; stress, sleep and eating compare higher days against lower. Small
+  // differences count too, so there are three of each whenever the diary has them.
+  const all = [
+    ...factors.map(f => {
+      const st = factorStory(f, data, today);
+      const d = st.best ?? st.byAmount;
+      return d && { name: f.name, href: `#/factor/${f.id}`, delta: d.delta, early: st.best ? st.early : d.early };
+    }),
+    ...scoreSplits(data, today).map(x => ({ name: x.name, href: null, delta: x.split.delta, early: x.split.early })),
+  ].filter(a => a && Math.abs(a.delta) >= 0.05);
   const rows = [
     ...all.filter(a => a.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3),
     ...all.filter(a => a.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3),
@@ -551,17 +557,14 @@ function findingRow(f) {
 /** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).
     No difference to show yet (only days with it so far): a dot on the line in its role's colour. */
 function patRow(a, w) {
-  const name = h('span', { class: 'pat-name' }, a ? a.factor.name : '');
-  if (a && a.delta == null) {
-    const dot = h('span', { class: `pat-dot ${a.factor.role === 'helper' ? 'helper' : 'stressor'}` });
-    return h('a', { class: 'pat-row', href: `#/factor/${a.factor.id}`, 'aria-label': `${a.factor.name}: logged, nothing to compare yet` }, name, h('span', { class: 'pat-track' }, dot));
-  }
+  const name = h('span', { class: 'pat-name' }, a ? a.name : '');
   const up = w > 0;
   const bar = h('span', { class: `pat-bar ${up ? 'up' : 'down'}${a?.early ? ' early' : ''}`, style: `--w:${Math.abs(w) * 100}%` },
     a ? h('b', {}, `${up ? '+' : '−'}${Math.abs(a.delta).toFixed(1)}`) : null);
   if (!a) return h('div', { class: 'pat-row' }, name, h('span', { class: 'pat-track' }, bar));
-  const label = `${a.factor.name}: pain ${Math.abs(a.delta).toFixed(1)} ${up ? 'higher' : 'lower'} on days with it${a.early ? ', early read' : ''}`;
-  return h('a', { class: 'pat-row', href: `#/factor/${a.factor.id}`, 'aria-label': label }, name, h('span', { class: 'pat-track' }, bar));
+  const label = `${a.name}: pain ${Math.abs(a.delta).toFixed(1)} ${up ? 'higher' : 'lower'} with more of it${a.early ? ', early read' : ''}`;
+  // Stressors and helpers open their own page; stress, sleep and eating have none
+  return h(a.href ? 'a' : 'div', { class: 'pat-row', href: a.href, 'aria-label': label }, name, h('span', { class: 'pat-track' }, bar));
 }
 
 function movementTile() {

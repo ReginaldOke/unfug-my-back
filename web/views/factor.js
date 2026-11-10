@@ -74,7 +74,7 @@ export function FactorDetailView(ctx) {
     const now = R.factors.get(f.id);
     return h('section', { class: 'card glass stack' },
       h('p', { class: 'lead story' }, headline(now, story)),
-      story.best ? compare(now, story) : null);
+      story.best || story.byAmount ? compare(now, story) : null);
   };
   let top = summary();
 
@@ -123,6 +123,10 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** The one sentence at the top: what the diary shows so far, in plain words. */
 export function headline(f, st) {
   const n = lower(f.name);
+  // Logged too often for with and without: what the days with more of it show instead
+  const m = !st.best && st.byAmount;
+  if (m) return Math.abs(m.delta) < SAME_BAND ? `Your pain is about the same on days with more ${n} and with less.`
+    : `Your pain is ${Math.abs(m.delta).toFixed(1)} points ${m.delta > 0 ? 'higher' : 'lower'} on days with more ${n}.`;
   switch (st.state) {
     case 'none': return `You haven't logged ${n} in the last four weeks.`;
     case 'always': return `You've logged ${n} on all ${plural(st.nCheckins, 'check-in')}, so there are no days without it to compare with yet.`;
@@ -139,9 +143,10 @@ export function headline(f, st) {
   }
 }
 
-/** With and without, as two bars out of 10, then how many days that's from. */
+/** With and without (or, for something logged nearly every day, more and less) as two bars out of 10. */
 function compare(f, st) {
-  const b = st.best;
+  const m = !st.best && st.byAmount;
+  const b = st.best ?? { lag: 0, meanWith: m.meanMore, meanWithout: m.meanLess, delta: m.delta };
   const row = (label, v, cls) => h('div', { class: 'cmp-row' },
     h('span', { class: 'hint' }, label),
     h('span', { class: 'cmp-track' }, h('i', { class: cls, style: `--w:${v * 10}%` })),
@@ -149,8 +154,8 @@ function compare(f, st) {
   const nx = st.next;
   return h('div', { class: 'cmp' },
     h('span', { class: 'eyebrow' }, b.lag ? 'Pain the next day' : 'Average pain'),
-    row('With', b.meanWith, 'with'),
-    row('Without', b.meanWithout, 'without'),
+    row(m ? 'More' : 'With', b.meanWith, 'with'),
+    row(m ? 'Less' : 'Without', b.meanWithout, 'without'),
     nx && Math.abs(nx.delta) >= SAME_BAND && Math.sign(nx.delta) === Math.sign(b.delta)
       ? h('p', { class: 'hint' }, `It carries into the next day too: ${nx.meanWith.toFixed(1)} after it, ${nx.meanWithout.toFixed(1)} after days without.`) : null);
 }
