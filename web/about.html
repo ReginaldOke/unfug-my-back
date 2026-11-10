@@ -206,8 +206,9 @@
       .scene .copy { width: 100%; position: relative; }
       /* A soft wash up from the bottom of the screen, edge to edge, so the words read over the phone without a box */
       .scene::before {
-        content: ''; position: absolute; left: 50%; bottom: 0; width: 100vw; height: 64%; margin-left: -50vw; z-index: -1; pointer-events: none;
-        background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 72%, transparent) 34%, color-mix(in srgb, var(--bg) 94%, transparent) 70%, var(--bg));
+        content: ''; position: absolute; left: 50%; bottom: -24vh; width: 100vw; height: calc(64% + 24vh); margin-left: -50vw; z-index: -1; pointer-events: none;
+        /* Fades in above the words and out again below the section, so it never ends in a line */
+        background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 72%, transparent) 26%, color-mix(in srgb, var(--bg) 92%, transparent) 52%, color-mix(in srgb, var(--bg) 92%, transparent) 66%, transparent);
       }
       .scene h2, .scene p { text-shadow: 0 1px 18px var(--bg); }
       .scene h2 { font-size: 30px; margin-bottom: 12px; }
