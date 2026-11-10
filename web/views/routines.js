@@ -286,21 +286,24 @@ function stopwatch(s, repaintMoves, ctx) {
 const CHART = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>';
 
 /**
- * How each move has gone over the last dozen sessions, in the routine's order: its name and what you
- * did on the chosen day, over a small glowing line like Home's chart. Touch or drag along any line to
+ * How each move has gone over the last dozen sessions, in the routine's order, one line per move like
+ * the routine itself: its name, a small glowing line like Home's chart, and what you did on the chosen
+ * day in a column of fixed width, so nothing shifts as the day changes. Touch or drag along any line to
  * choose a day; every row follows. Starts on the latest session.
  */
 function progressView(session, past) {
   const shown = past.slice(-12);
   const rows = progressRows(session.items.map(it => it.name), shown);
-  const W = 300, H = 44, pad = 6, n = shown.length;
+  const W = 120, H = 34, pad = 4, n = shown.length;
   const x = i => pad + (n === 1 ? (W - 2 * pad) / 2 : (i * (W - 2 * pad)) / (n - 1));
   let sel = n - 1;
   const el = h('div', { class: 'prog' });
 
-  // Every line spans the view's full width, so the view itself is the ruler (lines are redrawn as you drag)
+  // Every line sits in the same column, so any one is the ruler (they're redrawn as you drag)
   const choose = e => {
-    const box = el.getBoundingClientRect();
+    const ruler = el.querySelector('.prog-chart');
+    if (!ruler) return;
+    const box = ruler.getBoundingClientRect();
     const f = (e.clientX - box.left) / box.width;
     const i = Math.max(0, Math.min(n - 1, Math.round(((f * W - pad) / (W - 2 * pad)) * (n - 1))));
     if (i !== sel) { sel = i; vibrate(3); paint(); }
@@ -318,7 +321,7 @@ function progressView(session, past) {
       svg('path', { class: 'prog-area', d: `${d} L${xy.at(-1).x},${H} L${xy[0].x},${H} Z` }),
       svg('line', { class: 'prog-hair', x1: x(sel), x2: x(sel), y1: 0, y2: H }),
       svg('path', { class: 'prog-line', d }),
-      here ? svg('circle', { class: 'prog-dot', cx: x(sel), cy: y(here.v), r: 3.2 }) : null);
+      here ? svg('circle', { class: 'prog-dot', cx: x(sel), cy: y(here.v), r: 2.6 }) : null);
     return chart;
   }
 
@@ -331,8 +334,9 @@ function progressView(session, past) {
       ...rows.map(row => {
         const e = row.entries[sel];
         return h('div', { class: 'prog-row' },
-          h('div', { class: 'prog-top' }, h('span', { class: 'prog-name' }, row.name), h('span', { class: `prog-val${e ? '' : ' none'}` }, e ? moveText(e) : 'Not done')),
-          line(row));
+          h('span', { class: 'prog-name' }, row.name),
+          line(row),
+          h('span', { class: `prog-val${e ? '' : ' none'}` }, e ? moveText(e) : '–'));
       }));
   }
   // One gesture for the whole view: touch a line, drag along it

@@ -1912,8 +1912,11 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .step-list { display: flex; flex-direction: column; }
 .step-row { padding: 10px 0; border-bottom: 1px solid var(--line); gap: 8px; }
 .step-row:last-child { border-bottom: 0; }
-.food-step { display: flex; flex-direction: column; gap: 16px; }
-.notes.meals { min-height: 0; resize: none; }
+.food-step { display: flex; flex-direction: column; }
+.notes.meals { min-height: 0; resize: none; padding: 13px 18px; line-height: 1.4; }
+/* Eating shares the screen with the meals box, so its slider is a little shorter than the others */
+.food-step .vslider { height: min(34dvh, 240px); }
+.food-step { gap: 14px; }
 
 /* Every routine tick matches a good day on the check-ins page: the lit teal bead with a white tick */
 .routine-tile .done-mark, .routine-card .well.done-mark, [data-theme="light"] .routine-card .well.done-mark {
@@ -1945,17 +1948,17 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .sw-saved { display: flex; align-items: center; gap: 10px; width: 100%; padding: 0 2px 0 4px; font-size: 14px; color: var(--ink-2); }
 .sw-saved-time { color: var(--ink); font-variant-numeric: tabular-nums; }
 
-/* Routine progress: the moves in their usual order, each a name, that day's numbers and a small line */
+/* Routine progress: one line per move, as in the routine: name, a small line, then that day's
+   numbers in a column of fixed width, so changing the day never moves anything */
 .icon-btn.chart-btn.on { background: var(--ink); color: var(--bg); }
-.prog { display: flex; flex-direction: column; gap: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
-.prog-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; font-size: 15px; }
-.prog-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
-.prog-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.prog-name { font-size: 16px; }
-.prog-val { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+.prog { display: flex; flex-direction: column; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.prog-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; font-size: 15px; }
+.prog-row { display: grid; grid-template-columns: minmax(0, 1fr) 24% 7.2em; align-items: center; gap: 10px; min-height: 50px; border-top: 1px solid var(--line); }
+.prog-name { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prog-val { font-size: 14px; font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prog-val.none { color: var(--ink-3); }
 .prog-chart { display: block; width: 100%; height: auto; overflow: visible; cursor: pointer; }
-.prog-chart.empty { height: 8px; }
+.prog-chart.empty { height: 1px; }
 .prog-line { fill: none; stroke: #74d4c0; stroke-width: 1.8; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 3px rgba(116, 212, 192, 0.55)); }
 .prog-area { fill: rgba(116, 212, 192, 0.12); }
 .prog-hair { stroke: var(--ink-3); stroke-width: 1; vector-effect: non-scaling-stroke; }

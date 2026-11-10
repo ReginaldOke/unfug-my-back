@@ -96,6 +96,9 @@ export function CheckinView(ctx) {
       h('div', { class: 'step-head' }, h('h1', { tabindex: -1 }, st.title), st.sub ? h('p', { class: 'muted' }, st.sub) : null),
       stepContent(st.id));
     renderFooter();
+    // Meals already written on a return visit open at their full height
+    const meals = body.querySelector('.meals');
+    if (meals?.value) requestAnimationFrame(() => grow(meals));
     body.scrollTop = 0;
     body.querySelector('h1').focus({ preventScroll: true });
   }
@@ -128,6 +131,8 @@ export function CheckinView(ctx) {
         last ? (existing ? 'Update' : 'Finish') : 'Next'));
   }
 
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`; };
+
   // Sliders keep their answer on the draft; the user's own sliders by id under draft.custom
   const valueOf = id => (id.startsWith('c:') ? draft.custom[id.slice(2)] ?? null : draft[id]);
   const setValue = (id, v) => { if (id.startsWith('c:')) draft.custom[id.slice(2)] = v; else draft[id] = v; };
@@ -154,8 +159,10 @@ export function CheckinView(ctx) {
       case 'food': return h('div', { class: 'food-step' },
         sliderStep('food', 'Eating', 'leaf', { colours: 'highIsGood', describe: sleepWord }),
         h('textarea', {
-          class: 'notes glass meals', rows: 2, maxlength: 500, placeholder: 'What did you eat? (optional)',
-          'aria-label': 'What you ate today (optional)', oninput: e => { draft.meals = e.target.value; renderFooter(); },
+          class: 'notes glass meals', rows: 1, maxlength: 500, placeholder: 'What did you eat? (optional)',
+          'aria-label': 'What you ate today (optional)',
+          // One line to start, growing as you write
+          oninput: e => { draft.meals = e.target.value; grow(e.target); renderFooter(); },
         }, draft.meals));
       case 'where': {
         const yEntry = R.checkins.entryFor(yesterday);
