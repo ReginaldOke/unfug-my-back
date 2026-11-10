@@ -2,38 +2,66 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Back Story</title>
-  <meta name="description" content="A one-minute daily check-in that shows how your days and your back pain line up. Free, private, on your iPhone.">
+  <meta name="description" content="A one-minute daily check-in that finds what your bad back days have in common, including things that catch up with you a day or two later. Free, private, on your iPhone.">
   <meta property="og:title" content="Back Story">
-  <meta property="og:description" content="A one-minute daily check-in that shows how your days and your back pain line up.">
-  <meta property="og:image" content="https://reginaldoke.github.io/unfug-my-back/assets/site/1-home.jpg">
+  <meta property="og:description" content="A one-minute daily check-in that finds what your bad back days have in common.">
+  <meta property="og:image" content="https://reginaldoke.github.io/unfug-my-back/assets/site/home-dark.jpg">
   <meta name="theme-color" content="#0d0d0f">
   <link rel="icon" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <script src="site.js"></script>
   <style>
     @font-face { font-family: 'Italiana'; src: url('assets/fonts/italiana.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Outfit'; src: url('assets/fonts/outfit.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
-    /* The app's own look: near-black, a red and navy glow at the top, quiet glass cards */
+    /* The app's two looks. Dark: near-black with a red and navy glow. Light: warm off-white with peach and blue.
+       The page follows the device until the switch is used (site.js then sets data-theme). */
     :root {
       color-scheme: dark;
       --bg: #0d0d0f; --ink: #f5f5f7; --ink-2: rgba(235, 235, 245, 0.62); --ink-3: rgba(235, 235, 245, 0.34);
-      --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.025) 45%, rgba(255, 255, 255, 0.045));
-      --edge: rgba(255, 255, 255, 0.07);
+      --edge: rgba(255, 255, 255, 0.08); --btn: rgba(255, 255, 255, 0.14); --btn-edge: rgba(255, 255, 255, 0.24);
+      --glow-a: rgba(236, 78, 52, 0.7); --glow-b: rgba(196, 48, 40, 0.55); --glow-c: rgba(30, 44, 112, 0.85); --glow-d: rgba(255, 222, 210, 0.35);
+      --frame: rgba(255, 255, 255, 0.12); --shade: rgba(0, 0, 0, 0.9);
     }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        color-scheme: light;
+        --bg: #efeeec; --ink: #1d1c1f; --ink-2: rgba(29, 28, 31, 0.66); --ink-3: rgba(29, 28, 31, 0.42);
+        --edge: rgba(0, 0, 0, 0.08); --btn: rgba(255, 255, 255, 0.7); --btn-edge: rgba(0, 0, 0, 0.1);
+        --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
+        --frame: rgba(0, 0, 0, 0.08); --shade: rgba(40, 30, 20, 0.28);
+      }
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #efeeec; --ink: #1d1c1f; --ink-2: rgba(29, 28, 31, 0.66); --ink-3: rgba(29, 28, 31, 0.42);
+      --edge: rgba(0, 0, 0, 0.08); --btn: rgba(255, 255, 255, 0.7); --btn-edge: rgba(0, 0, 0, 0.1);
+      --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
+      --frame: rgba(0, 0, 0, 0.08); --shade: rgba(40, 30, 20, 0.28);
+    }
+    /* Each screenshot comes in both looks; only the one matching the page shows (the hidden one never loads) */
+    .shot.light { display: none; }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) .shot.dark { display: none; }
+      :root:not([data-theme="dark"]) .shot.light { display: block; }
+    }
+    :root[data-theme="light"] .shot.dark { display: none; }
+    :root[data-theme="light"] .shot.light { display: block; }
+
     * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; }
-    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 Outfit, -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: clip; }
+    html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 Outfit, -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: clip; transition: background .3s ease, color .3s ease; }
     a { color: inherit; }
     .glow {
-      position: absolute; inset: -160px -30% auto; height: 820px; z-index: -1; pointer-events: none; filter: blur(30px);
+      position: absolute; inset: -160px 0 auto; height: 820px; z-index: -1; pointer-events: none; filter: blur(30px); overflow: hidden;
       background:
-        radial-gradient(22% 26% at 66% 30%, rgba(255, 222, 210, 0.35), transparent 70%),
-        radial-gradient(48% 34% at 56% 38%, rgba(236, 78, 52, 0.7), transparent 72%),
-        radial-gradient(44% 30% at 36% 46%, rgba(196, 48, 40, 0.55), transparent 72%),
-        radial-gradient(56% 36% at 44% 22%, rgba(30, 44, 112, 0.85), transparent 72%);
+        radial-gradient(22% 26% at 66% 30%, var(--glow-d), transparent 70%),
+        radial-gradient(48% 34% at 56% 38%, var(--glow-a), transparent 72%),
+        radial-gradient(44% 30% at 36% 46%, var(--glow-b), transparent 72%),
+        radial-gradient(56% 36% at 44% 22%, var(--glow-c), transparent 72%);
       -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent); mask-image: linear-gradient(180deg, #000 40%, transparent);
     }
     main { max-width: 1040px; margin: 0 auto; padding: 0 20px; position: relative; }
@@ -41,20 +69,28 @@
     header img { width: 36px; height: 36px; border-radius: 9px; }
     header span { font-family: 'Italiana', serif; font-size: 24px; -webkit-text-stroke: 0.3px currentColor; }
 
+    /* Light and dark, top right: a quiet round button showing the look it switches to */
+    .theme-switch {
+      margin-left: auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; padding: 0;
+      color: var(--ink); background: var(--btn); border: 1px solid var(--btn-edge); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    }
+    .theme-switch svg { width: 18px; height: 18px; }
+    .theme-switch .moon, .theme-switch[data-mode="light"] .sun { display: none; }
+    .theme-switch[data-mode="light"] .moon { display: block; }
+
     .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; padding: 48px 0 80px; }
     h1 { font-size: clamp(44px, 7vw, 76px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.02; margin: 0 0 22px; }
-    .lead { font-size: clamp(19px, 2.2vw, 23px); font-weight: 300; color: var(--ink-2); margin: 0 0 32px; max-width: 30ch; }
+    .lead { font-size: clamp(19px, 2.2vw, 23px); font-weight: 300; color: var(--ink-2); margin: 0 0 32px; max-width: 32ch; }
     .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
     .btn {
       display: inline-flex; align-items: center; min-height: 52px; padding: 0 26px; border-radius: 999px; text-decoration: none; font-weight: 500;
-      color: #fff; border: 1px solid rgba(255, 255, 255, 0.28);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.1));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 12px 32px -14px rgba(0, 0, 0, 0.9);
+      color: var(--ink); border: 1px solid var(--btn-edge); background: var(--btn);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 12px 32px -14px var(--shade);
     }
     .btn.quiet { background: none; border-color: transparent; box-shadow: none; color: var(--ink-2); padding: 0 8px; }
     .soon { font-size: 14px; color: var(--ink-3); margin-top: 14px; }
 
-    .phone { width: 100%; max-width: 340px; justify-self: center; border-radius: 46px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.95), 0 0 0 8px rgba(255, 255, 255, 0.03); }
+    .phone { width: 100%; max-width: 340px; justify-self: center; border-radius: 46px; overflow: hidden; border: 1px solid var(--frame); box-shadow: 0 50px 120px -40px var(--shade), 0 0 0 8px var(--edge); }
     .phone img { display: block; width: 100%; height: auto; }
 
     h2 { font-size: clamp(30px, 4vw, 42px); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 16px; }
@@ -63,14 +99,15 @@
     .feature p { color: var(--ink-2); margin: 0 0 12px; max-width: 42ch; }
     .feature .phone { max-width: 300px; }
 
-    /* The three steps: numbered columns on a shared rule, not boxes */
+    /* The three steps, and the three extras: columns on a shared rule, not boxes */
     .steps { list-style: none; counter-reset: step; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin: 0; padding: 32px 0 72px; border-top: 1px solid var(--edge); }
     .steps li { counter-increment: step; }
     .steps li::before { content: counter(step); display: block; font: 400 56px/1 'Italiana', serif; color: var(--ink-3); margin-bottom: 18px; }
-    .steps h3 { font-size: 19px; font-weight: 500; margin: 0 0 6px; }
-    .steps p { color: var(--ink-2); font-size: 16px; margin: 0; max-width: 30ch; }
+    .steps h3, .extras h3 { font-size: 19px; font-weight: 500; margin: 0 0 6px; }
+    .steps p, .extras p { color: var(--ink-2); font-size: 16px; margin: 0; max-width: 30ch; }
+    .extras { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin: 16px 0 0; padding: 40px 0 24px; border-top: 1px solid var(--edge); }
 
-    .private { text-align: center; padding: 40px 0 80px; }
+    .private { text-align: center; padding: 72px 0 80px; }
     .private p { color: var(--ink-2); margin: 0 auto; max-width: 52ch; }
     .note { font-size: 14px; color: var(--ink-3); margin-top: 28px !important; }
 
@@ -83,7 +120,7 @@
       .hero { padding-top: 24px; text-align: left; }
       .feature { padding: 40px 0; }
       .feature.flip .copy { order: 0; }
-      .steps { grid-template-columns: 1fr; gap: 28px; }
+      .steps, .extras { grid-template-columns: 1fr; gap: 28px; }
       .phone { max-width: 300px; }
     }
   </style>
@@ -91,54 +128,90 @@
 <body>
   <div class="glow" aria-hidden="true"></div>
   <main>
-    <header><img src="icons/icon-192.png" alt=""><span>Back Story</span></header>
+    <header>
+      <img src="icons/icon-192.png" alt=""><span>Back Story</span>
+      <button type="button" class="theme-switch" aria-label="Switch between light and dark">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1Z"/></svg>
+      </button>
+    </header>
 
     <section class="hero">
       <div>
-        <h1>Keep a diary of your back pain. See what lines up with it.</h1>
-        <p class="lead">Check in once a day. After a week or two you'll start to see what your bad days have in common.</p>
+        <h1>Keep a diary of your back pain. Find out what's behind it.</h1>
+        <p class="lead">Check in once a day. Back Story shows what your bad days have in common, even things that catch up with you a day or two later.</p>
         <div class="cta">
           <a class="btn" href="./">Try it in your browser</a>
           <a class="btn quiet" href="#how">How it works</a>
         </div>
         <p class="soon">Free on iPhone. Coming soon to the App Store.</p>
       </div>
-      <div class="phone"><img src="assets/site/1-home.jpg" alt="The home screen: a pattern from the diary, today's pain, the next reminder, today's routine and a chart" width="900" height="1955"></div>
+      <div class="phone">
+        <img class="shot dark" src="assets/site/home-dark.jpg" alt="The home screen: today's pain, the next nudge, today's routine and a chart" width="900" height="1955">
+        <img class="shot light" src="assets/site/home-light.jpg" alt="The home screen: today's pain, the next nudge, today's routine and a chart" width="900" height="1955" loading="lazy">
+      </div>
     </section>
 
     <ol class="steps" id="how" aria-label="How it works">
       <li><h3>Check in</h3><p>How much it hurts, where, and what you did today. It takes about a minute.</p></li>
       <li><h3>See the pattern</h3><p>Your pain on a chart next to sitting, walking, sleep and whatever else you track.</p></li>
-      <li><h3>Try a change</h3><p>Sit less for a week, say, and see if anything shifts.</p></li>
+      <li><h3>Try a change</h3><p>Sit less for a week, say, and watch what happens to the pattern.</p></li>
     </ol>
 
     <section class="feature">
       <div class="copy">
         <h2>What your bad days have in common.</h2>
-        <p>After a week or two the app shows what tends to turn up on days with more pain and on days with less, then suggests something to try. It can't tell you the cause, only what lines up in your own diary.</p>
+        <p>Back Story compares your days with more of something against days with less. More sitting, more driving, a poor night's sleep. You see what goes with more pain and what goes with less, side by side.</p>
       </div>
-      <div class="phone"><img src="assets/site/2-patterns.jpg" alt="Patterns: more pain on days with more long sitting or driving, and less on days with routines or stretching" width="900" height="1955" loading="lazy"></div>
+      <div class="phone">
+        <img class="shot dark" src="assets/site/patterns-dark.jpg" alt="Patterns: pain is worse two days after more long sitting, with what goes with more pain and less" width="900" height="1955" loading="lazy">
+        <img class="shot light" src="assets/site/patterns-light.jpg" alt="Patterns: pain is worse two days after more long sitting, with what goes with more pain and less" width="900" height="1955" loading="lazy">
+      </div>
     </section>
 
     <section class="feature flip">
       <div class="copy">
-        <h2>Tap where it hurts.</h2>
-        <p>Mark the spot on a 3D body, slide for pain, stress and sleep, then tap the things you did today.</p>
+        <h2>Some things hurt later.</h2>
+        <p>A long day at a desk might not hurt until two days on. Sitting and driving might be fine apart but not together. Back Story looks for both, and tells you in plain words.</p>
+        <p>Tap a pattern to see the days behind it. It only calls something a pattern when it's unlikely to be chance.</p>
       </div>
-      <div class="phone"><img src="assets/site/3-body-map.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy"></div>
+      <div class="phone">
+        <img class="shot dark" src="assets/site/insight-dark.jpg" alt="A pattern up close: pain two days after a long sitting day, against after other days" width="900" height="1955" loading="lazy">
+        <img class="shot light" src="assets/site/insight-light.jpg" alt="A pattern up close: pain two days after a long sitting day, against after other days" width="900" height="1955" loading="lazy">
+      </div>
     </section>
 
     <section class="feature">
       <div class="copy">
-        <h2>Reminders to get up and move.</h2>
-        <p>Keep your stretches and gym sessions in the app, with reps and weights. If your iPhone sees you've walked, the next reminder waits. Steps and sleep can come in from Apple Health.</p>
+        <h2>Tap where it hurts.</h2>
+        <p>Mark the spot on a 3D body, slide for pain, stress, sleep and how well you ate, then tap the things you did today. Add your own sliders, or hide the steps you don't need.</p>
       </div>
-      <div class="phone"><img src="assets/site/4-check-in.jpg" alt="Check-in exercise tiles for routines like Daily mobility and a gym split" width="900" height="1955" loading="lazy"></div>
+      <div class="phone">
+        <img class="shot dark" src="assets/site/body-map-dark.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy">
+        <img class="shot light" src="assets/site/body-map-light.jpg" alt="The body map, with a spot marked on the lower back" width="900" height="1955" loading="lazy">
+      </div>
     </section>
+
+    <section class="feature flip">
+      <div class="copy">
+        <h2>Your routines, getting stronger.</h2>
+        <p>Keep your stretches and gym sessions in the app, with reps and weights. Time a plank or a dead hang. A chart for each move shows what's going up and what isn't.</p>
+      </div>
+      <div class="phone">
+        <img class="shot dark" src="assets/site/progress-dark.jpg" alt="A gym routine's progress: each move's weight or time over the last sessions" width="900" height="1955" loading="lazy">
+        <img class="shot light" src="assets/site/progress-light.jpg" alt="A gym routine's progress: each move's weight or time over the last sessions" width="900" height="1955" loading="lazy">
+      </div>
+    </section>
+
+    <ul class="extras" aria-label="Also in Back Story">
+      <li><h3>Nudges that know you've moved</h3><p>Sit still too long and you get a nudge. Walk about and the next one waits, even with the app closed.</p></li>
+      <li><h3>Apple Health</h3><p>Steps and sleep come straight in, so there's less to type.</p></li>
+      <li><h3>A second opinion</h3><p>Export your diary any time, or share it with an AI chat for another look.</p></li>
+    </ul>
 
     <section class="private">
       <h2>Your diary stays on your phone.</h2>
-      <p>You don't need an account, and there are no ads or tracking. You can export it whenever you like, or share it with an AI chat if you want a second look.</p>
+      <p>You don't need an account, and there are no ads or tracking.</p>
       <p class="note">Back Story doesn't diagnose or treat anything. Check with a doctor before making medical decisions.</p>
     </section>
 
