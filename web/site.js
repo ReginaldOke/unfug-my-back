@@ -3,6 +3,9 @@
 const root = document.documentElement;
 const KEY = 'back-story-site-theme';
 root.classList.add('js');
+// The opening waits for its fonts (or a second and a half at most), then fades in, so nothing flashes in a stand-in font
+const reveal = () => root.classList.add('ready');
+Promise.race([document.fonts?.ready ?? Promise.resolve(), new Promise(r => setTimeout(r, 1500))]).then(() => requestAnimationFrame(reveal));
 try { const saved = localStorage.getItem(KEY); if (saved === 'light' || saved === 'dark') root.dataset.theme = saved; } catch {}
 
 const current = () => root.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');

@@ -2,7 +2,7 @@
 // when there's a connection.
 //  - App files: network first (so every new deploy shows up on the next open), cached copy when offline.
 //  - api/*: never cached (it needs the live server).
-const CACHE = 'back-story-v133';
+const CACHE = 'back-story-v134';
 
 // Everything the app needs to start offline. test/sw.test.js checks this list against web/.
 const ASSETS = [

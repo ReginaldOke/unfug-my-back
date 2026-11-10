@@ -13,11 +13,13 @@
   <meta name="theme-color" content="#0d0d0f">
   <link rel="icon" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/italiana.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
   <script src="site.js"></script>
   <script src="site-page.js" defer></script>
   <style>
-    @font-face { font-family: 'Italiana'; src: url('assets/fonts/italiana.woff2') format('woff2'); font-display: swap; }
-    @font-face { font-family: 'Outfit'; src: url('assets/fonts/outfit.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+    @font-face { font-family: 'Italiana'; src: url('assets/fonts/italiana.woff2') format('woff2'); font-display: block; }
+    @font-face { font-family: 'Outfit'; src: url('assets/fonts/outfit.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
     /* The app's two looks. Dark: near-black with a red and navy glow. Light: warm off-white with peach and blue.
        The page follows the device until the switch is used (site.js then sets data-theme). */
     :root {
@@ -224,8 +226,22 @@
       .private { scroll-snap-align: center; }
       footer { scroll-snap-align: end; }
     }
+    /* The opening: held back until the fonts are in, then the header, the name and the line under it arrive in turn,
+       the name sharpening out of a soft blur, while the phone drops in behind */
+    .js:not(.ready) header, .js:not(.ready) .hero h1, .js:not(.ready) .tagline, .js:not(.ready) .sky { opacity: 0; }
+    .js:not(.ready) .drop { animation-play-state: paused; }
+    .ready header { animation: arrive 1s cubic-bezier(.2, .8, .2, 1) .05s both; }
+    .ready .hero h1 { animation: sharpen 1.6s cubic-bezier(.2, .8, .2, 1) .1s both; }
+    .ready .tagline { animation: arrive 1.2s cubic-bezier(.2, .8, .2, 1) .7s both; }
+    .ready .sky { animation: bloom 2s ease both; }
+    @keyframes arrive { from { opacity: 0; transform: translateY(14px); } }
+    @keyframes sharpen { from { opacity: 0; filter: blur(14px); letter-spacing: .04em; transform: scale(1.03); } }
+    @keyframes bloom { from { opacity: 0; } }
+    /* The cover the page fades under when the name in the header takes you back to the top */
+    .page-veil { position: fixed; inset: 0; z-index: 30; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity .38s ease; }
+    .page-veil.on { opacity: 1; }
     @media (prefers-reduced-motion: reduce) {
-      .drop, .sky i { animation: none; }
+      .drop, .sky i, .ready header, .ready .hero h1, .ready .tagline, .ready .sky { animation: none; }
       .js .reveal { opacity: 1; transform: none; transition: none; }
     }
   </style>
@@ -265,7 +281,7 @@
 
       <section class="scene" id="intro" data-pose="right" data-clip="patterns">
         <div class="copy reveal">
-          <h2>Track your back pain and find out what affects it</h2>
+          <h2>Track back pain and learn what helps it</h2>
           <p>Back Story turns a quick daily check-in into a clear picture of your back: how it's doing, what makes it worse and what helps.</p>
           <div class="cta"><a class="btn big" href="try.html">Try it in your browser</a></div>
         </div>

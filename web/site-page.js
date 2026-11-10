@@ -78,6 +78,19 @@
 
     // The phone follows the scroll with a little give, so a wheel's steps turn into one smooth movement
     let follow = scrollY, lastNow = 0;
+    // The name in the header goes back to the top under a quick fade, rather than racing up through every section
+    const veil = document.createElement('div'); veil.className = 'page-veil'; document.body.append(veil);
+    document.querySelector('.brand')?.addEventListener('click', e => {
+      e.preventDefault();
+      if (scrollY < 10) return;
+      veil.classList.add('on');
+      setTimeout(() => {
+        document.documentElement.style.scrollSnapType = 'none';
+        scrollTo({ top: 0, behavior: 'instant' }); follow = 0;
+        document.documentElement.style.scrollSnapType = '';
+        requestAnimationFrame(() => requestAnimationFrame(() => veil.classList.remove('on')));
+      }, still ? 0 : 400);
+    });
     const frame = now => {
       requestAnimationFrame(frame);
       const dt = Math.min(64, now - (lastNow || now)); lastNow = now;
