@@ -512,9 +512,10 @@ function patternsCard(today) {
   }
 
   // Whatever goes most with pain, whatever its role: the three biggest rises, then the three biggest
-  // falls, by the same numbers as each one's own page
+  // falls, by the same numbers as each one's own page. Small differences count too, so there are three
+  // of each whenever the diary has them; their short bars show they're slight.
   const all = factors.map(f => ({ factor: f, st: factorStory(f, data, today) }))
-    .filter(x => x.st.state === 'up' || x.st.state === 'down')
+    .filter(x => x.st.best && x.st.best.delta !== 0)
     .map(x => ({ factor: x.factor, delta: x.st.best.delta, early: x.st.early }));
   const rows = [
     ...all.filter(a => a.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3),

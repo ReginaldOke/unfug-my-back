@@ -8,10 +8,10 @@ const DASH = 18;
 
 // Muted palettes that read well on charcoal. The line and its key are drawn in the first colour, so
 // a line looks the same wherever it sits; the second only deepens the area fill underneath.
-// The original palette, loosely sorted: things that go with more pain lean warm (amber, lime, pink,
+// The original palette, loosely sorted: things that go with more pain lean warm (amber, gold, pink,
 // orchid), things that help lean cool (teal, blue, violet, green). Neighbours in each set are far apart
 // in hue, so three stressors never read as three oranges; none comes close to pain's coral.
-export const WARM = [['#f3b46e', '#e8875a'], ['#dfe07a', '#b8b84a'], ['#ff9fcf', '#e46aa6'], ['#e3a6f5', '#c27be0']];
+export const WARM = [['#f3b46e', '#e8875a'], ['#f5c94c', '#dc9f1e'], ['#ff9fcf', '#e46aa6'], ['#e3a6f5', '#c27be0']];
 export const COOL = [['#74d4c0', '#4fb3a6'], ['#8fc4ff', '#5a8cf0'], ['#b9a0ff', '#8f6cf0'], ['#a3e19a', '#5fb85a']];
 export const PALETTES = {
   pain: ['#f4908a', '#e2687f'],
