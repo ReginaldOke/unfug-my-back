@@ -1932,7 +1932,8 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .range-chev { position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border: solid var(--ink-3); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none; }
 
 /* Routine stopwatch: one small pill; stopped, it opens into a line to name and save the time */
-.stopwatch { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 8px; }
+/* Under the moves, on the right, with room above and below so it doesn't crowd them or the slider */
+.stopwatch { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin: 16px 0 24px; }
 .sw-pill { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: var(--r-pill); border: 0; font-size: 14px; color: var(--ink-2); }
 .sw-pill .sw-icon { display: inline-flex; }
 .sw-pill.running { color: var(--ink); font-size: 16px; font-variant-numeric: tabular-nums; padding: 0 18px 0 14px; }

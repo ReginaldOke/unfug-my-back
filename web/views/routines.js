@@ -217,7 +217,7 @@ export function fmtClock(ms) {
 const CLOCK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M10 2.5h4"/></svg>';
 
 /**
- * A small stopwatch at the foot of a routine, for timed holds like a dead hang. Tap to start, tap to
+ * A small stopwatch under the moves, on the right, for timed holds like a dead hang. Tap to start, tap to
  * stop, name it, save. A name that matches a move fills that move's box (so it's tracked like reps);
  * any other name joins today's session only, listed under the timer. The clock lives in the session,
  * so it keeps running while you switch variations or open the player.
@@ -634,8 +634,8 @@ export function RoutineView(ctx) {
     body.append(
     list,
     add,
-    field,
     stopwatch(s, paint, ctx),
+    field,
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
     r ? h('button', {
       type: 'button', class: 'link-danger', onclick: async () => {
