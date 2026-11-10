@@ -2,10 +2,10 @@
 import { h, sheet, segmented, field, toast, iconButton } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { ROLE_OPTIONS, ROLE_LABEL, ROLE_ICON, MEASURE_OPTIONS, fmtAmount } from '../lib/labels.js';
-import { analyseFactor, factorStory, SAME_BAND } from '../lib/analysis.js';
-import { dayLabel, addDays, localDate } from '../lib/dates.js';
+import { analyseFactor, factorStory, scoreSplits, SAME_BAND, STRIP_DAYS } from '../lib/analysis.js';
+import { dayLabel, addDays, localDate, daysBetween } from '../lib/dates.js';
 import { SelectCard } from './controls.js';
-import { TrendChart, PALETTES } from './chart.js';
+import { TrendChart, PALETTES, WARM, COOL } from './chart.js';
 
 /**
  * Tall drawer to add a stressor or helper: your own at the top, common ones you haven't switched on below.
@@ -74,7 +74,8 @@ export function FactorDetailView(ctx) {
     const now = R.factors.get(f.id);
     return h('section', { class: 'card glass stack' },
       h('p', { class: 'lead story' }, headline(now, story)),
-      story.best || story.byAmount ? compare(now, story) : null);
+      story.best ? compare(now, story) : null,
+      story.best?.kind === 'amount' ? rateLine(now, story.best) : null);
   };
   let top = summary();
 
@@ -123,10 +124,13 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** The one sentence at the top: what the diary shows so far, in plain words. */
 export function headline(f, st) {
   const n = lower(f.name);
-  // Logged too often for with and without: what the days with more of it show instead
-  const m = !st.best && st.byAmount;
-  if (m) return Math.abs(m.delta) < SAME_BAND ? `Your pain is about the same on days with more ${n} and with less.`
-    : `Your pain is ${Math.abs(m.delta).toFixed(1)} points ${m.delta > 0 ? 'higher' : 'lower'} on days with more ${n}.`;
+  // Time and counts are about how much: more of it against less
+  if (st.amount) {
+    if (st.state === 'always') return `You've logged the same amount of ${n} every day, so there's nothing to compare yet.`;
+    if (st.state === 'few') return `A few more days, some with more ${n} and some with less, and there's something to compare.`;
+    if (st.state === 'same') return `Your pain is about the same with more ${n} or less.`;
+    return `Your pain is ${Math.abs(st.best.delta).toFixed(1)} points ${st.state === 'up' ? 'higher' : 'lower'} on days with more ${n}.`;
+  }
   switch (st.state) {
     case 'none': return `You haven't logged ${n} in the last four weeks.`;
     case 'always': return `You've logged ${n} on all ${plural(st.nCheckins, 'check-in')}, so there are no days without it to compare with yet.`;
@@ -143,10 +147,14 @@ export function headline(f, st) {
   }
 }
 
-/** With and without (or, for something logged nearly every day, more and less) as two bars out of 10. */
-function compare(f, st) {
-  const m = !st.best && st.byAmount;
-  const b = st.best ?? { lag: 0, meanWith: m.meanMore, meanWithout: m.meanLess, delta: m.delta };
+/**
+ * Average pain as two bars out of 10: with and without, or for time and counts, days with more against
+ * days with less, each labelled by its amount ("Over 5 h", "5 h or less").
+ */
+function compare(f, st, labels = null) {
+  const b = st.best;
+  const cut = f && b.kind === 'amount' && b.cut > 0 ? shortAmount(f, b.cut) : null;
+  const amountLabels = cut ? [`Over ${cut}`, `${cut} or less`] : null;
   const row = (label, v, cls) => h('div', { class: 'cmp-row' },
     h('span', { class: 'hint' }, label),
     h('span', { class: 'cmp-track' }, h('i', { class: cls, style: `--w:${v * 10}%` })),
@@ -154,10 +162,30 @@ function compare(f, st) {
   const nx = st.next;
   return h('div', { class: 'cmp' },
     h('span', { class: 'eyebrow' }, b.lag ? 'Pain the next day' : 'Average pain'),
-    row(m ? 'More' : 'With', b.meanWith, 'with'),
-    row(m ? 'Less' : 'Without', b.meanWithout, 'without'),
+    row(labels?.[0] ?? amountLabels?.[0] ?? 'With', b.meanWith, 'with'),
+    row(labels?.[1] ?? amountLabels?.[1] ?? 'Without', b.meanWithout, 'without'),
     nx && Math.abs(nx.delta) >= SAME_BAND && Math.sign(nx.delta) === Math.sign(b.delta)
       ? h('p', { class: 'hint' }, `It carries into the next day too: ${nx.meanWith.toFixed(1)} after it, ${nx.meanWithout.toFixed(1)} after days without.`) : null);
+}
+
+/** A bar label's amount, kept short: "4.5 h", "40 min", "3 times". */
+function shortAmount(f, v) {
+  if (f.measureType === 'minutes') return v >= 60 ? `${Math.round(v / 30) / 2} h` : `${Math.round(v)} min`;
+  return fmtAmount(f, Math.round(v));
+}
+
+/**
+ * The rate, where the days show a clear enough line: "Each extra hour of long sitting goes with about
+ * 0.4 more pain." Per hour for time, per one for counts; nothing when the link is loose (|r| < 0.3).
+ */
+export function rateLine(f, b, { per = null } = {}) {
+  if (Math.abs(b.r ?? 0) < 0.3) return null;
+  const n = lower(f.name);
+  const [step, what] = per ?? (f.measureType === 'minutes' ? [60, `hour of ${n}`]
+    : [1, `${(f.unit && f.unit !== '×' ? f.unit : 'time').replace(/s$/, '')} of ${n}`]);
+  const v = b.perUnit * step;
+  if (Math.abs(v) < 0.1) return null;
+  return h('p', { class: 'hint rate' }, `Each extra ${what} goes with about ${Math.abs(v).toFixed(1)} ${v > 0 ? 'more' : 'less'} pain.`);
 }
 
 /** Pain and this factor over the strip's days, drawn by the same chart as Home. */
@@ -186,3 +214,50 @@ function doseRange(f, b) {
 }
 
 const miniStat = (v, label) => h('div', { class: 'mini-stat' }, h('span', { class: 'num' }, v), h('span', { class: 'hint' }, label));
+
+// ---------- Stress, sleep and eating: the check-in's own scores, read the same way ----------
+
+const SCORES = {
+  stressScore: { name: 'Stress', phrase: 'on days with more stress', palette: 'warm' },
+  sleepQuality: { name: 'Sleep', phrase: 'after better sleep', palette: 'cool' },
+  dietScore: { name: 'Eating', phrase: 'on days you ate better', palette: 'cool' },
+};
+
+/** A score's page: what its higher days show against its lower, the two bars, and the days on Home's chart. */
+export function ScoreView(ctx) {
+  const key = ctx.args[0], meta = SCORES[key];
+  if (!meta) return h('div', { class: 'view' }, h('p', {}, 'Nothing to show here.'), h('a', { href: '#/' }, 'Home'));
+  const data = R.snapshot(), today = localDate();
+  const split = scoreSplits(data, today).find(x => x.key === key)?.split ?? null;
+  const headline = !split ? `Not enough days with different ${meta.name.toLowerCase()} scores to compare yet.`
+    : Math.abs(split.delta) < SAME_BAND ? `Your pain is about the same whatever your ${meta.name.toLowerCase()}.`
+      : `Your pain is ${Math.abs(split.delta).toFixed(1)} points ${split.delta > 0 ? 'higher' : 'lower'} ${meta.phrase}.`;
+
+  // The days, as on a stressor's page: a week at least, growing to two
+  const first = data.dailyEntries.reduce((m, e) => (e.date < m ? e.date : m), today);
+  const len = Math.min(STRIP_DAYS, Math.max(7, daysBetween(first, today) + 1));
+  const byDate = new Map(data.dailyEntries.map(e => [e.date, e]));
+  const strip = Array.from({ length: len }, (_, i) => { const e = byDate.get(addDays(today, i - (len - 1))); return { date: addDays(today, i - (len - 1)), pain: e?.painScore ?? null, score: e?.[key] ?? null }; });
+  const series = [
+    { key: 'pain', label: 'Pain', palette: PALETTES.pain, values: strip.map(d => (d.pain == null ? null : d.pain / 10)), format: i => `${strip[i].pain ?? '–'}/10` },
+    { key, label: meta.name, palette: meta.palette === 'warm' ? WARM[1] : COOL[1], values: strip.map(d => (d.score == null ? null : d.score / 10)), format: i => `${strip[i].score ?? '–'}/10` },
+  ];
+  const hidden = new Set();
+  const chart = h('div', {});
+  const draw = animate => chart.replaceChildren(TrendChart({
+    days: strip.map(d => ({ date: d.date, logged: d.pain != null })), series, hidden, animate, fadeLeft: false,
+    onToggle: k => { if (hidden.has(k)) hidden.delete(k); else hidden.add(k); draw(false); },
+  }));
+  draw(true);
+
+  return h('div', { class: 'view factor-page' },
+    h('header', { class: 'top-bar' }, iconButton('‹', 'Back', () => history.back()), h('span', { class: 'eyebrow' }, 'From your check-ins'), h('span')),
+    h('h1', { class: 'score-title' }, meta.name),
+    h('section', { class: 'card glass stack' },
+      h('p', { class: 'lead story' }, headline),
+      split ? compare(null, { best: { lag: 0, meanWith: split.meanMore, meanWithout: split.meanLess, delta: split.delta } }, ['Higher', 'Lower']) : null,
+      split ? rateLine({ name: meta.name }, split, { per: [1, `point of ${meta.name.toLowerCase()}`] }) : null),
+    h('section', { class: 'card glass' },
+      h('h2', {}, len >= 14 ? 'Last two weeks' : 'Since you started'),
+      chart));
+}

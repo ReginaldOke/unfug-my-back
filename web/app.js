@@ -4,7 +4,7 @@ import { h } from './lib/ui.js';
 import { HomeView } from './views/home.js';
 import { CheckinView } from './views/checkin.js';
 import { SetupView } from './views/setup.js';
-import { FactorDetailView } from './views/factor.js';
+import { FactorDetailView, ScoreView } from './views/factor.js';
 import { RoutinesView, RoutineView, RoutineRunView } from './views/routines.js';
 import { SettingsView } from './views/settings.js';
 import { HelpView } from './views/help.js';
@@ -39,6 +39,7 @@ const routes = [
   [/^\/checkins\/(\d{4}-\d{2}-\d{2})$/, CheckinDetailView],
   [/^\/setup$/, SetupView, { flow: true }],
   [/^\/factor\/([\w-]+)$/, FactorDetailView],
+  [/^\/score\/(\w+)$/, ScoreView],
   [/^\/routines$/, RoutinesView],
   [/^\/routine\/(new)$/, RoutineView, { flow: true }],
   [/^\/routine\/([\w-]+)\/edit$/, RoutineView, { flow: true }],

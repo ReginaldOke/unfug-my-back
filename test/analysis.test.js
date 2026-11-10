@@ -182,7 +182,7 @@ test('factorStory compares from two days each, and says when it cannot', async (
   assert.equal(up.strip.at(-2).amount, 30);
 });
 
-test('things logged every day are compared by more against less, and so are stress and sleep', async () => {
+test('time is compared by more against less, with a rate, and so are stress and sleep', async () => {
   const { factorStory, scoreSplits } = await import('../web/lib/analysis.js');
   const today = '2026-11-08';
   const days = ['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'];
@@ -190,8 +190,11 @@ test('things logged every day are compared by more against less, and so are stre
   const dailyEntries = days.map((date, i) => ({ date, painScore: sitting[i] > 300 ? 7 : 3, stressScore: sitting[i] > 300 ? 8 : 2, sleepQuality: 5 }));
   const factorLogs = days.map((date, i) => ({ factorId: 'sit', date, value: sitting[i] }));
   const st = factorStory({ id: 'sit', name: 'Long sitting', role: 'trigger', measureType: 'minutes' }, { dailyEntries, factorLogs }, today);
-  assert.equal(st.state, 'always');
-  assert.equal(st.byAmount.delta, 4);
+  assert.equal(st.state, 'up');
+  assert.equal(st.best.kind, 'amount');
+  assert.equal(st.best.delta, 4);
+  assert.equal(st.best.cut, 120);
+  assert.ok(st.best.perUnit > 0 && st.best.r > 0.9);
   const splits = scoreSplits({ dailyEntries }, today);
   assert.deepEqual(splits.map(x => [x.name, x.split.delta]), [['Stress', 4]]);
 });

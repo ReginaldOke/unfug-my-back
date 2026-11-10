@@ -1893,7 +1893,8 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .lead.story { font-size: 21px; line-height: 1.35; margin: 2px 0 0; }
 .cmp { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .cmp p { margin: 0; }
-.cmp-row { display: grid; grid-template-columns: 64px 1fr 34px; align-items: center; gap: 10px; }
+.cmp-row { display: grid; grid-template-columns: 7.4em 1fr 34px; align-items: center; gap: 10px; }
+.cmp .rate, p.rate { margin: 0; }
 .cmp-row strong { text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; }
 .cmp-track { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
 [data-theme="light"] .cmp-track { background: rgba(0, 0, 0, 0.06); }
@@ -1967,3 +1968,6 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 [data-theme="light"] .prog-line { stroke: #3aa594; filter: none; }
 [data-theme="light"] .prog-area { fill: rgba(58, 165, 148, 0.12); }
 [data-theme="light"] .prog-dot { fill: #fff; stroke: #3aa594; }
+
+/* A score's page (stress, sleep, eating): its name as a plain title, where a stressor's page has its name field */
+.score-title { font-size: 26px; font-weight: 300; padding: 6px 0; }

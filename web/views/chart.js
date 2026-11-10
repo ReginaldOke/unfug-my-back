@@ -58,8 +58,10 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   const y = v => bottom - v * (bottom - top);
   const labelEvery = n <= 14 ? 1 : n <= 31 ? 7 : n <= 92 ? 14 : 61; // about six labels at most past a fortnight
   const showLabel = i => (n - 1 - i) % labelEvery === 0;
-  // A label at either edge sits inside the plot, flush with it, rather than centred over the edge
-  const anchor = i => (n > 1 && i === 0 && x(i) < 14 ? 'start' : n > 1 && i === n - 1 ? 'end' : 'middle');
+  // With room between days, a label at either edge sits inside the plot, flush with it; when days are
+  // close together it stays centred (hanging a little past the edge) so it can't run into its neighbour
+  const roomy = n > 1 && n <= 8 && labelEvery === 1;
+  const anchor = i => (roomy && i === 0 ? 'start' : roomy && i === n - 1 ? 'end' : 'middle');
   const labelX = i => x(i) + (anchor(i) === 'start' ? -left : anchor(i) === 'end' ? W - right : 0);
   const visible = series.filter(sr => !hidden.has(sr.key));
 

@@ -313,28 +313,40 @@ export const STRIP_DAYS = 14; // days drawn on the factor page
 export const SAME_BAND = 0.5; // a gap smaller than this reads as "about the same"
 
 /**
- * Pain on the days with more of something against the days with less, for something logged too often to
- * compare with and without: the logged days split at the middle amount. Needs EARLY_MIN_DAYS on each
- * side and at least two different amounts; otherwise null. { delta, meanMore, meanLess, nMore, nLess, early }
+ * How pain moves with the amount of something: the check-in days split at the middle amount, days with
+ * more against days with less, and the straight-line rate (pain per unit) across all of them. Days without
+ * a log count as none of it (for a score, they sit out). Needs EARLY_MIN_DAYS on each side and at least
+ * two different amounts; otherwise null.
+ * { delta, meanMore, meanLess, nMore, nLess, cut, perUnit, r, early }: cut is the most a "less" day had.
  */
 export function amountSplit(pain, amounts, dates, { scores = false } = {}) {
-  // A score (stress, sleep) counts at 0 too; an amount of 0 means it wasn't done, so that day sits out
-  const days = dates.map(d => ({ a: amounts.get(d) ?? (scores ? null : 0), p: pain.get(d) })).filter(x => x.p != null && (scores ? x.a != null : x.a > 0));
+  const days = dates.map(d => ({ a: scores ? amounts.get(d) ?? null : amounts.get(d) || 0, p: pain.get(d) })).filter(x => x.p != null && x.a != null);
   const sorted = days.map(x => x.a).sort((a, b) => a - b);
   if (new Set(sorted).size < 2) return null;
-  const mid = sorted[Math.floor((sorted.length - 1) / 2)];
-  const more = days.filter(x => x.a > mid).map(x => x.p), less = days.filter(x => x.a <= mid).map(x => x.p);
+  const cut = sorted[Math.floor((sorted.length - 1) / 2)];
+  const more = days.filter(x => x.a > cut).map(x => x.p), less = days.filter(x => x.a <= cut).map(x => x.p);
   if (more.length < EARLY_MIN_DAYS || less.length < EARLY_MIN_DAYS) return null;
   const meanMore = mean(more), meanLess = mean(less);
-  return { delta: meanMore - meanLess, meanMore, meanLess, nMore: more.length, nLess: less.length, early: Math.min(more.length, less.length) < MIN_DAYS };
+  const { slope, r } = fit(days.map(x => x.a), days.map(x => x.p));
+  return { delta: meanMore - meanLess, meanMore, meanLess, nMore: more.length, nLess: less.length, cut, perUnit: slope, r, early: Math.min(more.length, less.length) < MIN_DAYS };
+}
+
+/** Least-squares line through the points: its slope, and the correlation. */
+function fit(xs, ys) {
+  const mx = mean(xs), my = mean(ys);
+  let sxy = 0, sxx = 0, syy = 0;
+  xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; syy += (ys[i] - my) ** 2; });
+  return { slope: sxx ? sxy / sxx : 0, r: sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0 };
 }
 
 /**
  * What one factor's page says: pain on check-in days with it against days without, the same day and
  * the next, from EARLY_MIN_DAYS of each. Returns { state, best, next, nCheckins, nWith, strip, early }:
  *   state 'none'   never logged in the window
- *   state 'always' logged on every check-in, so nothing to compare with and without; byAmount compares
- *                  its days with more against its days with less, where it can
+ *   state 'always' logged on every check-in in the same amount, so nothing to compare
+ * Time and counts (amount: true) compare days with more against days with less (best.kind 'amount',
+ * with best.cut, the most a "less" day had, and best.perUnit, pain per minute or per time); yes/no
+ * compares days with and without.
  *   state 'few'    not yet EARLY_MIN_DAYS with and without
  *   state 'up' | 'down' | 'same'   pain higher, lower or about the same with it (best: the clearer lag)
  * strip: the last 7 to STRIP_DAYS days (since the first check-in), oldest first, { date, pain, amount }.
@@ -353,16 +365,22 @@ export function factorStory(factor, data, today = localDate()) {
     const date = addDays(today, i - (len - 1));
     return { date, pain: pain.get(date) ?? null, amount: amounts.get(date) || 0 };
   });
-  const base = { nCheckins: dates.length, nWith, strip, best: null, next: null, early: false, byAmount: null };
+  const base = { nCheckins: dates.length, nWith, strip, best: null, next: null, early: false, amount: false };
   if (!nWith) return { ...base, state: 'none' };
-  // Logged (nearly) every day: no days without it to compare, but its days with more and with less can be
-  const byAmount = factor.measureType === 'yesno' ? null : amountSplit(pain, amounts, dates);
-  if (nWith === dates.length) return { ...base, state: 'always', byAmount };
+
+  // Time and counts: what matters is how much, so days with more of it are set against days with less
+  if (factor.measureType !== 'yesno') {
+    const split = amountSplit(pain, amounts, dates);
+    if (!split) return { ...base, amount: true, state: nWith === dates.length ? 'always' : 'few', need: { with: Math.max(0, EARLY_MIN_DAYS - nWith), without: Math.max(0, EARLY_MIN_DAYS - (dates.length - nWith)) } };
+    const best = { lag: 0, kind: 'amount', delta: split.delta, meanWith: split.meanMore, meanWithout: split.meanLess, nWith: split.nMore, nWithout: split.nLess, cut: split.cut, perUnit: split.perUnit, r: split.r };
+    return { ...base, amount: true, state: Math.abs(best.delta) < SAME_BAND ? 'same' : best.delta > 0 ? 'up' : 'down', best, early: split.early };
+  }
+  if (nWith === dates.length) return { ...base, state: 'always' };
 
   // Next day only counts check-ins whose next day is in the diary too
   const [same, next] = [0, 1].map(lag => lagComparison(pain, amounts, dates.filter(d => d <= addDays(today, -lag)), lag, EARLY_MIN_DAYS));
   const usable = [same, next].filter(l => l.enough);
-  if (!usable.length) return { ...base, state: 'few', byAmount, need: { with: Math.max(0, EARLY_MIN_DAYS - same.nWith), without: Math.max(0, EARLY_MIN_DAYS - same.nWithout) } };
+  if (!usable.length) return { ...base, state: 'few', need: { with: Math.max(0, EARLY_MIN_DAYS - same.nWith), without: Math.max(0, EARLY_MIN_DAYS - same.nWithout) } };
   // The same day unless the next day shows a clearly bigger gap
   const best = usable.length === 2 && Math.abs(next.delta) > Math.abs(same.delta) + 0.3 ? next : usable[0];
   const state = Math.abs(best.delta) < SAME_BAND ? 'same' : best.delta > 0 ? 'up' : 'down';

@@ -511,17 +511,18 @@ function patternsCard(today) {
       h('p', { class: 'hint' }, 'Check in to start seeing what moves your pain.'));
   }
 
-  // Whatever goes most with pain: the three biggest rises, then the three biggest falls. Stressors and
-  // helpers compare days with and without (as on their own page), or, when logged nearly every day, days
-  // with more against less; stress, sleep and eating compare higher days against lower. Small
-  // differences count too, so there are three of each whenever the diary has them.
+  // Whatever goes most with pain: the three biggest rises, then the three biggest falls, by the same
+  // numbers as each one's own page. Time and counts compare days with more against less; yes or no,
+  // days with and without; stress, sleep and eating, higher days against lower. Small differences
+  // count too, so there are three of each whenever the diary has them.
   const all = [
     ...factors.map(f => {
       const st = factorStory(f, data, today);
-      const d = st.best ?? st.byAmount;
-      return d && { name: f.name, href: `#/factor/${f.id}`, delta: d.delta, early: st.best ? st.early : d.early };
+      const n = midName(f.name);
+      // Time and counts read "with more long sitting"; yes or no reads "with a heat pack"
+      return st.best && { name: f.name, href: `#/factor/${f.id}`, delta: st.best.delta, early: st.early, phrase: st.amount ? `on days with more ${n}` : `on days with ${n}` };
     }),
-    ...scoreSplits(data, today).map(x => ({ name: x.name, href: null, delta: x.split.delta, early: x.split.early })),
+    ...scoreSplits(data, today).map(x => ({ name: x.name, href: `#/score/${x.key}`, delta: x.split.delta, early: x.split.early, phrase: SCORE_PHRASE[x.key] })),
   ].filter(a => a && Math.abs(a.delta) >= 0.05);
   const rows = [
     ...all.filter(a => a.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3),
@@ -536,22 +537,27 @@ function patternsCard(today) {
   const shown = rows;
   const allEarly = rows.every(a => a.early);
   const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta)));
-  // Over a couple of weeks, the clearest trends: up to two
-  const findings = trendFindings(data, factors, today).slice(0, 2);
+  // The headline is the longest bar below, in words, once it's a real difference
+  const top = [...shown].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+  const lead = Math.abs(top.delta) >= 0.5 ? top : null;
   return h('section', { class: 'card glass patterns' },
-    findings.length ? h('div', { class: 'findings' }, head, findings.map(findingRow)) : null,
-    h('div', { class: 'pat-head' }, findings.length ? h('span', {}) : head,
+    lead ? h('div', { class: 'findings' }, head, findingRow(lead)) : null,
+    h('div', { class: 'pat-head' }, lead ? h('span', {}) : head,
       h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
     h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
     allEarly ? h('p', { class: 'hint pat-note' }, 'Only a few days so far, so these could change.') : null);
 }
 
-/** "More pain on days with more guitar": a dot for which way it points, then the trend. No advice. */
-function findingRow(f) {
-  const good = f.kind === 'keep' || f.kind === 'not-stressor';
-  return h('a', { class: 'finding', href: `#/factor/${f.factor.id}` },
-    h('i', { class: `finding-dot ${good ? 'good' : 'bad'}`, 'aria-hidden': 'true' }),
-    h('span', { class: 'grow finding-title' }, f.title));
+// How each of the check-in's scores reads in a sentence
+const SCORE_PHRASE = { stressScore: 'on days with more stress', sleepQuality: 'after better sleep', dietScore: 'on days you ate better' };
+// "Long sitting" reads "long sitting" mid-sentence; names that start with an acronym ("TV time") stay as they are
+const midName = n => (/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n);
+
+/** "More pain on days with more long sitting": a dot for which way it points, then the trend. No advice. */
+function findingRow(a) {
+  return h('a', { class: 'finding', href: a.href },
+    h('i', { class: `finding-dot ${a.delta > 0 ? 'bad' : 'good'}`, 'aria-hidden': 'true' }),
+    h('span', { class: 'grow finding-title' }, `${a.delta > 0 ? 'More' : 'Less'} pain ${a.phrase}`));
 }
 
 /** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).
