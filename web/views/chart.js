@@ -52,7 +52,8 @@ export function TrendChart({ days, series, hidden = new Set(), onToggle = () => 
   const id = ++uid;
   // Even side padding, just enough to keep the first and last day labels whole
   // The plot runs nearly edge to edge, so it lines up with the card's text; the end labels hang inward
-  const W = 340, H = 196, top = 46, bottom = 176, left = 4, right = W - 4;
+  // Wider on an iPad, so the chart stretches across the card instead of growing tall (drawn about 1.4× there)
+  const W = Math.round(Math.min(720, Math.max(340, (innerWidth - 100) / 1.4))), H = 196, top = 46, bottom = 176, left = 4, right = W - 4;
   const n = days.length;
   const x = i => left + (n === 1 ? (right - left) / 2 : (i / (n - 1)) * (right - left));
   const y = v => bottom - v * (bottom - top);

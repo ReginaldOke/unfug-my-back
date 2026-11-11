@@ -2114,9 +2114,10 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 
 .did-pair .did-input.did-big { width: auto; flex: 1 1 0; min-width: 0; max-width: 170px; }
 
-/* iPad and wide windows: a roomier column than a phone's, still centred and easy to read */
-@media (min-width: 900px) {
-  #app, .flow { max-width: 680px; }
+/* iPad and wide windows: the cards run the full width of the screen, with a slightly wider margin */
+@media (min-width: 700px) {
+  :root { --gutter: 24px; }
+  #app, .flow { max-width: none; }
 }
 
 /* ---------- Body scan: the 3D figure with light rising through it, and the part to notice ---------- */
