@@ -248,7 +248,7 @@ function viewToggle() {
 
 function calendarCard() {
   return h('section', { class: 'card glass trend-card' },
-    h('div', { class: 'row between' }, h('h2', {}, 'Pain calendar'), viewToggle()),
+    h('div', { class: 'row between' }, h('h2', {}, 'Calendar'), viewToggle()),
     PainCalendar({
       month: ui.month, selected: ui.day,
       onMonth: m => { ui.month = m; ui.day = null; rerender(); },

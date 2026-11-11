@@ -28,17 +28,20 @@ export function moveValue({ did = '', extra = '' } = {}) {
 export const moveText = x => [x.did === '✓' ? 'Done' : x.did, x.extra].filter(Boolean).join(' · ');
 
 /**
- * One row per move, in the routine's order, then anything else logged (like a timed hang). Each row
- * has every session's entry (or null where it wasn't done) and the values to chart.
+ * One row per move, in the routine's order, then anything else logged (like a timed hang), leaving out
+ * moves no longer in the routine that never had a value. Each row has every session's entry (or null
+ * where it wasn't done) and the values to chart.
  * sessions: oldest first, each { date, log: [{ name, did, extra }] }.
  */
 export function progressRows(names, sessions) {
   const key = s => s.trim().toLowerCase();
   const order = [...names.filter(Boolean)];
   for (const s of sessions) for (const x of s.log ?? []) if (!order.some(o => key(o) === key(x.name))) order.push(x.name);
+  const current = new Set(names.filter(Boolean).map(key));
   return order.map(name => {
     const entries = sessions.map(s => (s.log ?? []).find(x => key(x.name) === key(name)) ?? null);
     const values = entries.map(x => (x ? moveValue(x) : null));
     return { name, entries, values };
-  });
+  // A move that's gone from the routine and never had anything to chart is left out: there's no line to show
+  }).filter(r => current.has(key(r.name)) || r.values.some(v => v));
 }

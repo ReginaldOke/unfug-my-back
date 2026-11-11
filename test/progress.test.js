@@ -27,3 +27,13 @@ test('rows keep the routine’s order, then add anything else that was logged', 
   assert.equal(moveText(sessions[1].log[0]), '3 × 8 · 72.5 kg');
   assert.equal(moveText({ did: '✓' }), 'Done');
 });
+
+test('a move dropped from the routine without ever being done gets no row', () => {
+  const sessions = [
+    { date: '2026-11-01', log: [{ name: 'Bench press', did: '3 × 8' }, { name: 'Cable fly', did: '' }] },
+    { date: '2026-11-03', log: [{ name: 'Bench press', did: '3 × 8' }, { name: 'Dead hang', did: '0:40' }] },
+  ];
+  const names = progressRows(['Bench press', 'Push-ups'], sessions).map(r => r.name);
+  // Cable fly was removed and never had a value; Push-ups is new but still in the routine; the hang was done
+  assert.deepEqual(names, ['Bench press', 'Push-ups', 'Dead hang']);
+});

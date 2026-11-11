@@ -152,8 +152,8 @@ function sessionFor(r, date, fromCheckin) {
     intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
     measure: r?.measure ?? defaultMeasure(`${r?.group ?? ''} ${r?.name ?? ''}`),
     times: logged?.times ?? 1,
-    // Timed with the stopwatch on this day, beyond the routine's own moves (today's log only)
-    timed: (logged?.log ?? []).filter(x => x.timed && !(r?.items ?? []).some(it => it.name === x.name)).map(x => ({ name: x.name, did: x.did })),
+    // Timed on this day, with the routine page's stopwatch or in the player (today's log only)
+    timed: (logged?.log ?? []).filter(x => x.timed).map(x => ({ name: x.name, did: x.did })),
   };
   sessions.set(key, s);
   return s;
@@ -196,8 +196,9 @@ function saveOne(s, { markDone = false } = {}) {
   const logIt = (markDone && !!s.id) || s.touched || items.some(it => it.done);
   if (logIt) {
     const log = [
-      ...items.map(it => ({ name: it.name.trim(), did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}) })),
-      ...(s.timed ?? []).map(t => ({ name: t.name, did: t.did, timed: true })),
+      ...items.map(it => ({ name: it.name.trim(), did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}), ...(isTimedEntry(s, it) ? { timed: true } : {}) })),
+      // Timings of the routine's own moves are already in their rows above
+      ...(s.timed ?? []).filter(t => !items.some(it => it.name.trim() === t.name)).map(t => ({ name: t.name, did: t.did, timed: true })),
     ];
     // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
     const live = checkinDraft(s.date);
@@ -207,6 +208,23 @@ function saveOne(s, { markDone = false } = {}) {
   sessions.delete(s.key);
   s.logged = logIt;
   return r;
+}
+
+/** Whether a move's time came from a timer, so it's listed under the routine page's stopwatch. */
+const isTimedEntry = (s, it) => (s.timed ?? []).some(t => t.name === it.name.trim());
+
+/**
+ * A move timed in the player: its box takes the time, it's listed with the routine page's timings, and it's
+ * saved to today's session straight away, so it's kept (and on the progress chart) even without Finish.
+ */
+function keepTime(s, it, did) {
+  it.did = did; it.done = true; s.touched = true;
+  s.timed = [...(s.timed ?? []).filter(t => t.name !== it.name.trim()), { name: it.name.trim(), did }];
+  if (!s.id) return; // a routine not saved yet keeps the time with the session until it is
+  const before = R.routines.sessionOn(s.id, s.date)?.log ?? [];
+  const log = [...before.filter(x => x.name !== it.name.trim()), { name: it.name.trim(), did, timed: true }];
+  const live = checkinDraft(s.date);
+  R.routines.logSession(s.id, s.date, s.measure === 'count' ? { log, times: s.times } : { log, intensity: s.intensity }, { writeLog: !live });
 }
 
 /** 0:07, 1:45, 1:02:10 */
@@ -741,7 +759,7 @@ export function RoutineRunView(ctx) {
       let b;
       if (c.start) {
         b = h('button', { type: 'button', class: 'sw-pill glass running', 'aria-label': 'Stop the timer', onclick: () => {
-          it.did = fmtClock(ms()); amount.value = it.did; s.touched = true; c.start = null; vibrate(8); paint();
+          keepTime(s, it, fmtClock(ms())); amount.value = it.did; c.start = null; vibrate(8); paint();
         } }, h('span', { class: 'sw-dot', 'aria-hidden': 'true' }), h('span', { class: 'sw-time' }, fmtClock(ms())));
         tick = setInterval(() => { const t = el.querySelector('.sw-time'); if (t) t.textContent = fmtClock(ms()); }, 250);
       } else {
