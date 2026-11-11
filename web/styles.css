@@ -2118,6 +2118,9 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 @media (min-width: 700px) {
   :root { --gutter: 24px; }
   #app, .flow { max-width: none; }
+  /* The check-in sliders sit in the middle of the tall screen, a little larger, not up under the question */
+  .flow-body .levels { flex: 1; align-items: center; padding-bottom: 6vh; }
+  .vslider { height: min(40dvh, 380px); }
 }
 
 /* ---------- Body scan: the 3D figure with light rising through it, and the part to notice ---------- */
