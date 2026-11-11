@@ -2,7 +2,7 @@
 import * as S from './store.js';
 import { localDate, addDays } from './dates.js';
 import { SEED_FACTORS, SEED_ROUTINE, SEED_GYM } from './seed.js';
-import { DEFAULT_ROUTINES, libraryRoutine } from './routine-library.js';
+import { DEFAULT_ROUTINES, libraryRoutine, fromLibrary, OLD_DOSES } from './routine-library.js';
 import { defaultUnit, emojiFor } from './labels.js';
 import { regionAt, H } from './regions3d.js';
 import { regionById } from './regions.js';
@@ -21,6 +21,7 @@ export function init() {
   trimDefaultRoutine();
   addGymRoutine();
   fixMarkerFrame();
+  refreshLibraryRoutines();
   giveRoutinesFactors();
 }
 
@@ -44,6 +45,25 @@ function routineFactor(r) {
     name: routineLabel(r), role: 'helper', measureType: 'yesno', unit: '', category: 'exercise', icon: routineIcon(r),
     status: 'suspected', isArchived: false, source: 'routine', routineId: r.id,
     sortWeight: Math.min(0, ...S.table('factors').map(f => f.sortWeight ?? 0)) - 1,
+  });
+}
+
+// Routines added from the library before doses were written the clearer way ("6-4-2 × 10 s holds"
+// became "3 × 4" with a "10 s hold" box) are brought up to date once, and pick up the library's emoji
+// and, if they had none, its reminders. Doses someone changed themselves are left alone.
+function refreshLibraryRoutines() {
+  if (S.settings().libraryVersion >= 2) return;
+  S.batch(() => {
+    for (const r of S.table('routines').filter(x => x.libraryId && !x.isArchived)) {
+      const lib = libraryRoutine(r.libraryId);
+      const items = r.items.map(it => ({ ...it, ...(OLD_DOSES[`${it.name}|${it.dose}`] ?? {}) }));
+      S.update('routines', r.id, {
+        items, ...(lib && !r.icon ? { icon: lib.icon } : {}), ...(lib && !r.schedule?.length ? { schedule: [...lib.schedule] } : {}),
+      });
+      const f = factors.get(r.linkedFactorId);
+      if (lib && f?.routineId && !r.icon) S.update('factors', f.id, { icon: lib.icon });
+    }
+    S.settings().libraryVersion = 2;
   });
 }
 
@@ -138,10 +158,7 @@ function seed() {
     SEED_FACTORS.forEach(({ defaultOn, ...f }, i) =>
       S.insert('factors', { ...f, status: 'suspected', isArchived: !defaultOn, sortWeight: i, source: 'seed' }));
     // New diaries start with the best-evidenced strength and stretching routines from the library
-    for (const id of DEFAULT_ROUTINES) {
-      const { name, items } = libraryRoutine(id);
-      S.insert('routines', { name, items: structuredClone(items), libraryId: id, schedule: [], linkedFactorId: null, isArchived: false });
-    }
+    for (const id of DEFAULT_ROUTINES) S.insert('routines', { ...fromLibrary(libraryRoutine(id)), linkedFactorId: null, isArchived: false });
     S.settings().seeded = true;
     S.settings().gymAdded = true; // the old Gym starter is for diaries from before the library
     S.settings().seedsAdded = [...ADDED_SEEDS];
@@ -344,6 +361,8 @@ export const routines = {
       const f = factors.get(row.linkedFactorId);
       if (!f?.routineId) S.update('routines', row.id, { linkedFactorId: routineFactor(row).id });
       else if (f.name !== routineLabel(row)) S.update('factors', f.id, { name: routineLabel(row) });
+      // A new emoji for the routine shows on its check-in item too
+      if (f?.routineId && fields.icon && f.icon !== fields.icon) S.update('factors', f.id, { icon: fields.icon });
       const what = before ? describeRoutineChange(before, row.items) : `Started ${routineLabel(row)}`;
       if (what) routines.logChange(row.id, what);
       return row;

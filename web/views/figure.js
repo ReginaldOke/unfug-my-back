@@ -1,166 +1,185 @@
 // Animated line figure for routine moves: a side-on body that eases between two poses, with a soft red
-// glow where the move works. Poses are joint positions in a 200 × 140 box, facing right, floor at y 130.
-// Far-side limbs are drawn fainter. Unknown moves get no figure.
+// glow where the move works. Limbs taper from thigh to shin and upper arm to forearm, the far side is
+// drawn fainter, and hands or feet planted on the floor stay there while the joints bend around them.
+// Calm activities (breathing, a body scan) get a soft abstract guide instead (calm.js). Poses live in
+// figure-moves.js and figure-library.js; unknown moves get no figure.
 import { s } from '../lib/ui.js';
 import { findByName } from '../lib/move-names.js';
-import { MORE_MOVES, body, lerpPose } from './figure-moves.js';
+import { MORE_MOVES, FLOOR, body, lerpPose, reach } from './figure-moves.js';
 import { LIBRARY_MOVES } from './figure-library.js';
+import { CalmGuide } from './calm.js';
+import { CALM } from '../lib/calm.js';
 
-const STAND = {
-  head: [102, 22], sh: [100, 40], mid: [100, 58], hip: [100, 76],
-  eN: [101, 58], hN: [102, 76], kN: [101, 103], fN: [103, 130],
-  eF: [99, 58], hF: [98, 76], kF: [99, 103], fF: [97, 130],
+// Seen from above: lying on one side, knees bent forward, arms out in front together. The one move
+// still given as points, as the top arm swings over (end-on) on its way round.
+const OPEN_BOOK = {
+  names: ['open book', 'thoracic rotation', 'side lying rotation', 'book opener', 't spine rotation'], accent: 'sh', hold: 1000, travel: 1700, floor: false, feet: false,
+  a: {
+    head: [150, 84], sh: [132, 84], mid: [106, 84], hip: [80, 84],
+    eN: [134, 60], hN: [136, 36], kN: [84, 56], fN: [58, 54],
+    eF: [130, 61], hF: [130, 37], kF: [80, 57], fF: [54, 55],
+  },
+  // The top arm lifts over (seen end-on) and opens to the floor behind; the head turns with it
+  via: {
+    head: [150, 84], sh: [132, 84], mid: [106, 84], hip: [80, 84],
+    eN: [134, 80], hN: [136, 76], kN: [84, 56], fN: [58, 54],
+    eF: [130, 61], hF: [130, 37], kF: [80, 57], fF: [54, 55],
+  },
+  b: {
+    head: [149, 86], sh: [132, 85], mid: [106, 84], hip: [80, 84],
+    eN: [134, 109], hN: [136, 133], kN: [84, 56], fN: [58, 54],
+    eF: [130, 61], hF: [130, 37], kF: [80, 57], fF: [54, 55],
+  },
 };
-const QUAD = {
-  head: [146, 80], sh: [130, 88], mid: [100, 88], hip: [70, 88],
-  eN: [131, 108], hN: [132, 128], kN: [71, 128], fN: [38, 128],
-  eF: [129, 108], hF: [128, 128], kF: [69, 128], fF: [36, 128],
-};
-const SUPINE = {
-  head: [160, 117], sh: [142, 121], mid: [121, 122], hip: [100, 123],
-  eN: [124, 126], hN: [108, 127], kN: [72, 124], fN: [42, 126],
-  eF: [124, 126], hF: [108, 127], kF: [72, 124], fF: [42, 126],
-};
-const pose = (base, patch) => ({ ...base, ...patch });
 
-const MOVES = [
-  {
-    names: ['cat cow', 'cat camel', 'cat and cow', 'cat', 'cow', 'spinal flexion extension'], accent: 'mid', hold: 700,
-    a: pose(QUAD, { mid: [100, 99], head: [149, 75] }), // cow: back drops, head lifts
-    b: pose(QUAD, { mid: [100, 72], head: [140, 101], hip: [70, 91] }), // cat: back rounds, head tucks
-  },
-  {
-    names: ['bird dog', 'birddog', 'quadruped opposite arm leg', 'opposite arm and leg'], accent: 'mid', hold: 900,
-    a: QUAD,
-    b: pose(QUAD, { eF: [155, 82], hF: [178, 78], kN: [44, 88], fN: [14, 86] }),
-  },
-  {
-    names: ['cobra and downward dog', 'cobra', 'downward dog', 'down dog', 'downdog', 'upward dog', 'up dog'], accent: 'mid', hold: 1100,
-    a: { // cobra
-      head: [140, 78], sh: [126, 96], mid: [106, 116], hip: [82, 124],
-      eN: [128, 112], hN: [130, 128], kN: [52, 126], fN: [22, 127],
-      eF: [126, 112], hF: [128, 128], kF: [52, 126], fF: [22, 127],
-    },
-    b: { // downward dog
-      head: [138, 108], sh: [130, 96], mid: [113, 75], hip: [96, 54],
-      eN: [141, 112], hN: [152, 128], kN: [77, 91], fN: [58, 128],
-      eF: [139, 112], hF: [150, 128], kF: [75, 91], fF: [56, 128],
-    },
-  },
-  {
-    // Seen from above: lying on one side, knees bent forward, arms out in front together
-    names: ['open book', 'thoracic rotation', 'side lying rotation', 'book opener', 't spine rotation'], accent: 'sh', hold: 1000, floor: false,
-    a: {
-      head: [150, 84], sh: [132, 84], mid: [106, 84], hip: [80, 84],
-      eN: [134, 60], hN: [136, 36], kN: [84, 56], fN: [58, 54],
-      eF: [130, 61], hF: [130, 37], kF: [80, 57], fF: [54, 55],
-    },
-    // The top arm lifts over (seen end-on) and opens to the floor behind; the head turns with it
-    via: {
-      head: [150, 84], sh: [132, 84], mid: [106, 84], hip: [80, 84],
-      eN: [134, 80], hN: [136, 76], kN: [84, 56], fN: [58, 54],
-      eF: [130, 61], hF: [130, 37], kF: [80, 57], fF: [54, 55],
-    },
-    b: {
-      head: [149, 86], sh: [132, 85], mid: [106, 84], hip: [80, 84],
-      eN: [134, 109], hN: [136, 133], kN: [84, 56], fN: [58, 54],
-      eF: [130, 61], hF: [130, 37], kF: [80, 57], fF: [54, 55],
-    },
-  },
-  {
-    names: ['hip flexor', 'half kneeling', 'kneeling lunge', 'couch stretch', 'psoas'], accent: 'hip', hold: 1400,
-    a: {
-      head: [94, 30], sh: [92, 47], mid: [91, 68], hip: [90, 90],
-      eN: [93, 66], hN: [95, 86], kN: [120, 96], fN: [124, 128],
-      eF: [91, 66], hF: [89, 86], kF: [76, 127], fF: [50, 126],
-    },
-    b: pose({
-      head: [104, 33], sh: [102, 50], mid: [101, 71], hip: [101, 94],
-      eN: [103, 69], hN: [105, 89], kN: [124, 99], fN: [124, 128],
-      eF: [101, 69], hF: [99, 89], kF: [78, 127], fF: [52, 126],
-    }, {}),
-  },
-  {
-    names: ['hinge', 'hip hinge', 'deadlift', 'rdl', 'romanian deadlift', 'single leg hinge', 'kettlebell swing', 'kb swing'], accent: 'hip', hold: 600,
-    a: STAND,
-    b: pose(STAND, {
-      head: [151, 63], sh: [136, 68], mid: [117, 72], hip: [98, 77],
-      eN: [137, 86], hN: [138, 104], eF: [135, 86], hF: [136, 104],
-      kF: [72, 79], fF: [44, 82],
-    }),
-  },
-  {
-    names: ['hamstring', 'hamstring stretch', 'supine hamstring', 'strap hamstring'], accent: 'kN', hold: 1500,
-    a: SUPINE,
-    b: pose(SUPINE, { kN: [94, 96], fN: [88, 68], eN: [118, 108], hN: [96, 98] }),
-  },
-  {
-    names: ['squat', 'deep squat', 'goblet squat', 'air squat', 'bodyweight squat', 'sumo squat', 'squat hold', 'back squat', 'barbell squat', 'high bar squat', 'low bar squat', 'dumbbell squat', 'kettlebell squat'], accent: 'hip', hold: 1600,
-    a: pose(STAND, { eN: [112, 56], hN: [124, 58], eF: [110, 56], hF: [122, 58] }),
-    b: {
-      head: [118, 57], sh: [111, 73], mid: [102, 90], hip: [92, 108],
-      eN: [126, 86], hN: [134, 76], kN: [121, 99], fN: [106, 130],
-      eF: [124, 86], hF: [132, 76], kF: [119, 101], fF: [104, 130],
-    },
-  },
-];
-
-const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+// Smootherstep: starts and stops with no jolt, for an unhurried, even glide
+const ease = t => t * t * t * (t * (t * 6 - 15) + 10);
 const lerp = (a, b, t) => Object.fromEntries(Object.keys(a).map(k => [k, [a[k][0] + (b[k][0] - a[k][0]) * t, a[k][1] + (b[k][1] - a[k][1]) * t]]));
-// Through an optional middle pose, so a limb can swing round instead of cutting across. Moves described
-// by angles (figure-moves.js) blend their angles, so limbs bend rather than shrink on the way.
-const mix = (move, t) => (move.pa ? body(lerpPose(move.pa, move.pb, t))
-  : move.via ? (t < 0.5 ? lerp(move.a, move.via, t * 2) : lerp(move.via, move.b, t * 2 - 1))
-    : lerp(move.a, move.b, t));
-export const ALL_MOVES = [...MOVES, ...MORE_MOVES, ...LIBRARY_MOVES];
+
+/** The joints of a move at k (0 = first pose, 1 = second), with planted hands and feet kept in place. */
+export function poseAt(move, k, breath = 0) {
+  if (!move.pa) return move.via ? (k < 0.5 ? lerp(move.a, move.via, k * 2) : lerp(move.via, move.b, k * 2 - 1)) : lerp(move.a, move.b, k);
+  // Through an optional middle pose (pm), so a foot or hand can keep its place on the way
+  let p = move.pm ? (k < 0.5 ? lerpPose(move.pa, move.pm, k * 2) : lerpPose(move.pm, move.pb, k * 2 - 1)) : lerpPose(move.pa, move.pb, k);
+  // A slow breath through the holds: the chest rises a touch
+  if (breath) p = { ...p, bend: (p.bend ?? 0) + breath * 0.8 };
+  const opts = { supine: move.supine, free: !!move.view };
+  if (move.plant) {
+    const start = body(move.pa);
+    for (const end of move.plant) p = reach(p, end, start[end], opts);
+  }
+  // Hands that hold on to a leg (behind the thigh, round a knee) follow it
+  for (const [end, [a, b, f]] of Object.entries(move.grip ?? {})) {
+    const j = body(p);
+    p = reach(p, end, [j[a][0] + (j[b][0] - j[a][0]) * f, j[a][1] + (j[b][1] - j[a][1]) * f], opts);
+  }
+  // Hands and feet slide along the floor rather than sinking into it on the way between poses
+  if (move.floor !== false) {
+    const j = body(p);
+    for (const end of ['hN', 'hF', 'fN', 'fF']) if (j[end][1] > FLOOR + 0.5 && !move.plant?.includes(end)) p = reach(p, end, [j[end][0], FLOOR], opts);
+  }
+  return body(p);
+}
+
+export const ALL_MOVES = [...MORE_MOVES, OPEN_BOOK, ...LIBRARY_MOVES];
 
 /** Whether there's an animation for a move name (however it's spelt). */
-export const hasFigure = name => !!findByName(ALL_MOVES, name);
+export const hasFigure = name => !!findByName([...ALL_MOVES, ...CALM], name);
 const pt = p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
 // Quadratic through the middle point: control = 2·mid − (start + end) / 2
 const through = (a, m, b) => `M${pt(a)} Q${pt([2 * m[0] - (a[0] + b[0]) / 2, 2 * m[1] - (a[1] + b[1]) / 2])} ${pt(b)}`;
+const toward = (a, b, d) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [a[0] + ((b[0] - a[0]) * d) / l, a[1] + ((b[1] - a[1]) * d) / l]; };
+const HEAD_R = 11.5, FOOT = 7;
+// Where the floor line sits: a little below the joints, as the chunky limbs have width
+const FLOOR_LINE = 133.5;
+let figId = 0;
 
-/** Animated figure for a move name, or null when there isn't one. */
-export function MoveFigure(name) {
-  const move = findByName(ALL_MOVES, name);
+/** A thumbnail's view: just the space the move uses, a little padded, in the thumbnail's shape (58 × 42). */
+function fitBox(move) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let k = 0; k <= 1; k += 0.125) {
+    for (const p of Object.values(poseAt(move, k))) {
+      if (!Array.isArray(p) || typeof p[0] !== 'number') continue;
+      x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]);
+    }
+  }
+  const pad = HEAD_R + 6;
+  x0 -= pad; y0 -= pad; x1 += pad; y1 = Math.max(y1 + pad, move.floor === false ? y1 + pad : FLOOR_LINE + 3);
+  let w = x1 - x0, hgt = y1 - y0;
+  const ratio = 58 / 42;
+  if (w / hgt < ratio) { const nw = hgt * ratio; x0 -= (nw - w) / 2; w = nw; } else { const nh = w / ratio; y0 -= nh - hgt; hgt = nh; }
+  return `${x0.toFixed(1)} ${y0.toFixed(1)} ${w.toFixed(1)} ${hgt.toFixed(1)}`;
+}
+
+/**
+ * Animated figure for a move name, or null when there isn't one. `small` draws a thumbnail (no glow,
+ * framed tight on the figure so it reads at a glance); `at` draws a still at that point of the move.
+ */
+export function MoveFigure(name, { small = false, at = null } = {}) {
+  // Movements and calm activities are matched together, so the closer name wins
+  const move = findByName([...ALL_MOVES, ...CALM], name);
   if (!move) return null;
+  if (move.kind) return CalmGuide(move, { small });
 
-  const limb = cls => s('path', { class: `fig-limb ${cls}` });
-  const far = { arm: limb('far'), leg: limb('far') };
-  const near = { arm: limb('near'), leg: limb('near') };
+  // The mascot: chunky, soft-cornered limbs that bow a touch like a hand-drawn line, a round head with
+  // one bright eye that blinks now and then, and (full size) a gentle ink wobble on every edge
+  const id = `fig${++figId}`;
+  const seg = cls => s('path', { class: `fig-seg ${cls}` });
+  const far = { upper: seg('far arm-u'), fore: seg('far arm-l'), thigh: seg('far leg-u'), shin: seg('far leg-l'), foot: seg('far foot') };
+  const near = { upper: seg('near arm-u'), fore: seg('near arm-l'), thigh: seg('near leg-u'), shin: seg('near leg-l'), foot: seg('near foot') };
+  // Near limbs sit on a thin cut-out of the background, so an arm across the body still reads as an arm
+  for (const k of Object.keys(near)) near[k].gap = s('path', { class: `fig-seg gap ${near[k].getAttribute('class').split(' ').pop()}` });
+  // (all the cut-outs first, so they never notch the limb's own joints)
+  const order = ['thigh', 'shin', 'foot', 'upper', 'fore'];
+  const nearDrawn = [...order.map(k => near[k].gap), ...order.map(k => near[k])];
   const torso = s('path', { class: 'fig-torso' });
-  const head = s('circle', { class: 'fig-head', r: 8.5 });
-  const glow = s('circle', { class: 'fig-glow', r: 13 });
-  const svg = s('svg', { viewBox: '0 0 200 140', class: 'move-figure', 'aria-hidden': 'true' },
-    s('defs', {}, s('radialGradient', { id: 'fig-glow' },
-      s('stop', { offset: '0%', 'stop-color': '#ff5a4f', 'stop-opacity': 0.7 }),
-      s('stop', { offset: '100%', 'stop-color': '#ff5a4f', 'stop-opacity': 0 }))),
-    move.floor === false ? null : s('line', { class: 'fig-floor', x1: 14, x2: 186, y1: 131.5, y2: 131.5 }),
+  const neck = s('path', { class: 'fig-neck' });
+  const head = s('circle', { class: 'fig-head', r: HEAD_R });
+  const eye = s('ellipse', { class: 'fig-eye', rx: 1.9, ry: 2.3 });
+  const glow = s('circle', { class: 'fig-glow', r: 15 });
+  const ink = small ? {} : { filter: `url(#${id}-ink)` };
+  const svg = s('svg', { viewBox: small ? fitBox(move) : '0 0 200 140', class: `move-figure${small ? ' small' : ''}`, 'aria-hidden': 'true' },
+    s('defs', {},
+      s('radialGradient', { id: 'fig-glow' },
+        s('stop', { offset: '0%', 'stop-color': '#ff5a4f', 'stop-opacity': 0.7 }),
+        s('stop', { offset: '100%', 'stop-color': '#ff5a4f', 'stop-opacity': 0 })),
+      // A faint, fixed wobble along the edges, like a marker on paper
+      small ? null : s('filter', { id: `${id}-ink`, x: '-10%', y: '-10%', width: '120%', height: '120%' },
+        s('feTurbulence', { type: 'fractalNoise', baseFrequency: 0.045, numOctaves: 2, seed: 7, result: 'n' }),
+        s('feDisplacementMap', { in: 'SourceGraphic', in2: 'n', scale: 2.4, xChannelSelector: 'R', yChannelSelector: 'G' }))),
+    move.floor === false ? null : s('path', { class: 'fig-floor', d: `M14 ${FLOOR_LINE} Q100 ${FLOOR_LINE + 0.8} 186 ${FLOOR_LINE - 0.4}`, ...ink }),
     (move.props ?? []).map(([x1, y1, x2, y2]) => s('line', { class: 'fig-floor fig-prop', x1, y1, x2, y2 })),
-    far.leg, far.arm, glow, torso, head, near.leg, near.arm);
+    small ? null : glow,
+    s('g', ink, far.thigh, far.shin, far.foot, far.upper, far.fore, torso, neck, head, eye, ...nearDrawn));
 
-  const draw = (p, strength) => {
-    far.arm.setAttribute('d', `M${pt(p.sh)} L${pt(p.eF)} L${pt(p.hF)}`);
-    far.leg.setAttribute('d', `M${pt(p.hip)} L${pt(p.kF)} L${pt(p.fF)}`);
-    near.arm.setAttribute('d', `M${pt(p.sh)} L${pt(p.eN)} L${pt(p.hN)}`);
-    near.leg.setAttribute('d', `M${pt(p.hip)} L${pt(p.kN)} L${pt(p.fN)}`);
-    torso.setAttribute('d', `${through(p.sh, p.mid, p.hip)} M${pt(p.sh)} L${pt([(p.sh[0] * 2 + p.head[0]) / 3, (p.sh[1] * 2 + p.head[1]) / 3])}`);
+  // Feet point forward from the ankle (the other way for a body lying face up), along the shin when
+  // pointed (lying face down), or are left off when the leg is seen end-on
+  const footTo = (ankle, knee) => {
+    const shin = Math.atan2(ankle[1] - knee[1], ankle[0] - knee[0]);
+    const a = move.feet === 'point' ? shin : shin + (move.supine ? 1 : -1) * Math.PI / 2;
+    return [ankle[0] + Math.cos(a) * FOOT, ankle[1] + Math.sin(a) * FOOT];
+  };
+  // Each bone bows very slightly to one side, as a drawn line does
+  const line = (el, a, b, bow = 1.1) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+    const c = [(a[0] + b[0]) / 2 - (dy / l) * bow, (a[1] + b[1]) / 2 + (dx / l) * bow];
+    el.setAttribute('d', `M${pt(a)} Q${pt(c)} ${pt(b)}`);
+    el.gap?.setAttribute('d', el.getAttribute('d'));
+  };
+  // The face looks the way the body faces: forward when upright, up when lying face up
+  const lookFrom = p => {
+    const up = Math.atan2(p.head[1] - p.sh[1], p.head[0] - p.sh[0]);
+    const face = up + (move.supine ? -1 : 1) * Math.PI / 2 * (move.view ? 0.4 : 1);
+    return [p.head[0] + Math.cos(face) * 5 + Math.cos(up) * 1.5, p.head[1] + Math.sin(face) * 5 + Math.sin(up) * 1.5];
+  };
+  const draw = (p, strength, blink = 1) => {
+    line(far.upper, p.sh, p.eF); line(far.fore, p.eF, p.hF, -1);
+    line(far.thigh, p.hip, p.kF); line(far.shin, p.kF, p.fF, -1);
+    line(near.upper, p.sh, p.eN); line(near.fore, p.eN, p.hN, -1);
+    line(near.thigh, p.hip, p.kN); line(near.shin, p.kN, p.fN, -1);
+    if (move.feet !== false && p.angles) { line(far.foot, p.fF, footTo(p.fF, p.kF), 0); line(near.foot, p.fN, footTo(p.fN, p.kN), 0); }
+    torso.setAttribute('d', through(p.sh, p.mid, p.hip));
+    // The neck runs from the shoulders right into the head, so the two never part
+    line(neck, p.sh, toward(p.head, p.sh, HEAD_R * 0.6), 0);
     head.setAttribute('cx', p.head[0].toFixed(1));
     head.setAttribute('cy', p.head[1].toFixed(1));
+    const [ex, ey] = lookFrom(p);
+    eye.setAttribute('cx', ex.toFixed(1));
+    eye.setAttribute('cy', ey.toFixed(1));
+    eye.setAttribute('ry', (2.3 * blink).toFixed(2));
     glow.setAttribute('cx', p[move.accent][0].toFixed(1));
     glow.setAttribute('cy', p[move.accent][1].toFixed(1));
     glow.style.opacity = (0.35 + 0.65 * strength).toFixed(2);
   };
 
-  const end = move.pa ? body(move.pb) : move.b;
-  // Still image for reduced motion: the stretched pose
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    draw(end, 1);
+  // A still at one point of the move (`at`, 0 to 1), or the stretched pose for reduced motion
+  if (at != null || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    draw(poseAt(move, at ?? 1), at ?? 1);
     return svg;
   }
 
-  // Cycle: hold A, ease to B, hold B (the stretch), ease back
-  const travel = move.travel ?? 1300, hold = move.hold, cycle = 2 * (travel + hold);
+  // Cycle: hold A, glide to B, hold B (the stretch), glide back, breathing softly all the while
+  const travel = move.travel ?? 1500, hold = move.hold, cycle = 2 * (travel + hold);
   const t0 = performance.now();
   const frame = now => {
     if (!svg.isConnected && now - t0 > 500) return; // left the screen
@@ -171,10 +190,11 @@ export function MoveFigure(name) {
     else if (t < hold * 1.6 + travel) k = 1;
     else if (t < hold * 1.6 + 2 * travel) k = 1 - ease((t - hold * 1.6 - travel) / travel);
     else k = 0;
-    draw(mix(move, k), k);
+    const b = (now - t0 + figId * 700) % 4600;
+    draw(poseAt(move, k, Math.sin((now - t0) / 650)), k, b < 140 ? Math.abs(b - 70) / 70 : 1);
     requestAnimationFrame(frame);
   };
-  draw(mix(move, 0), 0);
+  draw(poseAt(move, 0), 0);
   requestAnimationFrame(frame);
   return svg;
 }

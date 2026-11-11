@@ -1,6 +1,7 @@
 // The routine player's small decisions: which moves are timed rather than counted, where a move's form
 // video search goes, and which move to start on. Pure, unit-tested in test/play.test.js.
 import { normName } from './move-names.js';
+import { calmFor } from './calm.js';
 
 // "30 s", "45 sec", "1 min", "2 minutes", "0:45", "1:30"
 const TIME_TEXT = /(\d+(\.\d+)?\s*(s|sec|secs|second|seconds|min|mins|minute|minutes)\b)|(\b\d{1,2}:\d{2}\b)/i;
@@ -15,11 +16,13 @@ export function isTimed(name, ...amounts) {
 }
 
 /**
- * A YouTube search for short videos on doing the move well. On iPhone the link opens
- * in the YouTube app when it's installed, otherwise in the browser.
+ * A YouTube search for short videos on doing the move well, or a short guided session for breathing
+ * and meditation. On iPhone the link opens in the YouTube app when it's installed, otherwise in the browser.
  */
 export function formVideoUrl(name) {
-  const q = `${String(name ?? '').trim()} form #shorts`;
+  const calm = calmFor(name);
+  const what = !calm ? 'form' : calm.kind === 'breathe' ? 'guided breathing' : 'guided meditation';
+  const q = `${String(name ?? '').trim()} ${what} #shorts`;
   // A plain search, as if typed in: YouTube's own ranking puts the most useful form shorts first
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 }

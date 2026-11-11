@@ -27,3 +27,8 @@ test('a session picks up at the first move not yet done', () => {
   // All done (an earlier run today): start again from the top
   assert.equal(startIndex([{ done: true }, { done: true }]), 0);
 });
+
+test('breathing and meditation link to short guided sessions instead of form videos', () => {
+  assert.equal(new URL(formVideoUrl('Box breathing')).searchParams.get('search_query'), 'Box breathing guided breathing #shorts');
+  assert.equal(new URL(formVideoUrl('Body scan')).searchParams.get('search_query'), 'Body scan guided meditation #shorts');
+});

@@ -1,20 +1,13 @@
 // The common gym and bodyweight moves for the routine player, in the angle format of figure-moves.js.
 // Each pose is settled onto the floor (or a bar or bench) by `on`, so feet and hands touch down wherever
 // the angles put them. Names list the usual ways people write each move; typos are caught by move-names.js.
-import { body } from './figure-moves.js';
+import { on } from './figure-moves.js';
 
-const FLOOR = 129;
 const P = (base, patch) => ({ ...base, ...patch });
-/** Moves the hip up or down so the lowest of the given joints rests at `y` (the floor by default). */
-function on(pose, joints = ['fN', 'fF'], y = FLOOR) {
-  const j = body(pose);
-  const low = Math.max(...joints.map(k => j[k][1]));
-  return { ...pose, hip: [pose.hip[0], pose.hip[1] + (y - low)] };
-}
 const swap = p => ({ ...p, armN: p.armF, armF: p.armN, legN: p.legF, legF: p.legN });
 
 // Starting points
-const STAND = { hip: [100, 76], torso: -90, head: -90, bend: 0, armN: [90, 90], armF: [90, 90], legN: [90, 90], legF: [90, 90] };
+const STAND = { hip: [100, 75], torso: -90, head: -90, bend: 0, armN: [90, 90], armF: [90, 90], legN: [90, 90], legF: [90, 90] };
 const SUPINE = { hip: [86, 120], torso: 0, head: 0, bend: 0, armN: [175, 175], armF: [175, 175], legN: [180, 180], legF: [180, 180] };
 const SEATED = { hip: [96, 100], torso: -90, head: -90, bend: 0, armN: [80, 80], armF: [80, 80], legN: [0, 90], legF: [0, 90] };
 const KNEEL = { hip: [100, 100], torso: -90, head: -90, bend: 0, armN: [90, 90], armF: [90, 90], legN: [90, 180], legF: [90, 180] };
@@ -36,7 +29,7 @@ const LOW_BAR = [[96, 72, 156, 72]];
 // Lying on a flat bench, pressing: elbows bent to straight up
 const benchPose = arms => ({ hip: [92, 100], torso: 0, head: 0, bend: 0, armN: arms, armF: arms, legN: [180, 90], legF: [180, 90] });
 // On an incline, the same press angled up from the chest
-const inclinePose = arms => ({ hip: [92, 104], torso: -34, head: -30, bend: 0, armN: arms, armF: arms, legN: [20, 95], legF: [20, 95] });
+const inclinePose = arms => ({ hip: [92, 104], torso: -34, head: -30, bend: 0, armN: arms, armF: arms, legN: [-170, 104], legF: [-170, 104] });
 
 export const LIBRARY_MOVES = [
   // ---- Pushing
@@ -51,52 +44,52 @@ export const LIBRARY_MOVES = [
   { names: ['dip', 'dips', 'tricep dip', 'triceps dip', 'chest dip', 'parallel bar dip', 'bench dip', 'ring dip', 'bar dip'], accent: 'sh', hold: 500, floor: false, props: DIP_BARS,
     pa: on({ hip: [104, 80], torso: -84, head: -84, bend: 0, armN: [92, 92], armF: [92, 92], legN: [100, 150], legF: [100, 150] }, ['hN'], 70),
     pb: on({ hip: [100, 98], torso: -70, head: -70, bend: 0, armN: [160, 60], armF: [160, 60], legN: [100, 150], legF: [100, 150] }, ['hN'], 70) },
-  { names: ['incline bench press', 'incline press', 'incline dumbbell press', 'incline db press', 'incline chest press', 'incline bench'], accent: 'sh', hold: 500, props: INCLINE,
-    pa: inclinePose([110, -70]), pb: inclinePose([-62, -62]) },
-  { names: ['decline bench press', 'decline press', 'decline dumbbell press', 'decline bench'], accent: 'sh', hold: 500, props: [[64, 98, 142, 112], [104, 105, 104, 128]],
-    pa: { hip: [92, 96], torso: 10, head: 12, bend: 0, armN: [120, -70], armF: [120, -70], legN: [-170, 100], legF: [-170, 100] },
-    pb: { hip: [92, 96], torso: 10, head: 12, bend: 0, armN: [-80, -80], armF: [-80, -80], legN: [-170, 100], legF: [-170, 100] } },
-  { names: ['dumbbell fly', 'db fly', 'chest fly', 'pec fly', 'flye', 'dumbbell flye', 'incline fly', 'flat fly'], accent: 'sh', hold: 500, props: BENCH,
-    pa: benchPose([-90, -90]), pb: { ...benchPose([150, 170]), armF: [30, 10] } },
-  { names: ['cable crossover', 'cable fly', 'cable flye', 'crossover', 'cable chest fly', 'low to high fly', 'high to low fly'], accent: 'sh', hold: 500,
-    pa: P(STAND, { torso: -76, head: -78, armN: [-150, -130], armF: [-150, -130], legN: [80, 95], legF: [100, 92] }),
-    pb: P(STAND, { torso: -76, head: -78, armN: [40, 50], armF: [40, 50], legN: [80, 95], legF: [100, 92] }) },
-  { names: ['pec deck', 'pec dec', 'machine fly', 'butterfly machine', 'chest fly machine', 'rear delt machine'], accent: 'sh', hold: 500, props: SEAT,
+  { names: ['incline bench press', 'incline press', 'incline dumbbell press', 'incline db press', 'incline chest press', 'incline bench'], supine: true, accent: 'sh', hold: 500, props: INCLINE,
+    pa: inclinePose([110, 290]), pb: inclinePose([298, 298]) },
+  { supine: true, names: ['decline bench press', 'decline press', 'decline dumbbell press', 'decline bench'], supine: true, accent: 'sh', hold: 500, props: [[64, 98, 142, 112], [104, 105, 104, 128]],
+    pa: { hip: [92, 96], torso: 10, head: 12, bend: 0, armN: [120, 290], armF: [120, 290], legN: [-170, 100], legF: [-170, 100] },
+    pb: { hip: [92, 96], torso: 10, head: 12, bend: 0, armN: [280, 280], armF: [280, 280], legN: [-170, 100], legF: [-170, 100] } },
+  { names: ['dumbbell fly', 'db fly', 'chest fly', 'pec fly', 'flye', 'dumbbell flye', 'incline fly', 'flat fly'], supine: true, view: 'front', accent: 'sh', hold: 500, props: BENCH,
+    pa: benchPose([-90, -90]), pb: { ...benchPose([-210, -190]), armF: [30, 10] } },
+  { names: ['cable crossover', 'cable fly', 'cable flye', 'crossover', 'cable chest fly', 'low to high fly', 'high to low fly'], view: 'front', accent: 'sh', hold: 500,
+    pa: P(STAND, { torso: -76, head: -78, armN: [-150, -130], armF: [-150, -130], legN: [80, 95], legF: [96, 100] }),
+    pb: P(STAND, { torso: -76, head: -78, armN: [40, 50], armF: [40, 50], legN: [80, 95], legF: [96, 100] }) },
+  { names: ['pec deck', 'pec dec', 'machine fly', 'butterfly machine', 'chest fly machine', 'rear delt machine'], view: 'front', accent: 'sh', hold: 500, props: SEAT,
     pa: on(P(SEATED, { armN: [175, 100], armF: [175, 100] }), ['fN']), pb: on(P(SEATED, { armN: [-10, -60], armF: [-10, -60] }), ['fN']) },
-  { names: ['skull crusher', 'skullcrusher', 'lying tricep extension', 'lying triceps extension', 'ez bar skull crusher'], accent: 'sh', hold: 500, props: BENCH,
+  { names: ['skull crusher', 'skullcrusher', 'lying tricep extension', 'lying triceps extension', 'ez bar skull crusher'], supine: true, accent: 'sh', hold: 500, props: BENCH,
     pa: benchPose([-100, -100]), pb: benchPose([-100, 25]) },
   { names: ['tricep pushdown', 'triceps pushdown', 'cable pushdown', 'rope pushdown', 'tricep pressdown', 'pushdown', 'pressdown'], accent: 'sh', hold: 400,
     pa: P(STAND, { torso: -84, head: -84, armN: [96, -20], armF: [96, -20] }), pb: P(STAND, { torso: -84, head: -84, armN: [96, 92], armF: [96, 92] }) },
   { names: ['overhead tricep extension', 'overhead triceps extension', 'overhead extension', 'french press', 'tricep extension', 'triceps extension'], accent: 'sh', hold: 400,
-    pa: P(STAND, { armN: [-100, 120], armF: [-100, 120] }), pb: P(STAND, { armN: [-95, -92], armF: [-95, -92] }) },
+    pa: P(STAND, { armN: [-100, 120], armF: [-100, 120] }), pb: P(STAND, { armN: [-95, 268], armF: [-95, 268] }) },
   { names: ['tricep kickback', 'triceps kickback', 'dumbbell kickback', 'cable kickback'], accent: 'sh', hold: 400,
     pa: on({ hip: [96, 76], torso: -22, head: -18, bend: 0, armN: [172, 90], armF: [172, 90], legN: [72, 98], legF: [72, 98] }),
     pb: on({ hip: [96, 76], torso: -22, head: -18, bend: 0, armN: [172, 175], armF: [172, 175], legN: [72, 98], legF: [72, 98] }) },
   { names: ['arnold press', 'dumbbell shoulder press', 'seated shoulder press', 'db shoulder press', 'seated overhead press', 'landmine press'], accent: 'sh', hold: 500,
     pa: P(STAND, { armN: [70, -110], armF: [70, -110] }), pb: P(STAND, { armN: [-90, -90], armF: [-90, -90] }) },
-  { names: ['lateral raise', 'side raise', 'dumbbell lateral raise', 'lat raise', 'side lateral raise', 'cable lateral raise', 'front raise', 'plate front raise', 'dumbbell front raise'], accent: 'sh', hold: 450,
+  { names: ['lateral raise', 'side raise', 'dumbbell lateral raise', 'lat raise', 'side lateral raise', 'cable lateral raise', 'front raise', 'plate front raise', 'dumbbell front raise'], view: 'front', accent: 'sh', hold: 450,
     pa: P(STAND, { armN: [86, 88], armF: [94, 92] }), pb: P(STAND, { armN: [-4, -2], armF: [-8, -6] }) },
-  { names: ['rear delt fly', 'reverse fly', 'rear fly', 'bent over fly', 'rear delt raise', 'reverse flye'], accent: 'sh', hold: 450,
+  { names: ['rear delt fly', 'reverse fly', 'rear fly', 'bent over fly', 'rear delt raise', 'reverse flye'], view: 'front', accent: 'sh', hold: 450,
     pa: on({ hip: [96, 76], torso: -18, head: -14, bend: 0, armN: [94, 92], armF: [94, 92], legN: [72, 98], legF: [72, 98] }),
-    pb: on({ hip: [96, 76], torso: -18, head: -14, bend: 0, armN: [-168, -172], armF: [-168, -172], legN: [72, 98], legF: [72, 98] }) },
-  { names: ['face pull', 'face pulls', 'cable face pull', 'band face pull', 'band pull apart', 'pull apart'], accent: 'sh', hold: 450,
+    pb: on({ hip: [96, 76], torso: -18, head: -14, bend: 0, armN: [192, 188], armF: [192, 188], legN: [72, 98], legF: [72, 98] }) },
+  { names: ['face pull', 'face pulls', 'cable face pull', 'band face pull', 'band pull apart', 'pull apart'], view: 'front', accent: 'sh', hold: 450,
     pa: P(STAND, { armN: [-6, -4], armF: [-6, -4] }), pb: P(STAND, { armN: [-24, -170], armF: [-24, -170] }) },
-  { names: ['upright row', 'upright rows', 'cable upright row'], accent: 'sh', hold: 450,
+  { names: ['upright row', 'upright rows', 'cable upright row'], view: 'front', accent: 'sh', hold: 450,
     pa: P(STAND, { armN: [80, 100], armF: [80, 100] }), pb: P(STAND, { armN: [-14, 118], armF: [-14, 118] }) },
   { names: ['shrug', 'shrugs', 'barbell shrug', 'dumbbell shrug', 'trap shrug'], accent: 'sh', hold: 500,
-    pa: P(STAND, { armN: [92, 92], armF: [92, 92] }), pb: P(STAND, { hip: [100, 72], head: -96, armN: [92, 92], armF: [92, 92], legN: [90, 82], legF: [90, 82] }) },
+    pa: P(STAND, { armN: [92, 92], armF: [92, 92] }), pb: P(STAND, { hip: [100, 72], head: -96, armN: [92, 92], armF: [92, 92], legN: [90, 90], legF: [90, 90] }) },
 
   // ---- Arms
   { names: ['bicep curl', 'biceps curl', 'curl', 'curls', 'dumbbell curl', 'barbell curl', 'ez bar curl', 'cable curl', 'hammer curl', 'preacher curl', 'concentration curl', 'incline curl', 'spider curl', 'zottman curl'], accent: 'sh', hold: 400,
     pa: P(STAND, { armN: [94, 92], armF: [94, 92] }), pb: P(STAND, { armN: [96, -72], armF: [96, -72] }) },
 
   // ---- Pulling
-  { names: ['inverted row', 'australian pull up', 'australian row', 'bodyweight row', 'ring row', 'trx row', 'table row'], accent: 'sh', hold: 500, props: LOW_BAR,
+  { names: ['inverted row', 'australian pull up', 'australian row', 'bodyweight row', 'ring row', 'trx row', 'table row'], supine: true, accent: 'sh', hold: 500, props: LOW_BAR,
     pa: { hip: [86, 108], torso: -20, head: -18, bend: 0, armN: [-58, -58], armF: [-58, -58], legN: [160, 160], legF: [160, 160] },
-    pb: { hip: [86, 98], torso: -28, head: -24, bend: 0, armN: [150, -60], armF: [150, -60], legN: [164, 164], legF: [164, 164] } },
+    pb: { hip: [86, 98], torso: -28, head: -24, bend: 0, armN: [-210, -60], armF: [-210, -60], legN: [164, 164], legF: [164, 164] } },
   { names: ['muscle up', 'muscleup', 'bar muscle up', 'ring muscle up'], accent: 'sh', hold: 500, floor: false, props: [[70, 60, 130, 60]],
     pa: { hip: [100, 132], torso: -90, head: -90, bend: 0, armN: [-90, -90], armF: [-90, -90], legN: [96, 100], legF: [96, 100] },
-    pb: { hip: [100, 60], torso: -90, head: -90, bend: 0, armN: [92, 92], armF: [92, 92], legN: [96, 100], legF: [96, 100] } },
+    pb: { hip: [100, 60], torso: -90, head: -90, bend: 0, armN: [-268, -268], armF: [-268, -268], legN: [96, 100], legF: [96, 100] } },
   { names: ['hanging leg raise', 'leg raise hanging', 'hanging knee raise', 'knee raise', 'knees to elbow', 'toes to bar', 'captain chair', 'captains chair'], accent: 'hip', hold: 600, floor: false, props: BAR,
     pa: HANG, pb: P(HANG, { legN: [-4, -4], legF: [-4, -4], bend: -4 }) },
   { names: ['front lever', 'tuck front lever', 'front lever raise'], accent: 'mid', hold: 1200, floor: false, props: [[70, 30, 130, 30]],
@@ -130,11 +123,11 @@ export const LIBRARY_MOVES = [
     pa: on(P(SEATED, { armN: [90, 90], armF: [90, 90] }), ['fN']), pb: { ...on(P(SEATED, { armN: [90, 90], armF: [90, 90] }), ['fN']), legN: [-4, -4], legF: [-4, -4] } },
   { names: ['leg curl', 'lying leg curl', 'hamstring curl', 'seated leg curl', 'prone leg curl'], accent: 'kN', hold: 500,
     pa: { hip: [86, 118], torso: 0, head: 0, bend: 0, armN: [150, 30], armF: [150, 30], legN: [180, 180], legF: [180, 180] },
-    pb: { hip: [86, 118], torso: 0, head: 0, bend: 0, armN: [150, 30], armF: [150, 30], legN: [180, -70], legF: [180, -70] } },
+    pb: { hip: [86, 118], torso: 0, head: 0, bend: 0, armN: [150, 30], armF: [150, 30], legN: [180, 290], legF: [180, 290] } },
   { names: ['nordic curl', 'nordic', 'nordics', 'natural leg curl', 'nordic hamstring curl'], accent: 'kN', hold: 400,
     pa: on({ hip: [100, 100], torso: -90, head: -90, bend: 0, armN: [80, 80], armF: [80, 80], legN: [90, 180], legF: [90, 180] }, ['kN']),
     pb: on({ hip: [117, 107], torso: -26, head: -22, bend: 0, armN: [60, 60], armF: [60, 60], legN: [130, 180], legF: [130, 180] }, ['kN']) },
-  { names: ['hip thrust', 'hip thrusts', 'barbell hip thrust', 'glute thrust', 'single leg hip thrust', 'banded hip thrust'], accent: 'hip', hold: 600, props: [[118, 100, 152, 100], [122, 100, 122, 129], [148, 100, 148, 129]],
+  { names: ['hip thrust', 'hip thrusts', 'barbell hip thrust', 'glute thrust', 'single leg hip thrust', 'banded hip thrust'], supine: true, accent: 'hip', hold: 600, props: [[118, 100, 152, 100], [122, 100, 122, 129], [148, 100, 148, 129]],
     pa: { hip: [100, 122], torso: -40, head: -30, bend: 0, armN: [20, 20], armF: [20, 20], legN: [-130, 95], legF: [-130, 95] },
     pb: { hip: [100, 104], torso: -10, head: -4, bend: 0, armN: [10, 10], armF: [10, 10], legN: [-170, 80], legF: [-170, 80] } },
   { names: ['calf raise', 'calf raises', 'standing calf raise', 'seated calf raise', 'heel raise', 'single leg calf raise'], accent: 'kN', hold: 500,
@@ -147,9 +140,9 @@ export const LIBRARY_MOVES = [
     pb: on({ hip: [140, 60], torso: -84, head: -86, bend: 0, armN: [-70, -70], armF: [-70, -70], legN: [40, 120], legF: [40, 120] }, ['fN'], 100) },
 
   // ---- Hinges and full body
-  { names: ['back extension', 'hyperextension', 'hyper extension', '45 degree back extension', 'roman chair back extension', 'reverse hyper'], accent: 'mid', hold: 600, props: [[86, 96, 112, 84], [100, 90, 100, 129]],
-    pa: { hip: [100, 88], torso: 62, head: 70, bend: 0, armN: [150, 150], armF: [150, 150], legN: [150, 150], legF: [150, 150] },
-    pb: { hip: [100, 88], torso: -20, head: -18, bend: 0, armN: [170, 150], armF: [170, 150], legN: [150, 150], legF: [150, 150] } },
+  { names: ['back extension', 'hyperextension', 'hyper extension', '45 degree back extension', 'roman chair back extension', 'reverse hyper'], accent: 'mid', hold: 600, props: [[86, 88, 112, 76], [100, 82, 100, 129]],
+    pa: { hip: [100, 80], torso: 50, head: 58, bend: 0, armN: [95, 85], armF: [95, 85], legN: [150, 150], legF: [150, 150] },
+    pb: { hip: [100, 80], torso: -20, head: -18, bend: 0, armN: [170, 60], armF: [170, 60], legN: [150, 150], legF: [150, 150] } },
   { names: ['power clean', 'clean', 'hang clean', 'squat clean', 'dumbbell clean', 'kettlebell clean'], accent: 'hip', hold: 400,
     pa: on({ hip: [92, 80], torso: -42, head: -50, bend: 0, armN: [90, 90], armF: [90, 90], legN: [76, 104], legF: [76, 104] }),
     pb: P(STAND, { armN: [-8, -170], armF: [-8, -170] }) },
@@ -166,43 +159,43 @@ export const LIBRARY_MOVES = [
     pb: PUSH_TOP },
   { names: ['mountain climber', 'mountain climbers', 'climber', 'cross body mountain climber'], accent: 'hip', hold: 60, travel: 380,
     pa: { ...PUSH_TOP, legN: [60, 150] }, pb: { ...PUSH_TOP, legF: [60, 150] } },
-  { names: ['bear crawl walk', 'crab walk', 'reverse plank', 'tabletop', 'table top', 'reverse table top'], accent: 'hip', hold: 800,
+  { names: ['bear crawl walk', 'crab walk', 'reverse plank', 'tabletop', 'table top', 'reverse table top'], supine: true, accent: 'hip', hold: 800,
     pa: on({ hip: [92, 116], torso: 0, head: -6, bend: 0, armN: [110, 110], armF: [110, 110], legN: [-170, 80], legF: [-170, 80] }, ['hN', 'fN']),
     pb: on({ hip: [92, 98], torso: 6, head: -4, bend: 0, armN: [116, 116], armF: [116, 116], legN: [-176, 86], legF: [-176, 86] }, ['hN', 'fN']) },
 
   // ---- Core
-  { names: ['leg raise', 'leg raises', 'lying leg raise', 'straight leg raise', 'leg lift', 'leg lifts'], accent: 'hip', hold: 500,
-    pa: SUPINE, pb: P(SUPINE, { legN: [-92, -92], legF: [-92, -92] }) },
-  { names: ['reverse crunch', 'reverse crunches'], accent: 'hip', hold: 500,
-    pa: P(SUPINE, { legN: [-120, 170], legF: [-120, 170] }), pb: P(SUPINE, { hip: [86, 114], legN: [-60, -170], legF: [-60, -170] }) },
-  { names: ['v up', 'v ups', 'v sit up', 'jackknife', 'jack knife', 'pike up'], accent: 'mid', hold: 400,
-    pa: P(SUPINE, { armN: [0, 0], armF: [0, 0] }), pb: P(SUPINE, { torso: -48, head: -44, armN: [-40, -40], armF: [-40, -40], legN: [-132, -132], legF: [-132, -132] }) },
-  { names: ['hollow hold', 'hollow body hold', 'hollow body', 'hollow rock', 'hollow'], accent: 'mid', hold: 1200,
+  { names: ['leg raise', 'leg raises', 'lying leg raise', 'straight leg raise', 'leg lift', 'leg lifts'], supine: true, accent: 'hip', hold: 500,
+    pa: SUPINE, pb: P(SUPINE, { legN: [268, 268], legF: [268, 268] }) },
+  { names: ['reverse crunch', 'reverse crunches'], supine: true, accent: 'hip', hold: 500,
+    pa: P(SUPINE, { legN: [-120, 170], legF: [-120, 170] }), pb: P(SUPINE, { hip: [86, 114], legN: [-60, 190], legF: [-60, 190] }) },
+  { names: ['v up', 'v ups', 'v sit up', 'jackknife', 'jack knife', 'pike up'], supine: true, accent: 'mid', hold: 400,
+    pa: P(SUPINE, { armN: [0, 0], armF: [0, 0] }), pb: P(SUPINE, { torso: -48, head: -44, armN: [-40, -40], armF: [-40, -40], legN: [228, 228], legF: [228, 228] }) },
+  { names: ['hollow hold', 'hollow body hold', 'hollow body', 'hollow rock', 'hollow'], supine: true, accent: 'mid', hold: 1200,
     pa: P(SUPINE, { torso: -10, head: -14, armN: [-8, -8], armF: [-8, -8], legN: [-170, -170], legF: [-170, -170] }),
     pb: P(SUPINE, { torso: -16, head: -20, armN: [-14, -14], armF: [-14, -14], legN: [-164, -164], legF: [-164, -164] }) },
-  { names: ['flutter kick', 'flutter kicks', 'scissor kick', 'scissor kicks', 'scissors'], accent: 'hip', hold: 60, travel: 380,
-    pa: P(SUPINE, { legN: [-166, -166], legF: [176, 176] }), pb: P(SUPINE, { legN: [176, 176], legF: [-166, -166] }) },
-  { names: ['bicycle crunch', 'bicycle crunches', 'bicycle', 'bicycles'], accent: 'mid', hold: 120, travel: 520,
-    pa: P(SUPINE, { torso: -16, head: -22, armN: [-150, 60], armF: [-150, 60], legN: [-50, 160], legF: [-176, -176] }),
-    pb: P(SUPINE, { torso: -16, head: -22, armN: [-150, 60], armF: [-150, 60], legN: [-176, -176], legF: [-50, 160] }) },
+  { names: ['flutter kick', 'flutter kicks', 'scissor kick', 'scissor kicks', 'scissors'], supine: true, accent: 'hip', hold: 60, travel: 380,
+    pa: P(SUPINE, { legN: [194, 194], legF: [176, 176] }), pb: P(SUPINE, { legN: [176, 176], legF: [194, 194] }) },
+  { names: ['bicycle crunch', 'bicycle crunches', 'bicycle', 'bicycles'], supine: true, accent: 'mid', hold: 120, travel: 520,
+    pa: P(SUPINE, { torso: -16, head: -22, armN: [-30, 110], armF: [-30, 110], legN: [310, 160], legF: [184, 184] }),
+    pb: P(SUPINE, { torso: -16, head: -22, armN: [-30, 110], armF: [-30, 110], legN: [184, 184], legF: [310, 160] }) },
   { names: ['russian twist', 'russian twists', 'seated twist', 'oblique twist'], accent: 'mid', hold: 120, travel: 520,
     pa: { hip: [96, 120], torso: -58, head: -60, bend: 0, armN: [10, -10], armF: [10, -10], legN: [-22, 40], legF: [-22, 40] },
     pb: { hip: [96, 120], torso: -58, head: -56, bend: 0, armN: [60, 30], armF: [60, 30], legN: [-22, 40], legF: [-22, 40] } },
   { names: ['l sit', 'lsit', 'l sit hold', 'v sit'], accent: 'mid', hold: 1400,
     pa: on({ hip: [98, 118], torso: -84, head: -84, bend: 0, armN: [92, 92], armF: [92, 92], legN: [2, 2], legF: [2, 2] }, ['hN']),
     pb: on({ hip: [98, 114], torso: -82, head: -82, bend: 0, armN: [94, 94], armF: [94, 94], legN: [-4, -4], legF: [-4, -4] }, ['hN']) },
-  { names: ['dragon flag', 'dragon flags'], accent: 'mid', hold: 700, props: BENCH,
+  { names: ['dragon flag', 'dragon flags'], supine: true, accent: 'mid', hold: 700, props: BENCH,
     pa: { hip: [96, 104], torso: 0, head: 0, bend: 0, armN: [-30, 10], armF: [-30, 10], legN: [180, 180], legF: [180, 180] },
-    pb: { hip: [104, 82], torso: 42, head: 10, bend: 0, armN: [-30, 10], armF: [-30, 10], legN: [-138, -138], legF: [-138, -138] } },
+    pb: { hip: [104, 82], torso: 42, head: 10, bend: 0, armN: [-30, 10], armF: [-30, 10], legN: [222, 222], legF: [222, 222] } },
   { names: ['ab wheel', 'ab rollout', 'ab roller', 'rollout', 'barbell rollout', 'ab wheel rollout'], accent: 'mid', hold: 500,
     pa: on({ hip: [92, 100], torso: -64, head: -62, bend: 0, armN: [72, 72], armF: [72, 72], legN: [90, 180], legF: [90, 180] }, ['kN', 'hN']),
     pb: on({ hip: [84, 104], torso: -16, head: -12, bend: 0, armN: [10, 10], armF: [10, 10], legN: [120, 180], legF: [120, 180] }, ['kN', 'hN']) },
   { names: ['cable crunch', 'kneeling cable crunch', 'rope crunch'], accent: 'mid', hold: 500,
-    pa: on(P(KNEEL, { torso: -84, head: -84, armN: [-120, 60], armF: [-120, 60] }), ['kN']),
-    pb: on(P(KNEEL, { torso: -14, head: 10, bend: -6, armN: [-30, 140], armF: [-30, 140] }), ['kN']) },
+    pa: on(P(KNEEL, { torso: -84, head: -84, armN: [-120, 64], armF: [-120, 64] }), ['kN']),
+    pb: on(P(KNEEL, { torso: -14, head: 10, bend: -6, armN: [-30, 160], armF: [-30, 160] }), ['kN']) },
 
   // ---- Conditioning
-  { names: ['jumping jack', 'jumping jacks', 'star jump', 'star jumps', 'jacks'], accent: 'mid', hold: 80, travel: 380,
+  { names: ['jumping jack', 'jumping jacks', 'star jump', 'star jumps', 'jacks'], view: 'front', accent: 'mid', hold: 80, travel: 380,
     pa: STAND, pb: P(STAND, { hip: [100, 72], armN: [-110, -110], armF: [-70, -70], legN: [80, 80], legF: [100, 100] }) },
   { names: ['high knees', 'high knee', 'knee drive', 'a skip', 'running in place'], accent: 'hip', hold: 40, travel: 300,
     pa: on({ ...STAND, armN: [60, -60], armF: [120, 100], legN: [-2, 90], legF: [90, 90] }, ['fF']),
@@ -214,31 +207,26 @@ export const LIBRARY_MOVES = [
     pa: on({ hip: [96, 90], torso: -60, head: -66, bend: 0, armN: [140, 120], armF: [30, 20], legN: [30, 110], legF: [130, 150] }, ['fN']),
     pb: on({ hip: [104, 90], torso: -60, head: -66, bend: 0, armN: [30, 20], armF: [140, 120], legN: [130, 150], legF: [30, 110] }, ['fF']) },
   { names: ['jump rope', 'skipping', 'skipping rope', 'double unders', 'double under', 'rope skipping'], accent: 'kN', hold: 60, travel: 280,
-    pa: P(STAND, { armN: [110, 30], armF: [110, 30] }), pb: P(STAND, { hip: [100, 68], armN: [110, 40], armF: [110, 40], legN: [96, 84], legF: [96, 84] }) },
+    pa: P(STAND, { armN: [110, 30], armF: [110, 30] }), pb: P(STAND, { hip: [100, 68], armN: [110, 40], armF: [110, 40], legN: [86, 96], legF: [86, 96] }) },
   { names: ['rowing machine', 'rower', 'erg', 'ergometer', 'indoor rowing', 'rowing'], accent: 'mid', hold: 150, travel: 700, props: [[50, 124, 170, 124]],
     pa: { hip: [86, 116], torso: -64, head: -70, bend: 0, armN: [6, 4], armF: [6, 4], legN: [-40, 60], legF: [-40, 60] },
     pb: { hip: [86, 116], torso: -104, head: -100, bend: 0, armN: [110, -6], armF: [110, -6], legN: [-2, 4], legF: [-2, 4] } },
   { names: ['cycling', 'bike', 'stationary bike', 'exercise bike', 'spin', 'spin class', 'peloton', 'assault bike', 'air bike'], accent: 'kN', hold: 40, travel: 420, props: [[78, 72, 112, 72], [94, 72, 100, 129], [130, 52, 140, 52]],
-    pa: { hip: [94, 68], torso: -42, head: -46, bend: 0, armN: [20, 50], armF: [20, 50], legN: [10, 100], legF: [80, 130] },
-    pb: { hip: [94, 68], torso: -42, head: -46, bend: 0, armN: [20, 50], armF: [20, 50], legN: [80, 130], legF: [10, 100] } },
+    pa: { hip: [94, 68], torso: -42, head: -46, bend: 0, armN: [40, 10], armF: [40, 10], legN: [10, 100], legF: [80, 130] },
+    pb: { hip: [94, 68], torso: -42, head: -46, bend: 0, armN: [40, 10], armF: [40, 10], legN: [80, 130], legF: [10, 100] } },
   { names: ['shadow boxing', 'boxing', 'punch', 'punches', 'heavy bag', 'bag work', 'jab'], accent: 'sh', hold: 80, travel: 320,
-    pa: P(STAND, { torso: -86, armN: [60, -80], armF: [40, -90], legN: [76, 94], legF: [106, 96] }),
-    pb: P(STAND, { torso: -84, armN: [0, 0], armF: [40, -90], legN: [76, 94], legF: [106, 96] }) },
+    pa: P(STAND, { torso: -86, armN: [60, -80], armF: [40, -90], legN: [76, 94], legF: [100, 104] }),
+    pb: P(STAND, { torso: -84, armN: [0, 0], armF: [40, -90], legN: [76, 94], legF: [100, 104] }) },
 
   // ---- Back care moves used by the routine library
-  { names: ['prone lying', 'lying face down', 'prone lie', 'lie on your front', 'lying on stomach'], accent: 'mid', hold: 1800,
-    pa: { hip: [92, 122], torso: 0, head: 0, bend: 0, armN: [178, 178], armF: [178, 178], legN: [180, 180], legF: [180, 180] },
-    pb: { hip: [92, 122], torso: 0, head: 2, bend: 2, armN: [178, 178], armF: [178, 178], legN: [180, 180], legF: [180, 180] } },
-  { names: ['abdominal drawing in', 'drawing in', 'abdominal hollowing', 'tva activation', 'transversus activation', 'abdominal bracing', 'core bracing', 'brace'], accent: 'mid', hold: 1400,
+  { names: ['abdominal drawing in', 'drawing in', 'abdominal hollowing', 'tva activation', 'transversus activation', 'abdominal bracing', 'core bracing', 'brace'], supine: true, accent: 'mid', hold: 1400,
     pa: { hip: [92, 122], torso: 0, head: 0, bend: 0, armN: [178, 178], armF: [178, 178], legN: [-125, 100], legF: [-125, 100] },
     pb: { hip: [92, 122], torso: 0, head: 0, bend: -4, armN: [178, 178], armF: [178, 178], legN: [-125, 100], legF: [-125, 100] } },
-  { names: ['hundred', 'the hundred', 'pilates hundred', 'hundreds', 'modified hundred'], accent: 'mid', hold: 60, travel: 300,
+  { names: ['hundred', 'the hundred', 'pilates hundred', 'hundreds', 'modified hundred'], supine: true, accent: 'mid', hold: 60, travel: 300,
     pa: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [172, 172], armF: [172, 172], legN: [-90, 180], legF: [-90, 180] },
     pb: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [164, 164], armF: [164, 164], legN: [-90, 180], legF: [-90, 180] } },
-  { names: ['single leg stretch', 'pilates single leg stretch', 'single leg circles', 'leg pull in'], accent: 'mid', hold: 120, travel: 520,
-    pa: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [-150, 150], armF: [-150, 150], legN: [-40, 175], legF: [-172, -172] },
-    pb: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [-150, 150], armF: [-150, 150], legN: [-172, -172], legF: [-40, 175] } },
-  { names: ['side lying leg lift', 'side lying leg raise', 'side lying hip abduction', 'hip abduction', 'side leg raise', 'lying hip abduction', 'leg lift side'], accent: 'hip', hold: 600,
-    pa: { hip: [88, 118], torso: 0, head: -5, bend: 0, armN: [180, 180], armF: [0, 0], legN: [180, 180], legF: [180, 180] },
-    pb: { hip: [88, 118], torso: 0, head: -5, bend: 0, armN: [180, 180], armF: [0, 0], legN: [-158, -158], legF: [180, 180] } },
+  // Head and shoulders curled up; one knee draws in to the chest as the other leg reaches long, then they swap
+  { names: ['single leg stretch', 'pilates single leg stretch', 'single leg circles', 'leg pull in'], accent: 'mid', hold: 350, travel: 1300, supine: true,
+    pa: { hip: [86, 123], torso: -14, head: -22, bend: 0, armN: [190, 190], armF: [190, 190], legN: [-44, 172], legF: [-156, 204] },
+    pb: { hip: [86, 123], torso: -14, head: -22, bend: 0, armN: [190, 190], armF: [190, 190], legN: [-156, 204], legF: [-44, 172] } },
 ];

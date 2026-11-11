@@ -23,19 +23,58 @@ class AppViewController: CAPBridgeViewController {
         view.addSubview(loader)
         self.loader = loader
         loader.start()
-        liftWhenReady(triesLeft: 400)
+        liftWhenReady(triesLeft: 200) // gives up waiting after about 4 seconds, so the loader can never stay up
         // Holding a link shouldn't lift iOS's drag preview out of the app
         webView?.scrollView.subviews.forEach { $0.interactions.compactMap { $0 as? UIDragInteraction }.forEach { $0.isEnabled = false } }
+        // Anything showing past the page (a bounce, a resize) is the page's own background, light or dark
+        let pageBackground = UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 13 / 255, green: 13 / 255, blue: 15 / 255, alpha: 1) : UIColor(red: 239 / 255, green: 238 / 255, blue: 236 / 255, alpha: 1) }
+        view.backgroundColor = pageBackground
+        webView?.underPageBackgroundColor = pageBackground
         // iOS 26's fade under the status bar takes its colour from the launch background; the page draws its own
         if #available(iOS 26.0, *) {
             webView?.scrollView.topEdgeEffect.isHidden = true
         }
     }
 
+    // In a resizable iPad window the window controls sit in the top corner. The page doesn't see them as safe
+    // area, so it's told how far down to start (--win-top) whenever the window changes.
+    private var lastTop: CGFloat = -1
+    // After an iPad window is resized UIKit can leave the app's view short of the window's top edge, so the
+    // black window behind shows through as a strip: the view always fills the whole window
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
+        if let window = view.window, view.superview === window, view.frame != window.bounds { view.frame = window.bounds }
+        view.window?.backgroundColor = view.backgroundColor
+        if let web = webView, web.superview === view, web.frame != view.bounds { web.frame = view.bounds }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // A resized iPad window can hand the web view a top inset, which shows as a dark strip above the
+        // page: the page handles its own safe areas, so the scroll view never takes one
+        if let scroll = webView?.scrollView {
+            if scroll.contentInsetAdjustmentBehavior != .never { scroll.contentInsetAdjustmentBehavior = .never }
+            if scroll.contentInset != .zero { scroll.contentInset = .zero }
+        }
+        if #available(iOS 26.0, *), let web = webView, web.obscuredContentInsets != .zero { web.obscuredContentInsets = .zero }
+        shareWindowTop()
+    }
+
+    private func shareWindowTop(force: Bool = false) {
+        var top = view.safeAreaInsets.top
+        if #available(iOS 26.0, *) {
+            top = max(top, view.edgeInsets(for: .safeArea(cornerAdaptation: .vertical)).top)
+        }
+        guard force || top != lastTop else { return }
+        lastTop = top
+        webView?.evaluateJavaScript("document.documentElement.style.setProperty('--win-top', '\(Int(top.rounded()))px')", completionHandler: nil)
+    }
+
     private func liftWhenReady(triesLeft: Int) {
         webView?.evaluateJavaScript("window.__appReady === true ? 1 : 0") { [weak self] result, _ in
             guard let self else { return }
             if (result as? Int) == 1 || triesLeft == 0 {
+                self.shareWindowTop(force: true)
                 self.loader?.finish(onReveal: {
                     self.overrideUserInterfaceStyle = .unspecified
                     self.webView?.evaluateJavaScript("window.__reveal && window.__reveal()", completionHandler: nil)

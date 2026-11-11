@@ -32,12 +32,19 @@
     layEdge();
     addEventListener('resize', layEdge);
 
-    // Each clip in the look the page is in, loaded only when it's showing or next
+    // Each clip in the look the page is in. Every clip's still frame is set straight away, so the screen is
+    // never blank; the clip showing loads first, and once it can play the others load behind it, so each is
+    // ready by the time the page scrolls to it (they're small: under 700 KB each)
     const videos = [...phone.querySelectorAll('video')];
     const byClip = new Map(videos.map(v => [v.dataset.clip, v]));
     let showing = null;
     const srcFor = v => `assets/site/${v.dataset.clip}-${theme()}.mp4`;
-    const load = v => { if (v && v.dataset.loaded !== srcFor(v)) { v.poster = srcFor(v).replace('.mp4', '.jpg'); v.src = srcFor(v); v.dataset.loaded = srcFor(v); } };
+    const posters = () => videos.forEach(v => { v.poster = srcFor(v).replace('.mp4', '.jpg'); });
+    const load = v => { if (v && v.dataset.loaded !== srcFor(v)) { v.preload = 'auto'; v.src = srcFor(v); v.dataset.loaded = srcFor(v); } };
+    const loadAll = () => videos.forEach(load);
+    posters();
+    videos[0].addEventListener('canplay', loadAll, { once: true });
+    addEventListener('load', () => setTimeout(loadAll, 1200), { once: true });
     const show = (clip, next) => {
       load(byClip.get(next));
       if (clip === showing) return;
@@ -48,14 +55,15 @@
         if (on) { load(v); v.currentTime = 0; if (!still) v.play().catch(() => {}); } else v.pause();
       });
     };
-    onTheme(() => { const c = showing; showing = null; videos.forEach(v => { v.dataset.loaded = ''; }); show(c); });
+    onTheme(() => { const c = showing; showing = null; posters(); videos.forEach(v => { v.dataset.loaded = ''; }); show(c); loadAll(); });
 
-    // Where the phone sits beside each section. On a phone screen it stays central, above the words.
+    // Where the phone sits beside each section. On a phone screen it's large and central, its top three
+    // quarters showing above the words, so the screen can be read
     const narrow = () => innerWidth <= 820;
     const POSES = {
-      hero: () => ({ x: 0, y: 0, s: narrow() ? 0.84 : 0.8, rx: 14, ry: -26, rz: 8, fade: 0 }),
-      right: () => (narrow() ? { x: 0, y: -0.18, s: 0.86, rx: 4, ry: -12, rz: 0, fade: 0 } : { x: 0.24, y: 0, s: 1.02, rx: 2, ry: -16, rz: 1.5, fade: 0 }),
-      left: () => (narrow() ? { x: 0, y: -0.18, s: 0.86, rx: 4, ry: 12, rz: 0, fade: 0 } : { x: -0.24, y: 0, s: 1.02, rx: 2, ry: 16, rz: -1.5, fade: 0 }),
+      hero: () => ({ x: 0, y: 0, s: narrow() ? 0.6 : 0.8, rx: 14, ry: -26, rz: 8, fade: 0 }),
+      right: () => (narrow() ? { x: 0, y: -0.08, s: 0.9, rx: 3, ry: -10, rz: 0, fade: 0 } : { x: 0.24, y: 0, s: 1.02, rx: 2, ry: -16, rz: 1.5, fade: 0 }),
+      left: () => (narrow() ? { x: 0, y: -0.08, s: 0.9, rx: 3, ry: 10, rz: 0, fade: 0 } : { x: -0.24, y: 0, s: 1.02, rx: 2, ry: 16, rz: -1.5, fade: 0 }),
     };
     // Leaving: it tips back, sinks away and fades, rather than being cut off by the next section
     POSES.exit = () => ({ ...POSES[sections.at(-2).dataset.pose](), y: narrow() ? -0.34 : -0.16, s: 0.72, rx: 26, fade: 1 });
@@ -170,7 +178,6 @@
     d.pain = Math.round(clamp(pain, 1, 9));
   });
   // The routine, week by week, for the last chapter: deadlifts going up while weekly pain comes down
-  const week = i => Math.min(7, Math.floor(i / 7));
   const weekPain = Array.from({ length: 8 }, (_, w) => days.slice(w * 7, w * 7 + 7).reduce((s, d) => s + d.pain, 0) / 7);
   const smoothWeeks = (vals, i) => { const f = i / 7 - 0.5, a = clamp(Math.floor(f), 0, 7), b = clamp(a + 1, 0, 7), u = clamp(f - a); return lerp(vals[a], vals[b], ease(u)); };
   const deadlift = [60, 60, 60, 60, 70, 77.5, 87.5, 95], birdDog = [6, 6, 8, 8, 10, 10, 12, 12], plank = [30, 35, 40, 45, 50, 60, 65, 75];
@@ -466,7 +473,7 @@
       msg.text.animate?.([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: still ? 0 : 450, easing: 'ease-out' });
       msg.text.textContent = c.text;
     }
-    if (showCh === LAST) msg.day.textContent = scrub != null ? `Week ${week(scrub) + 1}` : `Deadlifts from week 4. Average pain ${avgPain(0, LIFTS_FROM).toFixed(1)} before, ${avgPain(LIFTS_FROM, N).toFixed(1)} since`;
+    if (showCh === LAST) msg.day.textContent = `Deadlifts from week 4. Average pain ${avgPain(0, LIFTS_FROM).toFixed(1)} before, ${avgPain(LIFTS_FROM, N).toFixed(1)} since`;
     else {
       const d = days[day];
       msg.day.textContent = '';

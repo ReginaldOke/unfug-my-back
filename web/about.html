@@ -28,6 +28,7 @@
       --edge: rgba(255, 255, 255, 0.08); --btn: rgba(255, 255, 255, 0.1); --btn-edge: rgba(255, 255, 255, 0.18);
       --glow-a: rgba(236, 78, 52, 0.62); --glow-b: rgba(196, 48, 40, 0.5); --glow-c: rgba(30, 44, 112, 0.85); --glow-d: rgba(255, 222, 210, 0.3);
       --shade: rgba(0, 0, 0, 0.9); --hair: rgba(255, 255, 255, 0.07); --pill: rgba(255, 255, 255, 0.05);
+      --name-shadow: 0 10px 60px rgba(0, 0, 0, 0.9), 0 0 40px var(--bg);
       /* The phone: graphite, with a lit edge */
       --body-a: #2a2a2e; --body-b: #0f0f11; --rim: rgba(255, 255, 255, 0.22); --screen: #0d0d0f;
       --glass-hi: rgba(255, 255, 255, 0.16); --glass-lo: rgba(255, 255, 255, 0.04); --glass-rim: rgba(255, 255, 255, 0.22); --glass-shine: rgba(255, 255, 255, 0.35);
@@ -35,6 +36,8 @@
     @media (prefers-color-scheme: light) {
       :root:not([data-theme="dark"]) {
         color-scheme: light;
+        /* In the light, the name sits on a soft pale halo rather than a dark shadow */
+        --name-shadow: 0 0 34px rgba(255, 255, 255, 0.9), 0 0 80px rgba(255, 248, 242, 0.7);
         --bg: #efeeec; --ink: #1d1c1f; --ink-2: rgba(29, 28, 31, 0.66); --ink-3: rgba(29, 28, 31, 0.42);
         --edge: rgba(0, 0, 0, 0.08); --btn: rgba(255, 255, 255, 0.6); --btn-edge: rgba(0, 0, 0, 0.1);
         --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
@@ -45,6 +48,8 @@
     }
     :root[data-theme="light"] {
       color-scheme: light;
+        /* In the light, the name sits on a soft pale halo rather than a dark shadow */
+        --name-shadow: 0 0 34px rgba(255, 255, 255, 0.9), 0 0 80px rgba(255, 248, 242, 0.7);
       --bg: #efeeec; --ink: #1d1c1f; --ink-2: rgba(29, 28, 31, 0.66); --ink-3: rgba(29, 28, 31, 0.42);
       --edge: rgba(0, 0, 0, 0.08); --btn: rgba(255, 255, 255, 0.6); --btn-edge: rgba(0, 0, 0, 0.1);
       --glow-a: rgba(246, 176, 146, 0.65); --glow-b: rgba(240, 190, 170, 0.5); --glow-c: rgba(170, 196, 236, 0.75); --glow-d: rgba(255, 245, 235, 0.6);
@@ -122,7 +127,7 @@
 
     /* The opening: a big name, in front of the phone */
     .hero { position: relative; z-index: 2; height: 100vh; height: 100svh; display: grid; place-items: center; text-align: center; pointer-events: none; }
-    .hero h1 { margin: 0; font: 400 clamp(84px, 15vw, 230px)/0.9 'Italiana', serif; letter-spacing: -0.01em; -webkit-text-stroke: 1px currentColor; text-shadow: 0 10px 60px var(--shade), 0 0 40px var(--bg); }
+    .hero h1 { margin: 0; font: 400 clamp(84px, 15vw, 230px)/0.9 'Italiana', serif; letter-spacing: -0.01em; -webkit-text-stroke: 1px currentColor; text-shadow: var(--name-shadow); }
     .hero-copy { position: relative; }
     .tagline { margin: 22px 0 0; font-size: clamp(18px, 1.9vw, 24px); font-weight: 400; color: var(--ink); letter-spacing: 0.01em; text-shadow: 0 2px 24px var(--bg), 0 0 2px var(--bg); }
 
@@ -142,7 +147,8 @@
        line in the middle. Drawn by site-page.js. */
     .vis-track { position: relative; height: 330vh; }
     .vis { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; padding-bottom: calc(max(32px, 5vh) + 100lvh - 100svh); }
-    .message { text-align: center; margin: 3vh auto 1vh; min-height: 110px; padding: 0 20px; max-width: 900px; }
+    .message { text-align: center; margin: 7vh auto 1vh; min-height: 110px; padding: 0 20px; max-width: 900px; }
+    .kicker { display: block; font-size: 13px; font-weight: 500; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-3); }
     .msg { font: 400 clamp(34px, 4.4vw, 58px)/1.08 'Italiana', serif; -webkit-text-stroke: .5px currentColor; margin: 10px 0 12px; text-wrap: balance; }
     .day { font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
     .plot { position: relative; height: min(42vh, 400px); }
@@ -202,7 +208,7 @@
       header { padding: 12px; }
       .brand span { font-size: 20px; }
       .btn.head { display: none; }
-      .phone3d { --w: min(200px, 22vh); }
+      .phone3d { --w: min(74vw, 300px, 33vh); }
       .scene { align-items: flex-end; padding: 0 20px 7vh; }
       .scene .copy { width: 100%; position: relative; }
       /* A soft wash up from the bottom of the screen, edge to edge, so the words read over the phone without a box */
@@ -219,7 +225,8 @@
       .key { font-size: 13px; gap: 7px; }
       .callout { width: 170px; margin-left: -85px; }
       .callout .tag { font-size: 12.5px; padding: 7px 11px; max-width: 170px; }
-      .message { min-height: 150px; margin-top: 1vh; }
+      .message { min-height: 150px; margin-top: 4vh; }
+      .kicker { font-size: 11px; }
       .msg { font-size: 30px; }
       .day { font-size: 12.5px; }
       .chapters { grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -332,7 +339,7 @@
 
     <div class="vis-track">
       <section class="vis" aria-label="An example diary, eight weeks long">
-        <div class="message" aria-live="polite"><h2 class="msg"></h2><div class="day"></div></div>
+        <div class="message" aria-live="polite"><span class="kicker">Track patterns</span><h2 class="msg"></h2><div class="day"></div></div>
         <div class="plot"></div>
         <div class="legend" role="group" aria-label="Lines on the chart"></div>
         <div class="chapters" role="group" aria-label="Chapters"></div>

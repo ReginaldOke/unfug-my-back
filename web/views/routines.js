@@ -9,7 +9,10 @@ import { bumpLastNumber, parseReminder, formatReminder } from '../lib/labels.js'
 import { checkinDraft } from './checkin.js';
 import { MoveFigure } from './figure.js';
 import { isTimed, formVideoUrl, startIndex } from '../lib/play.js';
+import { calmFor } from '../lib/calm.js';
 import { dragHandles } from './sortable.js';
+import { libraryRoutine } from '../lib/routine-library.js';
+import { emojiFor } from '../lib/labels.js';
 
 /** Set when a routine is finished, read once by the Today screen to play its celebration. */
 export const justFinished = { id: null };
@@ -86,8 +89,11 @@ function routineCard(r, today) {
       h('span', { class: 'well', 'aria-hidden': 'true' }, R.routineIcon(r)),
       h('div', { class: 'grow' }, h('h2', {}, r.name), status ? h('p', { class: 'hint' }, status) : null),
       doneToggle(r, today, done)),
-    h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, it.dose)))));
+    h('ol', { class: 'moves' }, r.items.map(it => h('li', {}, h('span', {}, it.name), h('span', { class: 'hint' }, doseText(it))))));
 }
+
+/** "3 × 4 · 10 s hold": a move's target, with its second box when it has one. */
+export const doseText = it => [it.dose, it.extra].filter(Boolean).join(' · ');
 
 /** The quick way: a circle that marks the routine done for today (with its usual reps), or undoes it. */
 // The list is redrawn on every tick: this is the one that just went on, so only it pops
@@ -103,7 +109,7 @@ function doneToggle(r, today, done) {
       e.preventDefault(); e.stopPropagation();
       if (done) { R.routines.undo(r.id, today); toast(`${R.routineLabel(r)} unmarked`); }
       else {
-        R.routines.logSession(r.id, today, { log: r.items.map(it => ({ name: it.name, did: it.dose || '✓' })) });
+        R.routines.logSession(r.id, today, { log: r.items.map(it => ({ name: it.name, did: it.dose || '✓', ...(it.extra ? { extra: it.extra } : {}) })) });
         vibrate(10);
         justTicked = r.id;
         toast(`${R.routineLabel(r)} done`);
@@ -147,10 +153,11 @@ function sessionFor(r, date, fromCheckin) {
   const draft = fromCheckin && r ? checkinDraft(date) : null;
   // Each box starts with what you did today if logged, else last time, else the target
   const s = {
-    key, id: r?.id ?? null, date, name: r?.name ?? '', group: r?.group ?? null, schedule: [...(r?.schedule ?? [])],
+    key, id: r?.id ?? null, date, name: r?.name ?? '', group: r?.group ?? null, schedule: [...(r?.schedule ?? [])], icon: r?.icon ?? null,
     items: (r?.items ?? []).map(it => {
       const now = didNow.get(it.name);
-      return { name: it.name, dose: it.dose, did: now || before.get(it.name) || it.dose || '', done: !!now, extra: extraNow.get(it.name) ?? extraBefore.get(it.name) ?? it.extra ?? '' };
+      // extraDose is the routine's own second box (a hold, say), kept apart from what's typed today
+      return { name: it.name, dose: it.dose, extraDose: it.extra, did: now || before.get(it.name) || it.dose || '', done: !!now, extra: extraNow.get(it.name) ?? extraBefore.get(it.name) ?? it.extra ?? '' };
     }),
     intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
     measure: r?.measure ?? defaultMeasure(`${r?.group ?? ''} ${r?.name ?? ''}`),
@@ -187,13 +194,13 @@ function saveOne(s, { markDone = false } = {}) {
   if (s.group !== null && !s.group.trim()) { toast('Give the routine a name'); return null; }
   if (!name) { toast(s.group ? 'Give this variation a name' : 'Give the routine a name'); return null; }
   if (!items.length) { toast(s.group ? `Add a move to ${name}` : 'Add at least one move'); return null; }
-  const moves = items.map(it => ({ name: it.name.trim(), dose: it.dose || it.did.trim() }));
+  const moves = items.map(templateOf);
   const existing = s.id ? R.routines.get(s.id) : null;
   const group = s.group?.trim() || null;
   if (existing?.group && group && existing.group !== group) R.routines.renameGroup(existing.group, group);
   const changed = !existing || existing.name !== name || (existing.group ?? null) !== group || (existing.measure ?? defaultMeasure(`${existing.group ?? ''} ${existing.name}`)) !== s.measure || JSON.stringify(existing.items) !== JSON.stringify(moves)
-    || existing.schedule.join() !== [...new Set(s.schedule)].sort().join();
-  const r = changed ? R.routines.save(s.id, { name, group, measure: s.measure, items: moves, schedule: [...new Set(s.schedule)].sort() }) : R.routines.get(s.id);
+    || existing.schedule.join() !== [...new Set(s.schedule)].sort().join() || (s.icon && existing.icon !== s.icon);
+  const r = changed ? R.routines.save(s.id, { name, group, measure: s.measure, items: moves, schedule: [...new Set(s.schedule)].sort(), ...(s.icon ? { icon: s.icon } : {}) }) : R.routines.get(s.id);
   // Done on a routine's page marks it done; a brand-new routine isn't (making it isn't doing it). Other
   // variations edited on the way only log if something was entered for them.
   const logIt = (markDone && !!s.id) || s.touched || items.some(it => it.done);
@@ -212,6 +219,15 @@ function saveOne(s, { markDone = false } = {}) {
   s.logged = logIt;
   return r;
 }
+
+/**
+ * A move as the routine keeps it: its target, and its second box (a hold, a weight) when it has one.
+ * A second box added for a new move becomes part of it; emptying one takes it away.
+ */
+const templateOf = it => {
+  const extra = it.extraDose !== undefined ? it.extraDose : it.extra?.trim();
+  return { name: it.name.trim(), dose: it.dose || it.did.trim(), ...(extra ? { extra } : {}) };
+};
 
 /** Whether a move's time came from a timer, so it's listed under the routine page's stopwatch. */
 const isTimedEntry = (s, it) => (s.timed ?? []).some(t => t.name === it.name.trim());
@@ -374,6 +390,28 @@ function progressView(session, past) {
 // A play mark in a rounded frame: watch a video
 const WATCH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="4"/><path d="M10.5 9.5v5l4.2-2.5z" fill="currentColor"/></svg>';
 const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>';
+const INFO = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>';
+// Emoji offered when changing a routine's own; any other can be typed in the box after them
+const ROUTINE_EMOJI = ['🧘', '🤸', '🏋️', '💪', '🛡️', '🎯', '🦵', '🚶', '🏊', '☯️', '🪷', '🌬️', '🌿'];
+
+/**
+ * The routine's emoji beside its name: tap it to pick another from a short row, or type any emoji
+ * into the box at the end of the row.
+ */
+function emojiPicker(s) {
+  const current = () => s.icon || emojiFor(`${s.group ?? ''} ${s.name}`, { exercise: true });
+  const btn = h('button', { type: 'button', class: 'well emoji-btn', 'aria-label': 'Change the emoji', 'aria-expanded': 'false' }, current());
+  const own = h('input', {
+    type: 'text', class: 'emoji-own', placeholder: '🙂', 'aria-label': 'Any emoji', maxlength: 8, enterkeyhint: 'done',
+    oninput: e => { const m = e.target.value.match(/\p{Extended_Pictographic}(\u200d\p{Extended_Pictographic}|\ufe0f)*/u); if (m) choose(m[0]); },
+  });
+  const row = h('div', { class: 'emoji-row', hidden: true, role: 'group', 'aria-label': 'Emoji' },
+    ROUTINE_EMOJI.map(e => h('button', { type: 'button', class: 'emoji-opt', 'aria-label': e, onclick: () => choose(e) }, e)), own);
+  const open = on => { row.hidden = !on; btn.setAttribute('aria-expanded', String(on)); if (on) row.querySelectorAll('.emoji-opt').forEach(b => b.classList.toggle('on', b.textContent === current())); };
+  function choose(e) { s.icon = e; btn.textContent = e; own.value = ''; vibrate(6); open(false); }
+  btn.onclick = () => { open(row.hidden); vibrate(4); };
+  return { btn, row };
+}
 
 /**
  * One page per routine: tap the title to rename it, set reps by typing or swiping the box (+ adds a
@@ -451,7 +489,7 @@ export function RoutineView(ctx) {
       'aria-label': `Extra for ${it.name}, like weight or a note`,
       oninput: e => { it.extra = e.target.value; s.touched = true; fitWidth(extra); },
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
-      onblur: () => { if (!extra.value.trim()) { it.extra = ''; showExtra(false); } },
+      onblur: () => { if (!extra.value.trim()) { it.extra = ''; if (it.extraDose) it.extraDose = ''; showExtra(false); } },
     });
     const plus = h('button', { type: 'button', class: 'extra-add', 'aria-label': `Add another box for ${it.name || 'this move'}`, onclick: () => { showExtra(true); extra.focus(); } }, '+');
     const showExtra = on => { extra.hidden = !on; plus.hidden = on; };
@@ -616,7 +654,7 @@ export function RoutineView(ctx) {
   // A new routine has to exist before the player can open it
   function saveDraftRoutine() {
     if (!s.name.trim()) { toast('Give the routine a name'); title.focus(); return null; }
-    const r2 = R.routines.save(null, { name: s.name.trim(), items: s.items.filter(it => it.name.trim()).map(it => ({ name: it.name.trim(), dose: it.did.trim() })), schedule: s.schedule });
+    const r2 = R.routines.save(null, { name: s.name.trim(), items: s.items.filter(it => it.name.trim()).map(templateOf), schedule: s.schedule, ...(s.icon ? { icon: s.icon } : {}) });
     sessions.delete(s.key);
     s.id = r2.id;
     s.key = `${r2.id}|${date}`;
@@ -625,6 +663,11 @@ export function RoutineView(ctx) {
   }
 
   if (!r) setTimeout(() => title.focus(), 50);
+  const picker = emojiPicker(s);
+  // A routine from the library links back to its page: what it's for and the research behind it
+  const lib = r?.libraryId ? libraryRoutine(r.libraryId) : null;
+  const info = lib ? h('a', { class: 'icon-btn glass info-btn', href: `#/routines/browse/${lib.id}`, 'aria-label': `About ${lib.name}`, title: 'About this routine' }) : null;
+  if (info) info.innerHTML = INFO;
   // Progress: once there are two sessions, a chart button swaps the moves for how each has changed
   const past = r ? R.routines.history(r.id) : [];
   const body = h('div', { class: 'routine-body' });
@@ -646,9 +689,10 @@ export function RoutineView(ctx) {
     h('header', { class: 'top-bar' },
       iconButton('‹', 'Back', () => history.back()),
       date === localDate() ? h('span') : h('span', { class: 'eyebrow' }, dayLabel(date)),
-      h('div', { class: 'row tight' }, chartBtn, play,
+      h('div', { class: 'row tight' }, chartBtn, info, play,
         h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
-    title,
+    h('div', { class: 'title-row' }, picker.btn, title),
+    picker.row,
     variationTabs(),
     progress,
     fillBody());
@@ -788,17 +832,29 @@ export function RoutineRunView(ctx) {
       onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
     });
     scrubNumber(amount, () => it.dose || '0');
-    // Its figure, with a way to watch it done well in the corner
-    const video = h('a', { class: 'glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': `See form videos for ${it.name}` },
-      h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', {}, 'See form'));
+    // The second box (a hold, a weight) when the move has one, beside the first
+    const extra = it.extra || it.extraDose ? h('input', {
+      type: 'text', class: 'did-input did-big extra-input', value: it.extra || it.extraDose || '', enterkeyhint: 'done',
+      'aria-label': `Second box for ${it.name}`,
+      oninput: e => { it.extra = e.target.value; },
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+    }) : null;
+    if (extra) scrubNumber(extra, () => it.extraDose || '0');
+    // Its figure (or, for breathing and meditation, a calm guide), with a way to watch it in the corner
+    const calm = calmFor(it.name);
+    const video = h('a', { class: 'glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': calm ? `Guided ${it.name} videos` : `See form videos for ${it.name}` },
+      h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', {}, calm ? 'Guided' : 'See form'));
     video.firstChild.innerHTML = WATCH;
     const art = h('div', { class: 'move-art' }, MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)), video);
+    // A line on how to do it, for the calm activities that come with one
+    const how = r.items.find(x => x.name === it.name)?.how;
     // Story-style progress: done, this one, still to come; tap one to go to it
     const bar = h('div', { class: 'progress run-progress', role: 'tablist', 'aria-label': 'Moves' }, moves.map((m, k) => h('button', {
       type: 'button', class: k < i ? 'done' : k === i ? 'now' : '', role: 'tab', 'aria-selected': String(k === i), 'aria-label': `${k + 1}. ${m.name}`, onclick: () => go(k),
     })));
     const stage = h('div', { class: `flow-body move-stage${dir ? ` enter-${dir > 0 ? 'next' : 'prev'}` : ''}` },
-      art, h('h1', { tabindex: -1 }, it.name), amount, isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null);
+      art, h('h1', { tabindex: -1 }, it.name), how ? h('p', { class: 'run-how' }, how) : null,
+      extra ? h('div', { class: 'did-pair' }, amount, extra) : amount, isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null);
     root.replaceChildren(
       h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, R.routineLabel(r)), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),
       bar, stage,

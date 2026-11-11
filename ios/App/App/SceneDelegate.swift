@@ -7,6 +7,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        // On iPad the window can be resized: never narrower or shorter than a small phone, so every screen
+        // keeps the layout it was designed for
+        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 375, height: 640)
+
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = AppViewController()
         window?.makeKeyAndVisible()

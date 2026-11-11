@@ -215,6 +215,93 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
   return root;
 }
 
+// ---------- body scan ----------
+
+// From the feet to the top of the head, as the light rises (the usual order for a body scan)
+const SCAN_PARTS = [[0.06, 'Feet'], [0.28, 'Lower legs'], [0.45, 'Knees and thighs'], [0.56, 'Hips'], [0.64, 'Lower back and belly'],
+  [0.74, 'Chest and upper back'], [0.8, 'Shoulders and arms'], [0.86, 'Neck'], [0.93, 'Face'], [1.01, 'Top of the head']];
+// One slow pass up the body; about a minute per part, as guided body scans go
+export const SCAN_PASS_MS = 150_000;
+
+/**
+ * The body scan: the 3D figure facing you, softly lit, with a warm band of light moving very slowly up
+ * from the feet to the head. Parts already passed keep a faint glow; the part it's on is named below.
+ */
+export function BodyScan() {
+  const canvas = h('canvas', { class: 'scan3d-canvas', 'aria-hidden': 'true' });
+  const word = h('div', { class: 'scan3d-word', 'aria-live': 'polite' });
+  const root = h('div', { class: 'scan3d' }, canvas, word);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(24, 1, 0.05, 40);
+  camera.position.set(0, H * 0.52, 5.1);
+  camera.lookAt(0, H * 0.5, 0);
+
+  const material = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: { uScan: { value: 0 }, uH: { value: H } },
+    vertexShader: `
+      varying vec3 vNormal; varying float vY;
+      void main() {
+        vec4 world = modelMatrix * vec4(position, 1.0);
+        vY = world.y;
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * viewMatrix * world;
+      }`,
+    fragmentShader: `
+      uniform float uScan; uniform float uH;
+      varying vec3 vNormal; varying float vY;
+      void main() {
+        float y = vY / uH;
+        vec3 n = normalize(vNormal);
+        float light = 0.55 + 0.45 * max(dot(n, normalize(vec3(0.3, 0.7, 0.8))), 0.0);
+        float rim = pow(1.0 - abs(n.z), 2.2);
+        vec3 calm = mix(vec3(0.56, 0.52, 0.72), vec3(0.86, 0.82, 0.92), light);
+        float d = y - uScan;
+        float band = exp(-d * d / (2.0 * 0.045 * 0.045));
+        float trail = smoothstep(0.0, 0.35, -d) * step(d, 0.0) * 0.28;
+        vec3 warm = mix(vec3(1.0, 0.6, 0.48), vec3(1.0, 0.82, 0.62), light);
+        vec3 col = mix(calm, mix(calm, warm, 0.45), trail * 2.0);
+        col = mix(col, warm, band * 0.8);
+        col += vec3(1.0, 0.85, 0.8) * rim * (0.18 + band * 0.25);
+        gl_FragColor = vec4(col, 0.94);
+      }`,
+  });
+
+  const body = new THREE.Group();
+  scene.add(body);
+  loadModel(material).then(model => body.add(model));
+
+  const resize = () => {
+    const { width, height } = root.getBoundingClientRect();
+    if (!width || !height) return;
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  };
+  const ro = new ResizeObserver(resize);
+  ro.observe(root);
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const t0 = performance.now();
+  let wasConnected = false, last = '';
+  renderer.setAnimationLoop(now => {
+    if (root.isConnected) wasConnected = true;
+    else if (wasConnected) { renderer.setAnimationLoop(null); ro.disconnect(); renderer.dispose(); return; }
+    const f = reduce ? 0.5 : ((now - t0) % SCAN_PASS_MS) / SCAN_PASS_MS;
+    // Starts just below the feet and ends just above the head, so the light rises in and away
+    material.uniforms.uScan.value = -0.06 + f * 1.14;
+    // A barely-there sway, so the figure feels present rather than frozen
+    body.rotation.y = reduce ? 0 : Math.sin((now - t0) / 9000) * 0.12;
+    const part = (SCAN_PARTS.find(([top]) => material.uniforms.uScan.value < top) ?? SCAN_PARTS.at(-1))[1];
+    if (part !== last) { last = part; word.textContent = part; }
+    renderer.render(scene, camera);
+  });
+  return root;
+}
+
 // ---------- model ----------
 
 async function loadModel(material) {

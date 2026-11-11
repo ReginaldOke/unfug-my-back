@@ -159,7 +159,8 @@ function checkDailyReminders(now) {
       actions: [{ label: 'Start', primary: true, run: () => { location.hash = '#/checkin'; } }],
     });
   }
-  for (const r of R.routines.all()) {
+  // A new diary's starter routines wait until the first check-in, so the first visit isn't a nudge
+  for (const r of R.checkins.all().length ? R.routines.all() : []) {
     r.schedule.filter(e => reminderOn(e, today)).forEach((e, i) => {
       if (!due(`routine:${r.id}:${e}`, parseReminder(e).time) || R.routines.completionsOn(today, r.id).length > i) return;
       notify({

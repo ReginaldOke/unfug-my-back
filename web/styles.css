@@ -5,6 +5,8 @@
    tiles 30px, controls and sliders are pills, symbol wells are circles, "on" state is a bright fill. */
 
 :root {
+  /* The top safe area, or more in a resizable iPad window, where the window controls sit (set natively) */
+  --safe-top: max(env(safe-area-inset-top), var(--win-top, 0px));
   /* The tab bar floats just above the home indicator, like iOS's own (about 20 pt from the bottom on Face ID phones) */
   --tab-bottom: max(12px, calc(env(safe-area-inset-bottom) - 12px));
   color-scheme: dark;
@@ -51,6 +53,7 @@ body {
   -webkit-font-smoothing: antialiased;
   padding-bottom: calc(var(--tab-bottom) + 96px);
   overflow-x: hidden;
+  position: relative;
 }
 body.in-flow { padding-bottom: 0; }
 
@@ -72,7 +75,8 @@ body.in-flow { padding-bottom: 0; }
 /* Header glow (version 2): the logo's red and a deep navy across the very top, settling into a long
    grainy grey-black that runs most of the way down the screen. Version 1 is saved in design/. */
 .aura {
-  position: absolute; top: 0; left: 0; right: 0; height: 1600px; z-index: -1; pointer-events: none; overflow: hidden;
+  /* As tall as the page up to 1600px, never taller, so a short page doesn't scroll on into empty glow */
+  position: absolute; top: 0; left: 0; right: 0; height: min(1600px, 100%); z-index: -1; pointer-events: none; overflow: hidden;
   /* A long eased fade, so the grainy grey melts into the black rather than stopping */
   --fade: linear-gradient(180deg, #000 0%, #000 25%, rgba(0, 0, 0, 0.9) 38%, rgba(0, 0, 0, 0.72) 50%, rgba(0, 0, 0, 0.5) 62%, rgba(0, 0, 0, 0.3) 74%, rgba(0, 0, 0, 0.14) 86%, rgba(0, 0, 0, 0.04) 95%, transparent 100%);
   -webkit-mask-image: var(--fade); mask-image: var(--fade);
@@ -121,7 +125,7 @@ input, textarea, [contenteditable], .url-box { -webkit-user-select: text; user-s
 /* iOS's own fade under the status bar is off (it came out dark in light mode). This one only shows once
    content is scrolled beneath the clock, so Home's glow stays clear at rest. */
 body::before {
-  content: ''; position: fixed; inset: 0 0 auto; height: calc(env(safe-area-inset-top) * 1.3); z-index: 30; pointer-events: none;
+  content: ''; position: fixed; inset: 0 0 auto; height: calc(var(--safe-top) * 1.3); z-index: 30; pointer-events: none;
   /* A soft blur under the clock rather than a solid band */
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
@@ -160,7 +164,7 @@ button { cursor: pointer; }
 
 /* ---------- Layout ---------- */
 #app { max-width: 560px; margin: 0 auto; }
-.view { padding: calc(14px + env(safe-area-inset-top)) var(--gutter) 24px; display: flex; flex-direction: column; gap: 14px; }
+.view { padding: calc(14px + var(--safe-top)) var(--gutter) 24px; display: flex; flex-direction: column; gap: 14px; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .top-bar h1 { font-size: 22px; }
 .top-bar .wordmark {
@@ -267,7 +271,7 @@ body.in-flow #tabs { display: none; }
 
 /* ---------- Toast & banners ---------- */
 #toast {
-  position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translate(-50%, -16px);
+  position: fixed; left: 50%; top: calc(12px + var(--safe-top)); transform: translate(-50%, -16px);
   background: radial-gradient(90% 140% at 20% 0%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 60%), rgba(36, 36, 40, 0.45);
   -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 34px -14px rgba(0, 0, 0, 0.7);
@@ -298,15 +302,19 @@ body.in-flow #tabs { display: none; }
 
 /* ---------- Full-screen flows ---------- */
 .flow { min-height: 100dvh; display: flex; flex-direction: column; max-width: 560px; margin: 0 auto; }
-.flow-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) var(--gutter) 8px; }
+.flow-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + var(--safe-top)) var(--gutter) 8px; }
 .flow-body { flex: 1; padding: 10px var(--gutter) 24px; display: flex; flex-direction: column; }
 .flow-footer {
   position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center;
   padding: 14px var(--gutter) calc(16px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, transparent, rgba(5, 5, 5, 0.85) 40%);
+  --fade: linear-gradient(180deg, transparent, rgba(5, 5, 5, 0.85) 40%);
 }
 .flow-footer > span { min-width: 0; }
+/* The fade behind the buttons spans the whole screen, so on a wide iPad window it doesn't show as a box */
+.flow-footer::before { content: ''; position: absolute; inset: 0 calc(50% - 50vw); background: var(--fade); z-index: -1; pointer-events: none; }
+.flow-footer { isolation: isolate; }
 .flow-footer .btn.ghost { flex: none; }
+.flow-footer .btn.wide { flex: 1 1 0; width: auto; min-width: 0; }
 .step-head { margin: 8px 0 22px; display: flex; flex-direction: column; gap: 6px; }
 .timer { font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 15px; min-width: 44px; text-align: right; }
 .timer.over { color: var(--red-2); }
@@ -675,7 +683,7 @@ details.more[open] summary { margin-bottom: 10px; }
 }
 .btn.primary:hover { background: radial-gradient(120% 140% at 50% -40%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 60%), linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)); }
 .btn:active { transform: scale(0.96); }
-.flow-footer { background: linear-gradient(180deg, rgba(19, 19, 21, 0), rgba(19, 19, 21, 0.75) 45%); }
+.flow-footer { --fade: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 82%, transparent) 45%); }
 
 /* Tab bar: floating capsule with a glass lens on the active item (iOS 26) */
 #tabs { background: rgba(40, 40, 44, 0.42); padding: 5px; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8), inset 0 0 22px rgba(255, 255, 255, 0.04); }
@@ -863,12 +871,10 @@ details.more[open] summary { margin-bottom: 10px; }
 .frost-text { font-size: 13px; color: var(--ink-2); max-width: 260px; margin-bottom: 10px; }
 .btn.big { min-height: 58px; padding: 0 34px; font-size: 18px; }
 
-/* Heavier frost over the sample chart: shapes and colour only, no readable detail */
-.frost {
-  background: linear-gradient(180deg, rgba(30, 30, 34, 0.45), rgba(20, 20, 23, 0.62));
-}
+/* A light frost over the sample chart: the lines show through, softened, so the button stands out on top */
+.frost { background: linear-gradient(180deg, rgba(30, 30, 34, 0.08), rgba(20, 20, 23, 0.22)); box-shadow: none; }
 /* On the chart itself: a backdrop blur can't see through the card while its entrance is playing, and pops in after */
-.sample-chart { filter: blur(26px) saturate(140%); }
+.sample-chart { filter: blur(2.5px) saturate(130%); }
 
 /* ---------- Routine tile: progress, done state, and a celebration after finishing ---------- */
 .done-title { font-size: 22px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.1; }
@@ -958,7 +964,7 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 
 /* ---------- Check-in: 3D body fits above the footer, its spot chips in a row underneath ---------- */
 .head-spacer { width: 44px; flex: none; }
-.body3d { height: clamp(280px, calc(100dvh - 400px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 460px); }
+.body3d { height: clamp(280px, calc(100dvh - 400px - var(--safe-top) - env(safe-area-inset-bottom)), 460px); }
 .body3d-wrap { position: relative; }
 .segmented { overflow-y: hidden; scrollbar-width: none; }
 .field > .segmented { display: flex; }
@@ -1053,12 +1059,28 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 
 /* ---------- Routine move figure ---------- */
 .move-figure { width: min(100%, 320px); height: auto; overflow: visible; }
-.fig-floor { stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; stroke-linecap: round; }
-.fig-limb, .fig-torso { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.fig-limb.near { stroke: var(--ink); stroke-width: 5.5; }
-.fig-limb.far { stroke: rgba(235, 235, 245, 0.3); stroke-width: 5; }
-.fig-torso { stroke: var(--ink); stroke-width: 7.5; }
+.fig-floor { stroke: rgba(255, 255, 255, 0.16); stroke-width: 2; stroke-linecap: round; }
+.fig-seg, .fig-torso, .fig-neck { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fig-seg.near, .fig-torso, .fig-neck { stroke: var(--ink); }
+.fig-seg.far { stroke: rgba(235, 235, 245, 0.34); }
+/* The mascot: chunky and soft, thicker at the thigh and upper arm, like a felt-tip drawing */
+.fig-seg.leg-u { stroke-width: 11; }
+.fig-seg.leg-l { stroke-width: 9.5; }
+.fig-seg.arm-u { stroke-width: 8.5; }
+.fig-seg.arm-l { stroke-width: 7.5; }
+.fig-seg.foot { stroke-width: 7; }
+.fig-torso { stroke-width: 16; }
+.fig-neck { stroke-width: 8; }
 .fig-head { fill: var(--ink); }
+.fig-eye { fill: var(--bg); }
+/* The cut-out under near limbs: the background colour, a little wider than the limb */
+.fig-seg.gap { stroke: var(--bg); }
+.fig-seg.gap.leg-u { stroke-width: 15; }
+.fig-seg.gap.leg-l { stroke-width: 13.5; }
+.fig-seg.gap.arm-u { stroke-width: 12.5; }
+.fig-seg.gap.arm-l { stroke-width: 11.5; }
+.fig-seg.gap.foot { stroke-width: 11; }
+.fig-floor { fill: none; stroke-width: 2; }
 .fig-glow { fill: url(#fig-glow); }
 .move-figure { filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); }
 
@@ -1273,7 +1295,7 @@ input.day-tab.on { background: rgba(255, 255, 255, 0.9); color: #111; border: 0;
 [data-theme="light"] .log-row.lifted .log-inner { background: rgba(255, 255, 255, 0.96); box-shadow: 0 14px 34px -12px rgba(40, 42, 52, 0.35); }
 [data-theme="light"] .log-row.swiping .log-inner, [data-theme="light"] .log-row.open .log-inner { background: #fbfaf8; box-shadow: 6px 0 18px -8px rgba(40, 42, 52, 0.3); }
 [data-theme="light"] .body3d-label { background: rgba(255, 255, 255, 0.8); }
-[data-theme="light"] .frost { background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(250, 248, 245, 0.62)); }
+[data-theme="light"] .frost { background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(250, 248, 245, 0.2)); }
 [data-theme="light"] .chart .axis-today { fill: #efebe6; }
 [data-theme="light"] .effort-range::-webkit-slider-runnable-track {
   background: linear-gradient(90deg, transparent var(--pct, 50%), rgba(239, 238, 236, 0.75) var(--pct, 50%)), linear-gradient(90deg, #6cc47c, #e6bb3c 50%, #ec6a5a);
@@ -1304,7 +1326,7 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] .seg-dots i.on { background: #1d1c1f; }
 [data-theme="light"] .pill-badge { background: rgba(0, 0, 0, 0.06); }
 [data-theme="light"] .vslider { background: linear-gradient(180deg, rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.04)); box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.06), 0 26px 50px -26px rgba(40, 42, 52, 0.3); }
-[data-theme="light"] .flow-footer { background: linear-gradient(180deg, rgba(239, 238, 236, 0), rgba(239, 238, 236, 0.9) 45%); }
+[data-theme="light"] .flow-footer { --fade: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 90%, transparent) 45%); }
 .appearance { flex-direction: row; align-items: center; flex-wrap: wrap; row-gap: 12px; }
 .appearance .segmented { flex: none; width: auto; margin-left: auto; }
 .appearance .segmented button { padding: 0 14px; }
@@ -1368,7 +1390,13 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] .progress i.done { background: rgba(29, 28, 31, 0.35); }
 [data-theme="light"] .progress i.now { background: #1d1c1f; }
 [data-theme="light"] .fig-floor { stroke: rgba(0, 0, 0, 0.12); }
-[data-theme="light"] .fig-limb.far { stroke: rgba(29, 28, 31, 0.25); }
+[data-theme="light"] .fig-seg.far { stroke: rgba(29, 28, 31, 0.26); }
+/* Thumbnails: no shadow, framed on the figure itself */
+.move-figure.small { width: 100%; filter: none; }
+.move-figure.small .fig-floor { stroke-width: 2; }
+/* Calm guides: a liquid orb, its glow, and the word for the breath beneath */
+.calm-guide { filter: none; }
+.calm-word { font: 300 10px Outfit, sans-serif; letter-spacing: .08em; fill: var(--ink-2); }
 [data-theme="light"] .move-figure { filter: drop-shadow(0 10px 24px rgba(40, 42, 52, 0.18)); }
 [data-theme="light"] .key:not(.on) .key-name { text-decoration-color: rgba(0, 0, 0, 0.3); }
 [data-theme="light"] .cal-cell.today:not(.logged)::before { box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.3); }
@@ -2025,22 +2053,38 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .lib-tag { font-size: 13px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lib-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
 /* Each kind of routine gets a soft wash of the app's colours behind its figure */
-.tone-warm .lib-art, .lib-hero.tone-warm { background: radial-gradient(90% 80% at 30% 20%, rgba(243, 180, 110, .26), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(226, 104, 127, .22), transparent 70%); }
-.tone-cool .lib-art, .lib-hero.tone-cool { background: radial-gradient(90% 80% at 30% 20%, rgba(116, 212, 192, .24), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(143, 196, 255, .22), transparent 70%); }
-.tone-violet .lib-art, .lib-hero.tone-violet { background: radial-gradient(90% 80% at 30% 20%, rgba(227, 166, 245, .24), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(143, 196, 255, .2), transparent 70%); }
-.tone-green .lib-art, .lib-hero.tone-green { background: radial-gradient(90% 80% at 30% 20%, rgba(163, 225, 154, .24), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(116, 212, 192, .2), transparent 70%); }
-.lib-hero { border-radius: var(--r-card); display: grid; place-items: center; padding: 18px 12px; margin-bottom: 18px; }
-.lib-hero .move-figure { filter: none; }
-.lib-name { font-size: 30px; font-weight: 300; margin: 0 0 6px; }
+.tone-warm { --w1: 243, 180, 110; --w2: 226, 104, 127; }
+.tone-cool { --w1: 116, 212, 192; --w2: 143, 196, 255; }
+.tone-violet { --w1: 227, 166, 245; --w2: 143, 196, 255; }
+.tone-green { --w1: 163, 225, 154; --w2: 116, 212, 192; }
+.tone-calm { --w1: 255, 196, 160; --w2: 186, 160, 240; }
+.lib-art { background: radial-gradient(90% 80% at 30% 20%, rgba(var(--w1), .26), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(var(--w2), .22), transparent 70%); }
+/* A routine's page: its colour washes in behind the top, edge to edge, and fades into the page */
+.library-detail { position: relative; }
+.library-detail > :not(.lib-wash) { position: relative; z-index: 1; }
+.lib-wash {
+  position: absolute; inset: 0 0 auto; height: 380px; z-index: 0; pointer-events: none;
+  background: radial-gradient(110% 80% at 15% 0%, rgba(var(--w1), .42), transparent 68%), radial-gradient(90% 75% at 95% 12%, rgba(var(--w2), .36), transparent 72%);
+  -webkit-mask-image: linear-gradient(#000 35%, transparent); mask-image: linear-gradient(#000 35%, transparent);
+  animation: wash-in 1.2s var(--ease-out) both;
+}
+@keyframes wash-in { from { opacity: 0; } }
+.library-detail .top-bar { min-height: 40px; margin-bottom: -6px; }
+.lib-name { font-size: 30px; font-weight: 300; margin: 0 0 6px; display: flex; align-items: center; gap: 12px; }
+.lib-icon { font-size: 26px; line-height: 1; }
 .library-detail .lead { color: var(--ink-2); margin: 0 0 14px; }
 .lib-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; font-size: 13px; color: var(--ink-3); letter-spacing: .02em; }
 .lib-facts i { font-style: normal; opacity: .6; }
 .lib-section { padding: 18px 2px 4px; border-top: 1px solid rgba(255, 255, 255, .08); }
 .lib-section h2 { margin: 0 0 10px; font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 .lib-section p { margin: 0 0 14px; color: var(--ink-2); line-height: 1.55; }
-.lib-moves { margin: 0 0 12px; padding: 0; list-style: none; counter-reset: m; }
-.lib-moves li { counter-increment: m; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; }
-.lib-moves li > span:first-child::before { content: counter(m, decimal-leading-zero); display: inline-block; width: 30px; color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: 13px; }
+.lib-moves { margin: 0 0 12px; padding: 0; list-style: none; }
+.lib-moves li { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 12px; padding: 6px 0; }
+.lib-thumb { width: 58px; height: 42px; border-radius: 12px; display: grid; place-items: center; overflow: hidden; background: rgba(var(--w1), .1); }
+.lib-thumb .move-figure { width: 100%; height: 100%; }
+.lib-move { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lib-move small { font-size: 12px; line-height: 1.4; color: var(--ink-3); }
+.lib-moves .hint { text-align: right; font-size: 13px; }
 .lib-studies { margin: 0 0 16px; padding: 0; list-style: none; }
 .lib-studies a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; color: inherit; text-decoration: none; }
 .lib-studies a > span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -2050,3 +2094,32 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .lib-studies a:active { opacity: .6; }
 [data-theme="light"] .lib-section { border-top-color: rgba(0, 0, 0, .08); }
 .lib-action { margin-bottom: 18px; }
+
+/* ---------- Routine page: emoji beside the name, a row to change it, and the info link ---------- */
+.title-row { display: flex; align-items: center; gap: 12px; }
+.title-row .routine-title { flex: 1; min-width: 0; }
+.emoji-btn { flex: none; width: 46px; height: 46px; font-size: 24px; border: 0; cursor: pointer; transition: transform .2s var(--spring); }
+.emoji-btn:active { transform: scale(.9); }
+.emoji-row { display: flex; flex-wrap: wrap; gap: 4px; margin: -4px 0 6px; animation: rise-in .3s var(--ease-out) both; }
+.emoji-opt { width: 40px; height: 40px; border: 0; border-radius: 12px; background: none; font-size: 22px; line-height: 1; cursor: pointer; transition: background .15s, transform .2s var(--spring); }
+.emoji-opt:active { transform: scale(.88); }
+.emoji-opt.on { background: rgba(255, 255, 255, .14); }
+[data-theme="light"] .emoji-opt.on { background: rgba(0, 0, 0, .07); }
+.emoji-own { width: 52px; height: 40px; border-radius: 12px; border: 1px dashed var(--line); background: none; text-align: center; font-size: 20px; color: var(--ink); }
+.info-btn { color: var(--ink-2); }
+
+/* ---------- Player: the second box beside the first, and a line on how for calm activities ---------- */
+.did-pair { display: flex; gap: 10px; justify-content: center; align-items: center; width: min(100%, 360px); }
+.run-how { max-width: 300px; margin: -4px auto 4px; text-align: center; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+
+.did-pair .did-input.did-big { width: auto; flex: 1 1 0; min-width: 0; max-width: 170px; }
+
+/* iPad and wide windows: a roomier column than a phone's, still centred and easy to read */
+@media (min-width: 900px) {
+  #app, .flow { max-width: 680px; }
+}
+
+/* ---------- Body scan: the 3D figure with light rising through it, and the part to notice ---------- */
+.scan3d, .scan3d-slot { position: relative; width: min(100%, 300px); height: min(46dvh, 380px); margin: 0 auto; }
+.scan3d-canvas { width: 100%; height: 100%; display: block; }
+.scan3d-word { position: absolute; left: 0; right: 0; bottom: -4px; text-align: center; font-size: 13px; font-weight: 300; letter-spacing: .08em; color: var(--ink-2); transition: opacity .8s; }
