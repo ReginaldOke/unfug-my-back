@@ -535,6 +535,8 @@ body.in-flow #tabs { display: none; }
 }
 .grip i { width: 14px; height: 2px; border-radius: 1px; background: var(--ink-3); }
 .drag-row { border-radius: 16px; transition: box-shadow .2s, background .2s; }
+/* A draggable card keeps the same corners as every other card */
+.card.drag-row { border-radius: var(--r-card); }
 .drag-row.lifted { position: relative; z-index: 2; background: rgba(40, 40, 44, 0.92); box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.7); }
 .drag-row.lifted .grip { cursor: grabbing; }
 .item-row .dose-input { width: 92px; flex: none; }

@@ -102,7 +102,8 @@
        that stays on screen through the opening sections; site-page.js turns and moves it as the page scrolls. */
     .journey { position: relative; overflow: clip; }
     .journey-end { height: 40vh; }
-    .stage { position: sticky; top: 0; height: 100vh; height: 100svh; margin-bottom: -100vh; margin-bottom: -100svh; z-index: 1; pointer-events: none; perspective: 1800px; display: grid; place-items: center; }
+    /* Sized to the full screen (toolbars hidden), so nothing shows below it when a phone browser tucks its bars away */
+    .stage { position: sticky; top: 0; height: 100vh; height: 100lvh; margin-bottom: -100vh; margin-bottom: -100lvh; z-index: 1; pointer-events: none; perspective: 1800px; display: grid; place-items: center; }
     .drop { animation: drop 1.9s cubic-bezier(.18, .9, .22, 1.04) both .15s; transform-style: preserve-3d; }
     @keyframes drop {
       from { transform: translate3d(0, -120vh, 0) rotateX(58deg) rotateZ(-24deg); }
@@ -140,7 +141,7 @@
     /* ---- The example diary as a big chart. It stays put while the page scrolls, and the days slide past the
        line in the middle. Drawn by site-page.js. */
     .vis-track { position: relative; height: 330vh; }
-    .vis { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; padding-bottom: max(32px, 5vh); }
+    .vis { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; padding-bottom: calc(max(32px, 5vh) + 100lvh - 100svh); }
     .message { text-align: center; margin: 3vh auto 1vh; min-height: 110px; padding: 0 20px; max-width: 900px; }
     .msg { font: 400 clamp(34px, 4.4vw, 58px)/1.08 'Italiana', serif; -webkit-text-stroke: .5px currentColor; margin: 10px 0 12px; text-wrap: balance; }
     .day { font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
@@ -159,7 +160,7 @@
     .key:not(.on) .key-name { text-decoration: line-through; text-decoration-color: var(--ink-3); }
     .key:focus-visible { outline: 1px solid var(--c); outline-offset: 4px; border-radius: 4px; }
     .notes { position: absolute; inset: 0; pointer-events: none; }
-    .callout { position: absolute; width: 230px; margin-left: -115px; transition: opacity .35s; text-align: center; }
+    .callout { position: absolute; width: 230px; margin-left: -115px; transition: opacity .35s; text-align: center; will-change: transform; }
     .callout .tag { max-width: 230px; }
     /* Liquid glass: mostly clear, blurred and brightened behind, a lit top edge and a soft sheen */
     .callout .tag {
@@ -222,7 +223,7 @@
       .msg { font-size: 30px; }
       .day { font-size: 12.5px; }
       .chapters { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-      .chapter { height: 38px; font-size: 10.5px; letter-spacing: .1em; }
+      .chapter { height: 40px; font-size: 10px; letter-spacing: .05em; white-space: nowrap; padding: 0 4px; }
       .row { font-size: 13px; align-items: flex-start; padding-top: 6px; }
       footer { padding: 24px 20px 40px; }
     }

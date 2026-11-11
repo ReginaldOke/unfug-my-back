@@ -189,9 +189,9 @@
       row: { name: 'Plank', unit: 'hold', at: i => smoothWeeks(plank, i), min: 20, max: 80, fmt: clock, from: plank[0], c: '#74d4c0' } },
   ];
   const CHAPTERS = [
-    { from: 0, to: 37, key: 'walking', pill: 'What eases it', text: 'Your back feels better on days you walk more' },
-    { from: 37, to: N, key: 'driving', pill: 'What hurts later', text: 'A long drive leaves you sore the next day' },
-    { key: 'routine', pill: 'Your progress', text: 'Your pain has eased since you started deadlifting' },
+    { from: 0, to: 37, key: 'walking', pill: 'Track helpers', text: 'Your back feels better on days you walk more' },
+    { from: 37, to: N, key: 'driving', pill: 'Track stressors', text: 'A long drive leaves you sore the next day' },
+    { key: 'routine', pill: 'Track progress', text: 'Your pain has eased since you started deadlifting' },
   ];
   const CALLOUTS = [
     { ch: 0, a: ['walking', 26], b: ['pain', 26], text: 'A long walk, and an easier day' },
@@ -260,7 +260,8 @@
   };
   const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short' }), DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
 
-  let W = 0, H = 0, dayW = 0, offset = 0, pos = 0, morphT = 0, chapter = 0, built = false, scrub = null, sx = [0, 0];
+  let W = 0, H = 0, dayW = 0, offset = 0, pos = 0, morphT = 0, chapter = 0, built = false, scrub = null, sx = [0, 0], drawn = { t: -1 }, lastDay = -1;
+  const glowOK = () => innerWidth > 820;
   const parts = {};
 
   /** Builds the chart's pieces once per size or look; paint() moves them. */
@@ -271,9 +272,11 @@
     svg.replaceChildren();
     const defs = el('defs', {}, svg);
     el('feGaussianBlur', { stdDeviation: 7 }, el('filter', { id: 'glow', x: '-10%', y: '-40%', width: '120%', height: '180%' }, defs));
-    parts.grid = el('g', {}, svg);
+    // Everything that belongs to the days sits in one strip, laid out once and slid sideways as a whole
+    parts.strip = el('g', {}, svg);
+    parts.grid = el('g', {}, parts.strip);
     parts.days = days.map((d, i) => {
-      const g = el('g', {}, parts.grid);
+      const g = el('g', { transform: `translate(${((i + 0.5) * dayW).toFixed(1)},0)` }, parts.grid);
       el('line', { x1: 0, x2: 0, y1: 44, y2: H - 4, stroke: 'currentColor', 'stroke-opacity': 0.07 }, g);
       const a = el('text', { y: 14, 'text-anchor': 'middle', 'font-size': 11, 'letter-spacing': '0.14em', fill: 'currentColor' }, g); a.textContent = DAY.format(d.date).toUpperCase();
       const b = el('text', { y: 32, 'text-anchor': 'middle', 'font-size': 12, fill: 'currentColor' }, g); b.textContent = d.date.getDate();
@@ -283,12 +286,17 @@
       const grad = el('linearGradient', { id: `f-${s.key}`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
       const s0 = el('stop', { offset: 0, 'stop-color': s.c, 'stop-opacity': 0.5 }, grad);
       const s1 = el('stop', { offset: 1, 'stop-color': s.c, 'stop-opacity': 0 }, grad);
-      const g = el('g', {}, svg);
-      return { s, s0, s1, g, area: el('path', { fill: `url(#f-${s.key})` }, g), glow: el('path', { fill: 'none', 'stroke-width': 8, filter: 'url(#glow)', 'stroke-opacity': 0.5 }, g), line: el('path', { fill: 'none', 'stroke-linecap': 'round' }, g) };
+      const g = el('g', {}, parts.strip);
+      // The soft glow under a line is costly to draw, so phones go without it
+      const glow = el('path', { fill: 'none', 'stroke-width': 8, 'stroke-opacity': 0.5, ...(glowOK() ? { filter: 'url(#glow)' } : {}) }, g);
+      return { s, s0, s1, g, area: el('path', { fill: `url(#f-${s.key})` }, g), glow, line: el('path', { fill: 'none', 'stroke-linecap': 'round' }, g) };
     });
     // Pain on top
-    svg.append(parts.series[0].g);
-    parts.links = el('g', {}, svg);
+    parts.strip.append(parts.series[0].g);
+    parts.links = CALLOUTS.map(() => {
+      const g = el('g', { opacity: 0 }, parts.strip);
+      return { g, path: el('path', { fill: 'none', 'stroke-width': 1.5, 'stroke-dasharray': '4 4' }, g), dots: [0, 1].map(() => el('circle', { r: 5, 'stroke-width': 2 }, g)) };
+    });
     // Where deadlifts start: a dashed line down through every row and a dot where the line jumps
     parts.mark = el('g', { opacity: 0 }, svg);
     parts.markLine = el('line', { stroke: '#74d4c0', 'stroke-opacity': 0.6, 'stroke-dasharray': '3 5' }, parts.mark);
@@ -296,7 +304,7 @@
     parts.scrub = el('g', { opacity: 0 }, svg);
     parts.scrubLine = el('line', { stroke: 'currentColor', 'stroke-opacity': 0.5 }, parts.scrub);
     parts.scrubDots = SERIES.map(s => el('circle', { r: 4.5, fill: s.row.c }, parts.scrub));
-    parts.cursor = el('line', { y1: 44, y2: H - 4, stroke: 'currentColor', 'stroke-width': 1.5 }, svg);
+    parts.cursor = el('line', { y1: 44, y2: H - 4, stroke: 'currentColor', 'stroke-width': 1.5 }, parts.strip);
     // The routine view's rows: a name on the left, the trend in the middle, the latest on the right
     rowsEl.replaceChildren(...SERIES.map(s => {
       const r = document.createElement('div'); r.className = 'row';
@@ -306,11 +314,12 @@
     }));
     parts.tag = document.createElement('div'); parts.tag.className = 'start-tag'; parts.tag.textContent = 'Started deadlifts';
     notes.replaceChildren(...CALLOUTS.map(c => {
-      const n = document.createElement('div'); n.className = 'callout';
+      const n = document.createElement('div'); n.className = 'callout'; n.style.left = '0'; n.style.top = '0';
       n.innerHTML = '<span class="tag"></span>'; n.firstChild.textContent = c.text;
       return n;
     }));
     notes.append(parts.tag);
+    drawn = { t: -1 }; lastDay = -1;
     // Resting points for the scroll on phones (where the page snaps): each chapter's example, then the progress view
     track.querySelectorAll('.snap').forEach(m => m.remove());
     const span = track.offsetHeight - innerHeight;
@@ -336,7 +345,8 @@
     const day = hoverDay ?? Math.round(pos);
     const showCh = hoverChapter ?? chapter;
     offset = clamp(W / 2 - (pos + 0.5) * dayW, W - N * dayW, 0);
-    const xh = i => offset + (i + 0.5) * dayW;
+    // Strip positions: the whole strip is slid by the offset, so only the morph needs the lines redrawn
+    const xs = i => (i + 0.5) * dayW;
     const top = 58, bottom = H - 8;
     // Routine layout: a header, then a row per line
     const rowTop = 44, rowH = (H - rowTop) / SERIES.length;
@@ -344,69 +354,80 @@
     const stacked = W < 700, labelRoom = stacked ? 30 : 8;
     const sx0 = W * (stacked ? 0.05 : 0.3), sx1 = W * (stacked ? 0.95 : 0.74);
     const focus = CHAPTERS[showCh].key;
+    parts.strip.setAttribute('transform', `translate(${offset.toFixed(1)},0)`);
 
-    // Days, grid and cursor fade out as the routine view comes in
+    // Days, grid and cursor fade out as the routine view comes in; the bold day only changes when the day does
     parts.grid.setAttribute('opacity', (1 - t).toFixed(3));
-    parts.days.forEach(({ g, a, b }, i) => {
-      g.setAttribute('transform', `translate(${xh(i).toFixed(1)},0)`);
-      const on = i === day;
-      a.setAttribute('fill-opacity', on ? 1 : 0.45); b.setAttribute('fill-opacity', on ? 1 : 0.45);
-      a.setAttribute('font-weight', on ? 600 : 400); b.setAttribute('font-weight', on ? 600 : 400);
-    });
-    parts.cursor.setAttribute('x1', xh(day)); parts.cursor.setAttribute('x2', xh(day));
+    if (day !== lastDay) {
+      [lastDay, day].forEach(i => {
+        if (i < 0) return;
+        const { a, b } = parts.days[i], on = i === day;
+        a.setAttribute('fill-opacity', on ? 1 : 0.45); b.setAttribute('fill-opacity', on ? 1 : 0.45);
+        a.setAttribute('font-weight', on ? 600 : 400); b.setAttribute('font-weight', on ? 600 : 400);
+      });
+      parts.cursor.setAttribute('x1', xs(day)); parts.cursor.setAttribute('x2', xs(day));
+      lastDay = day;
+    }
     parts.cursor.setAttribute('stroke-opacity', ((1 - t) * 0.85).toFixed(3));
+    const shape = `${t.toFixed(3)}|${[...hidden].join()}`;
     parts.series.forEach(({ s, s0, s1, area, glow, line, g }, k) => {
       if (hidden.has(s.key)) { g.setAttribute('opacity', 0); return; }
       // Each line leaves for its row a moment after the one above, so the change reads as a cascade
       const tk = ease(clamp(t * 1.4 - k * 0.12));
-      const lo = rowTop + rowH * k + labelRoom, hi = rowTop + rowH * (k + 1) - 8;
-      const pts = days.map((d, i) => {
-        const yh = bottom - ((d[s.key] - s.min) / (s.max - s.min)) * (bottom - top);
-        const rv = s.row.at(i);
-        const yr = hi - ((rv - s.row.min) / (s.row.max - s.row.min)) * (hi - lo);
-        const xr = sx0 + (i / (N - 1)) * (sx1 - sx0);
-        return [lerp(xh(i), xr, tk), lerp(yh, yr, tk)];
-      });
-      const base = lerp(bottom, hi, tk);
-      const d = smooth(pts);
-      line.setAttribute('d', d); glow.setAttribute('d', d);
-      area.setAttribute('d', `${d} L${pts[N - 1][0].toFixed(1)},${base.toFixed(1)} L${pts[0][0].toFixed(1)},${base.toFixed(1)} Z`);
-      const colour = mixColour(s.c, s.row.c, tk);
-      line.setAttribute('stroke', colour); glow.setAttribute('stroke', colour);
-      s0.setAttribute('stop-color', colour); s1.setAttribute('stop-color', colour);
+      if (drawn.shape !== shape) {
+        const lo = rowTop + rowH * k + labelRoom, hi = rowTop + rowH * (k + 1) - 8;
+        const pts = days.map((d, i) => {
+          const yh = bottom - ((d[s.key] - s.min) / (s.max - s.min)) * (bottom - top);
+          const yr = hi - ((s.row.at(i) - s.row.min) / (s.row.max - s.row.min)) * (hi - lo);
+          const xr = sx0 + (i / (N - 1)) * (sx1 - sx0) - offset;
+          return [lerp(xs(i), xr, tk), lerp(yh, yr, tk)];
+        });
+        const base = lerp(bottom, hi, tk);
+        const d = smooth(pts);
+        line.setAttribute('d', d); glow.setAttribute('d', d);
+        area.setAttribute('d', `${d} L${pts[N - 1][0].toFixed(1)},${base.toFixed(1)} L${pts[0][0].toFixed(1)},${base.toFixed(1)} Z`);
+        const colour = mixColour(s.c, s.row.c, tk);
+        line.setAttribute('stroke', colour); glow.setAttribute('stroke', colour);
+        s0.setAttribute('stop-color', colour); s1.setAttribute('stop-color', colour);
+      }
       // The chapter's own line (and pain) stand out; the rest step back
       const lead = hoverSeries ? s.key === hoverSeries || s.front : s.front || s.key === focus || t > 0.5;
       g.setAttribute('opacity', lead ? 1 : 0.28);
       line.setAttribute('stroke-width', s.front || s.key === (hoverSeries ?? focus) ? 3 : 2);
       s0.setAttribute('stop-opacity', s.front ? 0.5 : lead ? (light ? 0.32 : 0.24) : 0.1);
-      glow.setAttribute('opacity', s.front || s.key === (hoverSeries ?? focus) ? 1 : 0);
+      glow.setAttribute('opacity', glowOK() && (s.front || s.key === (hoverSeries ?? focus)) ? 1 : 0);
     });
+    drawn.shape = shape;
 
-    // Callouts for the chapter on show: a dashed link between the two points, and a note above
-    parts.links.replaceChildren();
-    [...notes.querySelectorAll(".callout")].forEach((n, k) => {
-      const c = CALLOUTS[k];
+    // Callouts for the chapter on show: a dashed link between the two points, and a note beside or above them
+    [...notes.querySelectorAll('.callout')].forEach((n, k) => {
+      const c = CALLOUTS[k], link = parts.links[k];
       const on = c.ch === showCh && t < 0.05 && !hidden.has(c.a[0]) && !hidden.has(c.b[0]);
       n.style.opacity = on ? 1 : 0;
+      link.g.setAttribute('opacity', on ? 1 : 0);
       if (!on) return;
-      const sa = SERIES.find(s => s.key === c.a[0]), sb = SERIES.find(s => s.key === c.b[0]);
-      const p1 = [xh(c.a[1]), bottom - ((days[c.a[1]][c.a[0]] - sa.min) / (sa.max - sa.min)) * (bottom - top)];
-      const p2 = [xh(c.b[1]), bottom - ((days[c.b[1]][c.b[0]] - sb.min) / (sb.max - sb.min)) * (bottom - top)];
+      const sa = SERIES.find(x => x.key === c.a[0]), sb = SERIES.find(x => x.key === c.b[0]);
+      const p1 = [xs(c.a[1]), bottom - ((days[c.a[1]][c.a[0]] - sa.min) / (sa.max - sa.min)) * (bottom - top)];
+      const p2 = [xs(c.b[1]), bottom - ((days[c.b[1]][c.b[0]] - sb.min) / (sb.max - sb.min)) * (bottom - top)];
       const lift = Math.min(p1[1], p2[1]) - 34;
-      el('path', { d: p1[0] === p2[0] ? `M${p1[0]},${p1[1]} L${p2[0]},${p2[1]}` : `M${p1[0]},${p1[1]} C${p1[0]},${lift} ${p2[0]},${lift} ${p2[0]},${p2[1]}`, fill: 'none', stroke: sa.c, 'stroke-width': 1.5, 'stroke-dasharray': '4 4' }, parts.links);
-      [[p1, sa.c], [p2, sb.c]].forEach(([[cx, cy], col]) => el('circle', { cx, cy, r: 5, fill: col, stroke: light ? '#fff' : '#0d0d0f', 'stroke-width': 2 }, parts.links));
+      if (!link.done) {
+        link.path.setAttribute('d', p1[0] === p2[0] ? `M${p1[0]},${p1[1]} L${p2[0]},${p2[1]}` : `M${p1[0]},${p1[1]} C${p1[0]},${lift} ${p2[0]},${lift} ${p2[0]},${p2[1]}`);
+        link.path.setAttribute('stroke', sa.c);
+        [[p1, sa.c], [p2, sb.c]].forEach(([[cx, cy], col], j) => { const dot = link.dots[j]; dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('fill', col); dot.setAttribute('stroke', light ? '#fff' : '#0d0d0f'); });
+        link.done = true;
+        n.size = [n.firstChild.offsetWidth, n.firstChild.offsetHeight];
+      }
       // Above the points when there's room under the day names; otherwise beside them, so the dots stay clear
-      const tag = n.firstChild, tw = tag.offsetWidth, th = tag.offsetHeight, gap = 22, floor = 48;
+      const [tw, th] = n.size, gap = 22, floor = 48;
       const lo = Math.min(p1[1], p2[1]), hiY = Math.max(p1[1], p2[1]);
-      const minX = Math.min(p1[0], p2[0]), maxX = Math.max(p1[0], p2[0]);
+      const minX = Math.min(p1[0], p2[0]) + offset, maxX = Math.max(p1[0], p2[0]) + offset;
       const archTop = p1[0] === p2[0] ? lo : lo - 34;
-      let cx = clamp((p1[0] + p2[0]) / 2, tw / 2 + 8, W - tw / 2 - 8), ty = archTop - gap - th;
+      let cx = clamp((minX + maxX) / 2, tw / 2 + 8, W - tw / 2 - 8), ty = archTop - gap - th;
       if (ty < floor) {
         cx = maxX + gap + tw / 2 <= W - 8 ? maxX + gap + tw / 2 : minX - gap - tw / 2;
         ty = clamp((lo + hiY) / 2 - th / 2, floor, H - th - 8);
       }
-      n.style.left = `${cx}px`;
-      n.style.top = `${ty}px`;
+      n.style.transform = `translate3d(${cx.toFixed(1)}px, ${ty.toFixed(1)}px, 0)`;
     });
 
     // Row labels for the routine view
@@ -457,7 +478,17 @@
   read();
   build();
   addEventListener('resize', build);
-  addEventListener('scroll', () => requestAnimationFrame(() => { read(); paint(); }), { passive: true });
+  let queued = false;
+  addEventListener('scroll', () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      const r = track.getBoundingClientRect();
+      if (r.bottom < -50 || r.top > innerHeight + 50) return;
+      read(); paint();
+    });
+  }, { passive: true });
   onTheme(build);
   document.fonts?.ready.then(build);
 })();
