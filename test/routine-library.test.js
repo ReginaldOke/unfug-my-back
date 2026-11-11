@@ -24,3 +24,13 @@ test('every move in every routine has an animation, and so does each cover', () 
 test('the defaults are one strength routine and one stretching routine', () => {
   assert.deepEqual(DEFAULT_ROUTINES.map(id => libraryRoutine(id).kind).sort(), ['Strength', 'Stretch']);
 });
+
+test('every library routine links to at least one study, with its size', () => {
+  for (const r of ROUTINE_LIBRARY) {
+    assert.ok(r.studies?.length, r.id);
+    for (const st of r.studies) {
+      assert.match(st.url, /^https:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\d+\/$/, `${r.id} ${st.name}`);
+      assert.ok(st.name && st.size, `${r.id} ${st.name}`);
+    }
+  }
+});
