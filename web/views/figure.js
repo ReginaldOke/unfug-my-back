@@ -4,6 +4,7 @@
 import { s } from '../lib/ui.js';
 import { findByName } from '../lib/move-names.js';
 import { MORE_MOVES, body, lerpPose } from './figure-moves.js';
+import { LIBRARY_MOVES } from './figure-library.js';
 
 const STAND = {
   head: [102, 22], sh: [100, 40], mid: [100, 58], hip: [100, 76],
@@ -67,7 +68,7 @@ const MOVES = [
     },
   },
   {
-    names: ['hip flexor', 'half kneeling', 'kneeling lunge', 'couch stretch', 'lunge', 'psoas'], accent: 'hip', hold: 1400,
+    names: ['hip flexor', 'half kneeling', 'kneeling lunge', 'couch stretch', 'psoas'], accent: 'hip', hold: 1400,
     a: {
       head: [94, 30], sh: [92, 47], mid: [91, 68], hip: [90, 90],
       eN: [93, 66], hN: [95, 86], kN: [120, 96], fN: [124, 128],
@@ -94,7 +95,7 @@ const MOVES = [
     b: pose(SUPINE, { kN: [94, 96], fN: [88, 68], eN: [118, 108], hN: [96, 98] }),
   },
   {
-    names: ['squat', 'deep squat', 'goblet squat', 'air squat', 'bodyweight squat', 'sumo squat', 'squat hold'], accent: 'hip', hold: 1600,
+    names: ['squat', 'deep squat', 'goblet squat', 'air squat', 'bodyweight squat', 'sumo squat', 'squat hold', 'back squat', 'barbell squat', 'high bar squat', 'low bar squat', 'dumbbell squat', 'kettlebell squat'], accent: 'hip', hold: 1600,
     a: pose(STAND, { eN: [112, 56], hN: [124, 58], eF: [110, 56], hF: [122, 58] }),
     b: {
       head: [118, 57], sh: [111, 73], mid: [102, 90], hip: [92, 108],
@@ -111,7 +112,7 @@ const lerp = (a, b, t) => Object.fromEntries(Object.keys(a).map(k => [k, [a[k][0
 const mix = (move, t) => (move.pa ? body(lerpPose(move.pa, move.pb, t))
   : move.via ? (t < 0.5 ? lerp(move.a, move.via, t * 2) : lerp(move.via, move.b, t * 2 - 1))
     : lerp(move.a, move.b, t));
-const ALL_MOVES = [...MOVES, ...MORE_MOVES];
+export const ALL_MOVES = [...MOVES, ...MORE_MOVES, ...LIBRARY_MOVES];
 
 /** Whether there's an animation for a move name (however it's spelt). */
 export const hasFigure = name => !!findByName(ALL_MOVES, name);

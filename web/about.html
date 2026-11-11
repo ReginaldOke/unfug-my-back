@@ -246,11 +246,22 @@
     .ready .tagline { animation: arrive 1.2s cubic-bezier(.2, .8, .2, 1) .7s both; }
     .ready .sky { animation: bloom 2s ease both; }
     @keyframes arrive { from { opacity: 0; transform: translateY(14px); } }
-    @keyframes sharpen { from { opacity: 0; filter: blur(14px); letter-spacing: .04em; transform: scale(1.03); } }
+    @keyframes sharpen { from { opacity: 0; letter-spacing: .05em; transform: scale(1.035); } }
     @keyframes bloom { from { opacity: 0; } }
     /* The cover the page fades under when the name in the header takes you back to the top */
     .page-veil { position: fixed; inset: 0; z-index: 30; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity .38s ease; }
     .page-veil.on { opacity: 1; }
+    @media (max-width: 820px) {
+      /* The glow is painted once rather than blurred and drifted live, which phones find costly */
+      .sky i { display: none; }
+      .sky { background: radial-gradient(70% 38% at 70% 4%, var(--glow-a), transparent 70%), radial-gradient(60% 40% at 18% 14%, var(--glow-c), transparent 70%), radial-gradient(80% 40% at 50% 108%, color-mix(in srgb, var(--glow-c) 45%, transparent), transparent 70%); }
+      .callout .tag { -webkit-backdrop-filter: none; backdrop-filter: none; background: color-mix(in srgb, var(--bg) 82%, transparent); }
+      .plot svg { -webkit-mask-image: none; mask-image: none; }
+      .plot::before, .plot::after { content: ''; position: absolute; top: 0; bottom: 0; width: 14%; z-index: 1; pointer-events: none; transition: opacity .3s; }
+      .plot::before { left: 0; background: linear-gradient(90deg, var(--bg), transparent); }
+      .plot::after { right: 0; background: linear-gradient(-90deg, var(--bg), transparent); }
+      .as-rows .plot::before, .as-rows .plot::after { opacity: 0; }
+    }
     @media (prefers-reduced-motion: reduce) {
       .drop, .sky i, .ready header, .ready .hero h1, .ready .tagline, .ready .sky { animation: none; }
       .js .reveal { opacity: 1; transform: none; transition: none; }

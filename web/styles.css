@@ -1979,3 +1979,26 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .cmp-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .insight-page .score-title { font-size: 24px; line-height: 1.25; }
 .finding .chev { color: var(--ink-3); align-self: center; }
+
+/* ---- The routine player */
+/* Story-style progress: past moves dim, this one bright with a soft glow, the rest faint; each one a tap target */
+.run-progress button { flex: 1; height: 18px; padding: 7px 0; border: 0; background: none; cursor: pointer; position: relative; }
+.run-progress button::before { content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); transition: background .35s, box-shadow .35s; }
+.run-progress button.done::before { background: rgba(255, 255, 255, 0.32); }
+.run-progress button.now::before { background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.45); }
+[data-theme="light"] .run-progress button::before { background: rgba(0, 0, 0, 0.08); }
+[data-theme="light"] .run-progress button.done::before { background: rgba(29, 28, 31, 0.22); }
+[data-theme="light"] .run-progress button.now::before { background: #1d1c1f; box-shadow: 0 0 10px rgba(29, 28, 31, 0.2); }
+/* The figure, with the video button tucked in its top right corner */
+.move-art { position: relative; width: min(100%, 320px); display: grid; place-items: center; }
+.move-art .form-video { position: absolute; top: -6px; right: 0; width: 38px; height: 38px; color: var(--ink-2); text-decoration: none; display: grid; place-items: center; }
+.move-art .form-video:active { transform: scale(.94); }
+/* Moving between moves: the new one slides in from the side you're heading */
+.move-stage.enter-next > * { animation: move-in-next .42s var(--ease-out) both; }
+.move-stage.enter-prev > * { animation: move-in-prev .42s var(--ease-out) both; }
+.move-stage > :nth-child(2) { animation-delay: .03s; }
+.move-stage > :nth-child(3), .move-stage > :nth-child(4) { animation-delay: .06s; }
+@keyframes move-in-next { from { opacity: 0; transform: translateX(28px); } }
+@keyframes move-in-prev { from { opacity: 0; transform: translateX(-28px); } }
+.run-timer { align-items: center; margin: 4px 0 0; }
+@media (prefers-reduced-motion: reduce) { .move-stage.enter-next > *, .move-stage.enter-prev > * { animation: none; } }

@@ -65,7 +65,7 @@ export const MORE_MOVES = [
     pa: P(HOOK, { bend: 6 }), pb: P(HOOK, { bend: -5, hip: [92, 123], torso: -1 }) },
   { names: ['figure 4', 'figure four', 'piriformis', 'piriformis stretch', 'figure 4 stretch', 'supine pigeon', 'reclined pigeon', 'glute stretch'], accent: 'hip', hold: 1500,
     pa: P(HOOK, { legN: [-80, 167] }), pb: P(HOOK, { legF: [-70, 180], legN: [-40, 175], armN: [-110, -160], armF: [-110, -160] }) },
-  { names: ['prone press up', 'press up', 'mckenzie press up', 'mckenzie', 'extension in lying', 'prone extension', 'push up extension'], accent: 'mid', hold: 1300,
+  { names: ['prone press up', 'mckenzie press up', 'mckenzie', 'extension in lying', 'prone extension', 'push up extension'], accent: 'mid', hold: 1300,
     pa: P(PRONE, { armN: [-100, 80], armF: [-100, 80] }), pb: P(PRONE, { torso: -45, head: -40, bend: 8, armN: [62, 58], armF: [62, 58] }) },
   { names: ['sphinx', 'sphinx pose', 'prone on elbows', 'prone prop', 'elbow prop', 'sphinx stretch'], accent: 'mid', hold: 1600,
     pa: P(PRONE, { armN: [10, 0], armF: [10, 0] }), pb: P(PRONE, { torso: -23, head: -20, bend: 5, armN: [90, 0], armF: [90, 0] }) },

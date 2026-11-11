@@ -39,16 +39,18 @@ export function findByName(entries, name) {
       if (hit && aj.length > bestLen) { best = entry; bestLen = aj.length; }
     }
   }
-  if (best) return best;
+  // A longer name a typo or two away beats a shorter exact one ("bulgarain split squat" is a Bulgarian, not a
+  // split squat), so the near misses are still checked, but only against names longer than the exact hit
+  const exact = best, exactLen = bestLen;
   let bestDist = Infinity;
   for (const entry of entries) {
     for (const alias of entry.names) {
       const aj = normName(alias).replace(/ /g, '');
-      if (aj.length < 6) continue;
+      if (aj.length < 6 || aj.length <= exactLen + 2) continue;
       const allowed = aj.length >= 10 ? 2 : 1;
       const d = nearest(aj, joined);
       if (d <= allowed && (d < bestDist || (d === bestDist && aj.length > bestLen))) { best = entry; bestDist = d; bestLen = aj.length; }
     }
   }
-  return best;
+  return best ?? exact;
 }

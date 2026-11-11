@@ -8,6 +8,7 @@ import { localDate, dayLabel, parseDate } from '../lib/dates.js';
 import { bumpLastNumber, parseReminder, formatReminder } from '../lib/labels.js';
 import { checkinDraft } from './checkin.js';
 import { MoveFigure } from './figure.js';
+import { isTimed, formVideoUrl, startIndex } from '../lib/play.js';
 import { dragHandles } from './sortable.js';
 
 /** Set when a routine is finished, read once by the Today screen to play its celebration. */
@@ -349,6 +350,8 @@ function progressView(session, past) {
   return el;
 }
 
+// A play mark in a rounded frame: watch a video
+const WATCH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="4"/><path d="M10.5 9.5v5l4.2-2.5z" fill="currentColor"/></svg>';
 const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>';
 
 /**
@@ -709,11 +712,51 @@ export function RoutineRunView(ctx) {
   const fromCheckin = ctx.params.get('from') === 'checkin';
   const s = sessionFor(r, date, fromCheckin);
   const moves = s.items.filter(it => it.name.trim());
-  let i = Math.max(0, moves.findIndex(it => !it.done));
+  let i = startIndex(moves), dir = 0;
+  const clocks = new Map(); // a running or paused timer per move, so stepping away and back keeps it
+  let tick = 0;
+  ctx.onCleanup(() => clearInterval(tick));
   const root = h('div', { class: 'flow' });
   const back = () => { location.replace(`#/routine/${r.id}?date=${date}${fromCheckin ? '&from=checkin' : ''}`); };
+  const go = to => { if (to < 0 || to >= moves.length || to === i) return; dir = Math.sign(to - i); i = to; vibrate(4); render(); };
+
+  // A swipe sideways on the move steps through the routine, like turning a page
+  let swipe = null;
+  root.addEventListener('pointerdown', e => { if (!e.target.closest('input, button, a')) swipe = { x: e.clientX, y: e.clientY }; });
+  root.addEventListener('pointerup', e => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(i + (dx < 0 ? 1 : -1));
+  });
+
+  /** A small timer for holds: tap to start, tap to stop, and the time goes in the move's box. */
+  function timer(it, amount) {
+    const c = clocks.get(it) ?? { start: null };
+    clocks.set(it, c);
+    const el = h('div', { class: 'stopwatch run-timer' });
+    const ms = () => (c.start ? Date.now() - c.start : 0);
+    const paint = () => {
+      clearInterval(tick);
+      let b;
+      if (c.start) {
+        b = h('button', { type: 'button', class: 'sw-pill glass running', 'aria-label': 'Stop the timer', onclick: () => {
+          it.did = fmtClock(ms()); amount.value = it.did; s.touched = true; c.start = null; vibrate(8); paint();
+        } }, h('span', { class: 'sw-dot', 'aria-hidden': 'true' }), h('span', { class: 'sw-time' }, fmtClock(ms())));
+        tick = setInterval(() => { const t = el.querySelector('.sw-time'); if (t) t.textContent = fmtClock(ms()); }, 250);
+      } else {
+        b = h('button', { type: 'button', class: 'sw-pill glass idle', 'aria-label': 'Time this move', onclick: () => { c.start = Date.now(); vibrate(6); paint(); } },
+          h('span', { class: 'sw-icon' }), h('span', {}, 'Time it'));
+        b.querySelector('.sw-icon').innerHTML = CLOCK;
+      }
+      el.replaceChildren(b);
+    };
+    paint();
+    return el;
+  }
 
   function render() {
+    clearInterval(tick);
     const it = moves[i];
     const last = i === moves.length - 1;
     // The same box as the routine page: swipe up or down to change it, or tap to type
@@ -724,19 +767,25 @@ export function RoutineRunView(ctx) {
       onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
     });
     scrubNumber(amount, () => it.dose || '0');
+    // Its figure, with a way to watch it done well in the corner
+    const video = h('a', { class: 'icon-btn glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': `Watch videos of ${it.name}`, title: 'Watch how' });
+    video.innerHTML = WATCH;
+    const art = h('div', { class: 'move-art' }, MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)), video);
+    // Story-style progress: done, this one, still to come; tap one to go to it
+    const bar = h('div', { class: 'progress run-progress', role: 'tablist', 'aria-label': 'Moves' }, moves.map((m, k) => h('button', {
+      type: 'button', class: k < i ? 'done' : k === i ? 'now' : '', role: 'tab', 'aria-selected': String(k === i), 'aria-label': `${k + 1}. ${m.name}`, onclick: () => go(k),
+    })));
+    const stage = h('div', { class: `flow-body move-stage${dir ? ` enter-${dir > 0 ? 'next' : 'prev'}` : ''}` },
+      art, h('h1', { tabindex: -1 }, it.name), amount, isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null);
     root.replaceChildren(
       h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, R.routineLabel(r)), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),
-      h('div', { class: 'progress' }, moves.map((m, k) => h('i', { class: m.done ? 'done' : k === i ? 'now' : '' }))),
-      h('div', { class: 'flow-body move-stage' },
-        MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)),
-        h('h1', { tabindex: -1 }, it.name),
-        amount),
+      bar, stage,
       h('div', { class: 'flow-footer' },
-        i > 0 ? iconButton('‹', 'Previous move', () => { i--; render(); }) : h('span'),
+        i > 0 ? iconButton('‹', 'Previous move', () => go(i - 1)) : h('span'),
         h('button', {
           type: 'button', class: 'btn primary wide', onclick: () => {
             it.done = true;
-            if (last) saveSession(s, { fromCheckin }); else { i++; render(); }
+            if (last) saveSession(s, { fromCheckin }); else go(i + 1);
           },
         }, last ? 'Finish' : 'Next')));
     root.querySelector('h1').focus({ preventScroll: true });

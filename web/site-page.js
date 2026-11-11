@@ -423,7 +423,10 @@
       const minX = Math.min(p1[0], p2[0]) + offset, maxX = Math.max(p1[0], p2[0]) + offset;
       const archTop = p1[0] === p2[0] ? lo : lo - 34;
       let cx = clamp((minX + maxX) / 2, tw / 2 + 8, W - tw / 2 - 8), ty = archTop - gap - th;
-      if (ty < floor) {
+      if (ty < floor && W < 700) {
+        // No room beside the dots on a phone: below them instead, still fully on screen
+        ty = clamp(hiY + gap, floor, H - th - 8);
+      } else if (ty < floor) {
         cx = maxX + gap + tw / 2 <= W - 8 ? maxX + gap + tw / 2 : minX - gap - tw / 2;
         ty = clamp((lo + hiY) / 2 - th / 2, floor, H - th - 8);
       }
@@ -471,13 +474,19 @@
     }
     pillEls.forEach((p, k) => { p.classList.toggle('on', k === chapter); p.classList.toggle('peek', k === hoverChapter && k !== chapter); });
     legend.style.opacity = (1 - clamp(t * 3)).toFixed(3);
+    vis.classList.toggle('as-rows', t > 0.4);
     svg.style.setProperty('--edge', t.toFixed(3));
     legend.style.pointerEvents = t > 0.2 ? 'none' : '';
   }
 
   read();
   build();
-  addEventListener('resize', build);
+  let size = `${plot.clientWidth}x${plot.clientHeight}`;
+  addEventListener('resize', () => {
+    const now = `${plot.clientWidth}x${plot.clientHeight}`;
+    if (now === size) { read(); paint(); return; }
+    size = now; build();
+  });
   let queued = false;
   addEventListener('scroll', () => {
     if (queued) return;
@@ -490,5 +499,6 @@
     });
   }, { passive: true });
   onTheme(build);
-  document.fonts?.ready.then(build);
+  // Once the fonts are in, the notes are measured again; nothing is rebuilt
+  document.fonts?.ready.then(() => { parts.links?.forEach(l => { l.done = false; }); paint(); });
 })();
