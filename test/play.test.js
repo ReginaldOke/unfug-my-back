@@ -14,11 +14,11 @@ test('moves done for time are told apart from moves done for reps', () => {
   assert.equal(isTimed('Farmer carry', '3 × 40 m', '1:10'), true);
 });
 
-test('the form video link searches short videos of the move, most watched first', () => {
+test('the form video link searches short videos of the move, as if typed into YouTube', () => {
   const url = new URL(formVideoUrl(' Romanian deadlift '));
   assert.equal(url.hostname, 'www.youtube.com');
   assert.equal(url.searchParams.get('search_query'), 'Romanian deadlift form #shorts');
-  assert.equal(url.searchParams.get('sp'), 'CAMSAhgB');
+  assert.equal(url.searchParams.get('sp'), null);
 });
 
 test('a session picks up at the first move not yet done', () => {

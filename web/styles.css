@@ -1991,7 +1991,8 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 [data-theme="light"] .run-progress button.now::before { background: #1d1c1f; box-shadow: 0 0 10px rgba(29, 28, 31, 0.2); }
 /* The figure, with the video button tucked in its top right corner */
 .move-art { position: relative; width: min(100%, 320px); display: grid; place-items: center; }
-.move-art .form-video { position: absolute; top: -6px; right: 0; width: 38px; height: 38px; color: var(--ink-2); text-decoration: none; display: grid; place-items: center; }
+.move-art .form-video { position: absolute; top: -6px; right: 0; height: 34px; padding: 0 13px 0 10px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); text-decoration: none; }
+.move-art .form-video .fv-icon { display: inline-flex; }
 .move-art .form-video:active { transform: scale(.94); }
 /* Moving between moves: the new one slides in from the side you're heading */
 .move-stage.enter-next > * { animation: move-in-next .42s var(--ease-out) both; }

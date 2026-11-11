@@ -768,8 +768,9 @@ export function RoutineRunView(ctx) {
     });
     scrubNumber(amount, () => it.dose || '0');
     // Its figure, with a way to watch it done well in the corner
-    const video = h('a', { class: 'icon-btn glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': `Watch videos of ${it.name}`, title: 'Watch how' });
-    video.innerHTML = WATCH;
+    const video = h('a', { class: 'glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': `See form videos for ${it.name}` },
+      h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', {}, 'See form'));
+    video.firstChild.innerHTML = WATCH;
     const art = h('div', { class: 'move-art' }, MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)), video);
     // Story-style progress: done, this one, still to come; tap one to go to it
     const bar = h('div', { class: 'progress run-progress', role: 'tablist', 'aria-label': 'Moves' }, moves.map((m, k) => h('button', {

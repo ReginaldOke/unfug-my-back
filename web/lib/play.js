@@ -15,13 +15,13 @@ export function isTimed(name, ...amounts) {
 }
 
 /**
- * A YouTube search for short videos on doing the move well, most watched first. On iPhone the link opens
+ * A YouTube search for short videos on doing the move well. On iPhone the link opens
  * in the YouTube app when it's installed, otherwise in the browser.
  */
 export function formVideoUrl(name) {
   const q = `${String(name ?? '').trim()} form #shorts`;
-  // sp=CAMSAhgB: sorted by view count, under four minutes long
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=CAMSAhgB`;
+  // A plain search, as if typed in: YouTube's own ranking puts the most useful form shorts first
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 }
 
 /** Where a session picks up: the first move not yet done, unless none or all are done, then the first. */
