@@ -2,6 +2,7 @@
 import * as S from './store.js';
 import { localDate, addDays } from './dates.js';
 import { SEED_FACTORS, SEED_ROUTINE, SEED_GYM } from './seed.js';
+import { DEFAULT_ROUTINES, libraryRoutine } from './routine-library.js';
 import { defaultUnit, emojiFor } from './labels.js';
 import { regionAt, H } from './regions3d.js';
 import { regionById } from './regions.js';
@@ -136,8 +137,13 @@ function seed() {
   S.batch(() => {
     SEED_FACTORS.forEach(({ defaultOn, ...f }, i) =>
       S.insert('factors', { ...f, status: 'suspected', isArchived: !defaultOn, sortWeight: i, source: 'seed' }));
-    S.insert('routines', { ...SEED_ROUTINE, schedule: [], linkedFactorId: null, isArchived: false });
+    // New diaries start with the best-evidenced strength and stretching routines from the library
+    for (const id of DEFAULT_ROUTINES) {
+      const { name, items } = libraryRoutine(id);
+      S.insert('routines', { name, items: structuredClone(items), libraryId: id, schedule: [], linkedFactorId: null, isArchived: false });
+    }
     S.settings().seeded = true;
+    S.settings().gymAdded = true; // the old Gym starter is for diaries from before the library
     S.settings().seedsAdded = [...ADDED_SEEDS];
   });
 }

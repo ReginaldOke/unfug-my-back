@@ -224,4 +224,21 @@ export const LIBRARY_MOVES = [
   { names: ['shadow boxing', 'boxing', 'punch', 'punches', 'heavy bag', 'bag work', 'jab'], accent: 'sh', hold: 80, travel: 320,
     pa: P(STAND, { torso: -86, armN: [60, -80], armF: [40, -90], legN: [76, 94], legF: [106, 96] }),
     pb: P(STAND, { torso: -84, armN: [0, 0], armF: [40, -90], legN: [76, 94], legF: [106, 96] }) },
+
+  // ---- Back care moves used by the routine library
+  { names: ['prone lying', 'lying face down', 'prone lie', 'lie on your front', 'lying on stomach'], accent: 'mid', hold: 1800,
+    pa: { hip: [92, 122], torso: 0, head: 0, bend: 0, armN: [178, 178], armF: [178, 178], legN: [180, 180], legF: [180, 180] },
+    pb: { hip: [92, 122], torso: 0, head: 2, bend: 2, armN: [178, 178], armF: [178, 178], legN: [180, 180], legF: [180, 180] } },
+  { names: ['abdominal drawing in', 'drawing in', 'abdominal hollowing', 'tva activation', 'transversus activation', 'abdominal bracing', 'core bracing', 'brace'], accent: 'mid', hold: 1400,
+    pa: { hip: [92, 122], torso: 0, head: 0, bend: 0, armN: [178, 178], armF: [178, 178], legN: [-125, 100], legF: [-125, 100] },
+    pb: { hip: [92, 122], torso: 0, head: 0, bend: -4, armN: [178, 178], armF: [178, 178], legN: [-125, 100], legF: [-125, 100] } },
+  { names: ['hundred', 'the hundred', 'pilates hundred', 'hundreds', 'modified hundred'], accent: 'mid', hold: 60, travel: 300,
+    pa: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [172, 172], armF: [172, 172], legN: [-90, 180], legF: [-90, 180] },
+    pb: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [164, 164], armF: [164, 164], legN: [-90, 180], legF: [-90, 180] } },
+  { names: ['single leg stretch', 'pilates single leg stretch', 'single leg circles', 'leg pull in'], accent: 'mid', hold: 120, travel: 520,
+    pa: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [-150, 150], armF: [-150, 150], legN: [-40, 175], legF: [-172, -172] },
+    pb: { hip: [86, 120], torso: -14, head: -20, bend: 0, armN: [-150, 150], armF: [-150, 150], legN: [-172, -172], legF: [-40, 175] } },
+  { names: ['side lying leg lift', 'side lying leg raise', 'side lying hip abduction', 'hip abduction', 'side leg raise', 'lying hip abduction', 'leg lift side'], accent: 'hip', hold: 600,
+    pa: { hip: [88, 118], torso: 0, head: -5, bend: 0, armN: [180, 180], armF: [0, 0], legN: [180, 180], legF: [180, 180] },
+    pb: { hip: [88, 118], torso: 0, head: -5, bend: 0, armN: [180, 180], armF: [0, 0], legN: [-158, -158], legF: [180, 180] } },
 ];

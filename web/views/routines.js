@@ -38,7 +38,10 @@ export function RoutinesView() {
     h('header', { class: 'top-bar' }, h('h1', {}, 'Routines')),
     R.routines.all().length ? null : h('p', { class: 'muted' }, 'Keep your gym, stretching or calisthenics routines here. Tick one off in your check-in, or open it to log your sets.'),
     cards,
-    h('a', { class: 'add-card', href: '#/routine/new' }, '+ New routine'));
+    h('a', { class: 'add-card', href: '#/routine/new' }, '+ New routine'),
+    h('a', { class: 'browse-card glass', href: '#/routines/browse' },
+      h('span', { class: 'grow' }, h('strong', {}, 'Browse routines'), h('span', { class: 'hint block' }, 'Ten routines with research behind them')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
 }
 
 /** Routines in list order, the variations of a group kept together where the group first appears. */

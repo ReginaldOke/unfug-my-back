@@ -2003,3 +2003,38 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 @keyframes move-in-prev { from { opacity: 0; transform: translateX(-28px); } }
 .run-timer { align-items: center; margin: 4px 0 0; }
 @media (prefers-reduced-motion: reduce) { .move-stage.enter-next > *, .move-stage.enter-prev > * { animation: none; } }
+
+/* ---- Routines › Browse: a pinboard of research-backed routines */
+.browse-card { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 18px 20px; border-radius: var(--r-card); text-decoration: none; color: inherit; }
+.browse-card strong { font-weight: 500; }
+.browse-card .chev { color: var(--ink-3); font-size: 22px; }
+.lib-title { font-size: 28px; font-weight: 300; letter-spacing: -0.01em; margin: 4px 0 18px; }
+.lib-board { columns: 2; column-gap: 12px; }
+.lib-card { display: block; break-inside: avoid; margin-bottom: 12px; border-radius: 24px; overflow: hidden; text-decoration: none; color: inherit;
+  animation: rise-in .5s var(--ease-out) both; animation-delay: calc(var(--i) * 40ms); transition: transform .25s var(--spring); }
+.lib-card:active { transform: scale(.97); }
+.lib-art { position: relative; display: grid; place-items: center; padding: 10px; }
+.lib-art .move-figure { width: 100%; filter: none; }
+.lib-added { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 600; letter-spacing: .06em; padding: 3px 9px; border-radius: var(--r-pill); background: rgba(116, 212, 192, .22); color: #74d4c0; }
+.lib-text { display: flex; flex-direction: column; gap: 4px; padding: 0 14px 14px; }
+.lib-text strong { font-size: 16px; font-weight: 500; line-height: 1.25; }
+.lib-tag { font-size: 13px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+/* Each kind of routine gets a soft wash of the app's colours behind its figure */
+.tone-warm .lib-art, .lib-hero.tone-warm { background: radial-gradient(90% 80% at 30% 20%, rgba(243, 180, 110, .26), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(226, 104, 127, .22), transparent 70%); }
+.tone-cool .lib-art, .lib-hero.tone-cool { background: radial-gradient(90% 80% at 30% 20%, rgba(116, 212, 192, .24), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(143, 196, 255, .22), transparent 70%); }
+.tone-violet .lib-art, .lib-hero.tone-violet { background: radial-gradient(90% 80% at 30% 20%, rgba(227, 166, 245, .24), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(143, 196, 255, .2), transparent 70%); }
+.tone-green .lib-art, .lib-hero.tone-green { background: radial-gradient(90% 80% at 30% 20%, rgba(163, 225, 154, .24), transparent 70%), radial-gradient(80% 70% at 80% 90%, rgba(116, 212, 192, .2), transparent 70%); }
+.lib-hero { border-radius: var(--r-card); display: grid; place-items: center; padding: 18px 12px; margin-bottom: 18px; }
+.lib-hero .move-figure { filter: none; }
+.lib-name { font-size: 30px; font-weight: 300; margin: 0 0 6px; }
+.library-detail .lead { color: var(--ink-2); margin: 0 0 14px; }
+.lib-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.library-detail .card { margin-bottom: 12px; }
+.library-detail .card p { margin: 0; color: var(--ink-2); line-height: 1.5; }
+.lib-moves { margin: 0; padding: 0; list-style: none; counter-reset: m; }
+.lib-moves li { counter-increment: m; display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid rgba(255, 255, 255, .06); }
+.lib-moves li:first-child { border-top: 0; }
+.lib-moves li > span:first-child::before { content: counter(m) '. '; color: var(--ink-3); }
+[data-theme="light"] .lib-moves li { border-top-color: rgba(0, 0, 0, .06); }
+.lib-action { margin-bottom: 18px; }
