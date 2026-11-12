@@ -1063,16 +1063,20 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .fig-seg, .fig-torso, .fig-neck { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .fig-seg.near, .fig-torso, .fig-neck { stroke: var(--ink); }
 .fig-seg.far { stroke: rgba(235, 235, 245, 0.34); }
-/* The mascot: chunky and soft, thicker at the thigh and upper arm, like a felt-tip drawing */
-.fig-seg.leg-u { stroke-width: 11; }
-.fig-seg.leg-l { stroke-width: 9.5; }
-.fig-seg.arm-u { stroke-width: 8.5; }
-.fig-seg.arm-l { stroke-width: 7.5; }
-.fig-seg.foot { stroke-width: 7; }
-.fig-torso { stroke-width: 16; }
-.fig-neck { stroke-width: 8; }
+/* The mascot: slim limbs, a red top, sleeves, shoes and headband, and a calm face */
+.fig-seg.leg-u, .fig-seg.leg-l { stroke-width: 7; }
+.fig-seg.arm-u, .fig-seg.arm-l, .fig-seg.foot { stroke-width: 6; }
+.fig-seg.sleeve { stroke-width: 8; }
+.fig-seg.shoe { stroke-width: 7; }
+.fig-seg.kit.near, .fig-torso { stroke: #ff5a4f; }
+.fig-seg.kit.far { stroke: rgba(255, 90, 79, 0.45); }
+.fig-torso { stroke-width: 9; }
+.fig-neck { stroke-width: 6; }
 .fig-head { fill: var(--ink); }
-.fig-eye { fill: var(--bg); }
+.fig-band { stroke: #ff5a4f; stroke-width: 4.5; }
+.fig-tails { fill: none; stroke: #ff5a4f; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.fig-blush { fill: #ff8f86; opacity: 0.35; }
+.fig-feature { fill: none; stroke: var(--bg); stroke-width: 1.5; stroke-linecap: round; }
 .fig-floor { fill: none; stroke-width: 2; }
 .fig-glow { fill: url(#fig-glow); }
 .move-figure { filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); }
@@ -1384,6 +1388,7 @@ body:not(.on-home) .ambient { background: var(--bg); }
 [data-theme="light"] .progress i.now { background: #1d1c1f; }
 [data-theme="light"] .fig-floor { stroke: rgba(0, 0, 0, 0.12); }
 [data-theme="light"] .fig-seg.far { stroke: rgba(29, 28, 31, 0.26); }
+[data-theme="light"] .fig-seg.kit.far { stroke: rgba(255, 90, 79, 0.45); }
 /* Thumbnails: no shadow, framed on the figure itself */
 .move-figure.small { width: 100%; filter: none; }
 .move-figure.small .fig-floor { stroke-width: 2; }

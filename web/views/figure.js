@@ -101,27 +101,39 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
   if (!move) return null;
   if (move.kind) return CalmGuide(move, { small });
 
-  // The mascot: chunky, soft-cornered limbs that bow a touch like a hand-drawn line, and a round head
-  // with one bright eye that blinks now and then
+  // The mascot: a sporty little figure in a red top, sleeves and shoes, with a red headband whose tails
+  // flap behind as it moves, and a calm, content face (an eye that blinks, a blush, a small smile that
+  // tightens a touch at the hardest point)
   const seed = ++figId;
   const seg = cls => s('path', { class: `fig-seg ${cls}` });
-  const far = { upper: seg('far arm-u'), fore: seg('far arm-l'), thigh: seg('far leg-u'), shin: seg('far leg-l'), foot: seg('far foot') };
-  const near = { upper: seg('near arm-u'), fore: seg('near arm-l'), thigh: seg('near leg-u'), shin: seg('near leg-l'), foot: seg('near foot') };
+  const side = cls => ({
+    upper: seg(`${cls} arm-u`), fore: seg(`${cls} arm-l`), thigh: seg(`${cls} leg-u`), shin: seg(`${cls} leg-l`), foot: seg(`${cls} foot`),
+    sleeve: seg(`${cls} kit sleeve`), shoe: seg(`${cls} kit shoe`),
+  });
+  const far = side('far'), near = side('near');
   const torso = s('path', { class: 'fig-torso' });
   const neck = s('path', { class: 'fig-neck' });
-  const head = s('circle', { class: 'fig-head', r: HEAD_R });
-  const eye = s('ellipse', { class: 'fig-eye', rx: 1.9, ry: 2.3 });
+  const tails = s('path', { class: 'fig-tails' });
+  const clipId = `fig-head-${seed}`;
+  const face = s('g', {},
+    s('circle', { class: 'fig-head', r: HEAD_R }),
+    s('path', { class: 'fig-band', d: `M${-HEAD_R - 1} ${-HEAD_R * 0.5} L${HEAD_R + 1} ${-HEAD_R * 0.6}`, 'clip-path': `url(#${clipId})` }),
+    s('circle', { class: 'fig-blush', cx: 4.6, cy: 3.4, r: 2.2 }));
+  const eye = s('path', { class: 'fig-feature' });
+  const mouth = s('path', { class: 'fig-feature' });
+  face.append(eye, mouth);
   const glow = s('circle', { class: 'fig-glow', r: 15 });
   const svg = s('svg', { viewBox: small ? fitBox(move) : '0 0 200 140', class: `move-figure${small ? ' small' : ''}`, 'aria-hidden': 'true' },
     s('defs', {},
       s('radialGradient', { id: 'fig-glow' },
         s('stop', { offset: '0%', 'stop-color': '#ff5a4f', 'stop-opacity': 0.7 }),
-        s('stop', { offset: '100%', 'stop-color': '#ff5a4f', 'stop-opacity': 0 }))),
+        s('stop', { offset: '100%', 'stop-color': '#ff5a4f', 'stop-opacity': 0 })),
+      s('clipPath', { id: clipId }, s('circle', { r: HEAD_R }))),
     move.floor === false ? null : s('line', { class: 'fig-floor', x1: 14, x2: 186, y1: FLOOR_LINE, y2: FLOOR_LINE }),
     (move.props ?? []).map(([x1, y1, x2, y2]) => s('line', { class: 'fig-floor fig-prop', x1, y1, x2, y2 })),
     small ? null : glow,
-    s('g', {}, far.thigh, far.shin, far.foot, far.upper, far.fore, torso, neck, head, eye,
-      near.thigh, near.shin, near.foot, near.upper, near.fore));
+    s('g', {}, far.thigh, far.shin, far.foot, far.shoe, far.upper, far.fore, far.sleeve, torso, neck, tails, face,
+      near.thigh, near.shin, near.foot, near.shoe, near.upper, near.fore, near.sleeve));
 
   // Feet point forward from the ankle (the other way for a body lying face up), along the shin when
   // pointed (lying face down), or are left off when the leg is seen end-on
@@ -130,33 +142,43 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
     const a = move.feet === 'point' ? shin : shin + (move.supine ? 1 : -1) * Math.PI / 2;
     return [ankle[0] + Math.cos(a) * FOOT, ankle[1] + Math.sin(a) * FOOT];
   };
-  // Each bone bows very slightly to one side, as a drawn line does
-  const line = (el, a, b, bow = 1.1) => {
-    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
-    const c = [(a[0] + b[0]) / 2 - (dy / l) * bow, (a[1] + b[1]) / 2 + (dx / l) * bow];
-    el.setAttribute('d', `M${pt(a)} Q${pt(c)} ${pt(b)}`);
+  const line = (el, a, b) => el.setAttribute('d', `M${pt(a)} L${pt(b)}`);
+  const along = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  // The face looks the way the body faces: forward when upright, up when lying face up. The face is drawn
+  // side-on with x toward the front and y toward the chin, then turned (and flipped, lying face up) to fit.
+  const faceAngle = p => Math.atan2(p.head[1] - p.sh[1], p.head[0] - p.sh[0]) + (move.supine ? -1 : 1) * Math.PI / 2 * (move.view ? 0.4 : 1);
+  const onFace = (p, x, y) => {
+    const a = faceAngle(p), f = move.supine ? -1 : 1;
+    return [p.head[0] + Math.cos(a) * x - Math.sin(a) * y * f, p.head[1] + Math.sin(a) * x + Math.cos(a) * y * f];
   };
-  // The face looks the way the body faces: forward when upright, up when lying face up
-  const lookFrom = p => {
-    const up = Math.atan2(p.head[1] - p.sh[1], p.head[0] - p.sh[0]);
-    const face = up + (move.supine ? -1 : 1) * Math.PI / 2 * (move.view ? 0.4 : 1);
-    return [p.head[0] + Math.cos(face) * 5 + Math.cos(up) * 1.5, p.head[1] + Math.sin(face) * 5 + Math.sin(up) * 1.5];
+  // The headband's two tails trail from the back of the head, each end easing after the one before
+  let tail = null;
+  const flap = (p, t, settle) => {
+    const knot = onFace(p, -HEAD_R + 1, -HEAD_R * 0.55), sway = Math.sin(t / 260) * 1.2;
+    const goal = [[knot[0] - 7, knot[1] + 3], null, [knot[0] - 5, knot[1] + 6]];
+    const follow = (from, to, f) => (settle || !from ? to : along(from, to, f));
+    let a1 = follow(tail?.[0], goal[0], 0.25), b1 = follow(tail?.[2], goal[2], 0.22);
+    let a2 = follow(tail?.[1], [a1[0] - 6, a1[1] + 4 + sway], 0.2), b2 = follow(tail?.[3], [b1[0] - 5, b1[1] + 5 - sway], 0.18);
+    // They rest on the floor rather than sinking through it (lying down, the knot is near the floor)
+    tail = [a1, a2, b1, b2].map(q => (move.floor === false ? q : [q[0], Math.min(q[1], FLOOR_LINE - 1.5)]));
+    [a1, a2, b1, b2] = tail;
+    tails.setAttribute('d', `M${pt(knot)} Q${pt(a1)} ${pt(a2)} M${pt(knot)} Q${pt(b1)} ${pt(b2)}`);
   };
-  const draw = (p, strength, blink = 1) => {
-    line(far.upper, p.sh, p.eF); line(far.fore, p.eF, p.hF, -1);
-    line(far.thigh, p.hip, p.kF); line(far.shin, p.kF, p.fF, -1);
-    line(near.upper, p.sh, p.eN); line(near.fore, p.eN, p.hN, -1);
-    line(near.thigh, p.hip, p.kN); line(near.shin, p.kN, p.fN, -1);
-    if (move.feet !== false && p.angles) { line(far.foot, p.fF, footTo(p.fF, p.kF), 0); line(near.foot, p.fN, footTo(p.fN, p.kN), 0); }
+  const draw = (p, strength, blink = 1, t = 0, settle = true) => {
+    const limbs = (sd, e, h, k, f) => {
+      line(sd.upper, p.sh, e); line(sd.fore, e, h); line(sd.thigh, p.hip, k); line(sd.shin, k, f);
+      line(sd.sleeve, p.sh, along(p.sh, e, 0.45));
+      if (move.feet !== false && p.angles) { const toe = footTo(f, k); line(sd.foot, f, toe); line(sd.shoe, along(f, k, 0.05), toe); }
+    };
+    limbs(far, p.eF, p.hF, p.kF, p.fF);
+    limbs(near, p.eN, p.hN, p.kN, p.fN);
     torso.setAttribute('d', through(p.sh, p.mid, p.hip));
     // The neck runs from the shoulders right into the head, so the two never part
-    line(neck, p.sh, toward(p.head, p.sh, HEAD_R * 0.6), 0);
-    head.setAttribute('cx', p.head[0].toFixed(1));
-    head.setAttribute('cy', p.head[1].toFixed(1));
-    const [ex, ey] = lookFrom(p);
-    eye.setAttribute('cx', ex.toFixed(1));
-    eye.setAttribute('cy', ey.toFixed(1));
-    eye.setAttribute('ry', (2.3 * blink).toFixed(2));
+    line(neck, p.sh, toward(p.head, p.sh, HEAD_R * 0.6));
+    face.setAttribute('transform', `translate(${pt(p.head)}) rotate(${(faceAngle(p) * 180 / Math.PI).toFixed(1)})${move.supine ? ' scale(1,-1)' : ''}`);
+    eye.setAttribute('d', `M3.8 -0.6 Q5.8 ${(-0.6 - 1.6 * blink).toFixed(2)} 7.8 -0.6`);
+    mouth.setAttribute('d', `M6 5 Q8.2 ${(6.8 - strength * 0.8).toFixed(2)} 10.2 4.6`);
+    flap(p, t, settle);
     glow.setAttribute('cx', p[move.accent][0].toFixed(1));
     glow.setAttribute('cy', p[move.accent][1].toFixed(1));
     glow.style.opacity = (0.35 + 0.65 * strength).toFixed(2);
@@ -181,7 +203,7 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
     else if (t < hold * 1.6 + 2 * travel) k = 1 - ease((t - hold * 1.6 - travel) / travel);
     else k = 0;
     const b = (now - t0 + seed * 700) % 4600;
-    draw(poseAt(move, k, Math.sin((now - t0) / 650)), k, b < 140 ? Math.abs(b - 70) / 70 : 1);
+    draw(poseAt(move, k, Math.sin((now - t0) / 650)), k, b < 140 ? Math.abs(b - 70) / 70 : 1, now - t0, false);
     requestAnimationFrame(frame);
   };
   draw(poseAt(move, 0), 0);
