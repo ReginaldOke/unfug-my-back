@@ -1057,6 +1057,8 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .cal-cell.empty { cursor: default; }
 .cal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }
 .cal-foot strong { font-weight: 500; }
+/* After the day's summary: a small link to that check-in, in the same quiet size */
+.cal-see { margin-left: 8px; font-size: 13px; color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; white-space: nowrap; }
 .cal-scale { display: inline-flex; align-items: center; gap: 4px; }
 .cal-scale i { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 32% 26%, var(--dot), var(--dot2)); }
 .cal-scale small { font-size: 11px; color: var(--ink-3); margin: 0 2px; }
@@ -2161,4 +2163,9 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 }
 :root:not([data-theme="light"]) .checkin-dot[style] { color: #fff; text-shadow: none; }
 :root:not([data-theme="light"]) .cal-cell.today.logged::before { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--dot) 70%, transparent), 0 8px 16px -8px var(--dot2), 0 0 0 2px rgba(255, 255, 255, 0.18); }
-:root:not([data-theme="light"]) .cal-cell.logged.sel::before { box-shadow: inset 0 0 0 1.5px var(--dot), 0 8px 20px -6px var(--dot2), 0 0 0 2px var(--bg), 0 0 0 3.5px rgba(255, 255, 255, 0.85); }
+/* The selected day fills with its colour (no ring needed), so it stands out from the glass ones around it */
+:root:not([data-theme="light"]) .cal-cell.logged.sel { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+:root:not([data-theme="light"]) .cal-cell.logged.sel::before {
+  background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--dot) 70%, #fff), var(--dot) 45%, var(--dot2) 100%);
+  box-shadow: 0 8px 20px -6px var(--dot2);
+}

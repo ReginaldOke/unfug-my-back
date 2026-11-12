@@ -66,6 +66,7 @@ function dayDetail(date, change) {
   if (steps != null) bits.push(`${steps.toLocaleString()} steps`);
   return h('div', { class: 'cal-foot' },
     h('span', {}, h('strong', {}, label), h('span', { class: 'hint' }, ` · ${bits.filter(Boolean).join(' · ')}`),
+      e ? h('a', { class: 'cal-see', href: `#/checkins/${date}` }, 'See check-in ›') : null,
       change ? h('span', { class: 'cal-change-note' }, change.map(c => c.text).join(' · ')) : null),
     date >= localDate(new Date(Date.now() - 3 * 86_400_000)) ? h('a', { class: 'chip glass', href: `#/checkin?date=${date}` }, e ? 'Edit' : 'Check in') : null);
 }
