@@ -151,7 +151,7 @@
   if (!vis) return;
   const track = vis.parentElement;
   const plot = vis.querySelector('.plot'), legend = vis.querySelector('.legend'), pills = vis.querySelector('.chapters');
-  const msg = { text: vis.querySelector('.msg'), day: vis.querySelector('.day') };
+  const msg = { text: vis.querySelector('.msg') };
 
   // Eight weeks, made up but built the way diaries behave: more pain on long sitting days, less on days with a
   // good walk, a sore day after each long drive, and pain easing overall as the deadlifts go up.
@@ -473,10 +473,8 @@
       msg.text.animate?.([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: still ? 0 : 450, easing: 'ease-out' });
       msg.text.textContent = c.text;
     }
-    if (showCh === LAST) msg.day.textContent = `Deadlifts from week 4. Average pain ${avgPain(0, LIFTS_FROM).toFixed(1)} before, ${avgPain(LIFTS_FROM, N).toFixed(1)} since`;
-    else {
+    if (showCh !== LAST) {
       const d = days[day];
-      msg.day.textContent = '';
       keyEls.forEach((b, k) => { b.lastChild.textContent = SERIES[k].fmt(d[SERIES[k].key]); });
     }
     pillEls.forEach((p, k) => { p.classList.toggle('on', k === chapter); p.classList.toggle('peek', k === hoverChapter && k !== chapter); });

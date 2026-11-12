@@ -1073,13 +1073,6 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .fig-neck { stroke-width: 8; }
 .fig-head { fill: var(--ink); }
 .fig-eye { fill: var(--bg); }
-/* The cut-out under near limbs: the background colour, a little wider than the limb */
-.fig-seg.gap { stroke: var(--bg); }
-.fig-seg.gap.leg-u { stroke-width: 15; }
-.fig-seg.gap.leg-l { stroke-width: 13.5; }
-.fig-seg.gap.arm-u { stroke-width: 12.5; }
-.fig-seg.gap.arm-l { stroke-width: 11.5; }
-.fig-seg.gap.foot { stroke-width: 11; }
 .fig-floor { fill: none; stroke-width: 2; }
 .fig-glow { fill: url(#fig-glow); }
 .move-figure { filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); }
@@ -2121,6 +2114,13 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
   /* The check-in sliders sit in the middle of the tall screen, a little larger, not up under the question */
   .flow-body .levels { flex: 1; align-items: center; padding-bottom: 6vh; }
   .vslider { height: min(40dvh, 380px); }
+  .food-step .vslider { height: min(30dvh, 320px); }
+  /* The 3D body, the notes box and the routine figures grow with the screen rather than staying phone-sized */
+  .body3d { height: clamp(420px, calc(100dvh - 360px - var(--safe-top)), 900px); }
+  textarea.notes:not(.meals) { min-height: min(42dvh, 460px); font-size: 18px; padding: 22px; }
+  .figure { height: min(60dvh, 700px); }
+  .move-art, .move-figure { width: min(100%, 520px); }
+  .scan3d, .scan3d-slot { width: min(100%, 460px); height: min(56dvh, 620px); }
 }
 
 /* ---------- Body scan: the 3D figure with light rising through it, and the part to notice ---------- */

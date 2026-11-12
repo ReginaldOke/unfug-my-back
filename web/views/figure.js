@@ -101,36 +101,27 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
   if (!move) return null;
   if (move.kind) return CalmGuide(move, { small });
 
-  // The mascot: chunky, soft-cornered limbs that bow a touch like a hand-drawn line, a round head with
-  // one bright eye that blinks now and then, and (full size) a gentle ink wobble on every edge
-  const id = `fig${++figId}`;
+  // The mascot: chunky, soft-cornered limbs that bow a touch like a hand-drawn line, and a round head
+  // with one bright eye that blinks now and then
+  const seed = ++figId;
   const seg = cls => s('path', { class: `fig-seg ${cls}` });
   const far = { upper: seg('far arm-u'), fore: seg('far arm-l'), thigh: seg('far leg-u'), shin: seg('far leg-l'), foot: seg('far foot') };
   const near = { upper: seg('near arm-u'), fore: seg('near arm-l'), thigh: seg('near leg-u'), shin: seg('near leg-l'), foot: seg('near foot') };
-  // Near limbs sit on a thin cut-out of the background, so an arm across the body still reads as an arm
-  for (const k of Object.keys(near)) near[k].gap = s('path', { class: `fig-seg gap ${near[k].getAttribute('class').split(' ').pop()}` });
-  // (all the cut-outs first, so they never notch the limb's own joints)
-  const order = ['thigh', 'shin', 'foot', 'upper', 'fore'];
-  const nearDrawn = [...order.map(k => near[k].gap), ...order.map(k => near[k])];
   const torso = s('path', { class: 'fig-torso' });
   const neck = s('path', { class: 'fig-neck' });
   const head = s('circle', { class: 'fig-head', r: HEAD_R });
   const eye = s('ellipse', { class: 'fig-eye', rx: 1.9, ry: 2.3 });
   const glow = s('circle', { class: 'fig-glow', r: 15 });
-  const ink = small ? {} : { filter: `url(#${id}-ink)` };
   const svg = s('svg', { viewBox: small ? fitBox(move) : '0 0 200 140', class: `move-figure${small ? ' small' : ''}`, 'aria-hidden': 'true' },
     s('defs', {},
       s('radialGradient', { id: 'fig-glow' },
         s('stop', { offset: '0%', 'stop-color': '#ff5a4f', 'stop-opacity': 0.7 }),
-        s('stop', { offset: '100%', 'stop-color': '#ff5a4f', 'stop-opacity': 0 })),
-      // A faint, fixed wobble along the edges, like a marker on paper
-      small ? null : s('filter', { id: `${id}-ink`, x: '-10%', y: '-10%', width: '120%', height: '120%' },
-        s('feTurbulence', { type: 'fractalNoise', baseFrequency: 0.045, numOctaves: 2, seed: 7, result: 'n' }),
-        s('feDisplacementMap', { in: 'SourceGraphic', in2: 'n', scale: 2.4, xChannelSelector: 'R', yChannelSelector: 'G' }))),
-    move.floor === false ? null : s('path', { class: 'fig-floor', d: `M14 ${FLOOR_LINE} Q100 ${FLOOR_LINE + 0.8} 186 ${FLOOR_LINE - 0.4}`, ...ink }),
+        s('stop', { offset: '100%', 'stop-color': '#ff5a4f', 'stop-opacity': 0 }))),
+    move.floor === false ? null : s('line', { class: 'fig-floor', x1: 14, x2: 186, y1: FLOOR_LINE, y2: FLOOR_LINE }),
     (move.props ?? []).map(([x1, y1, x2, y2]) => s('line', { class: 'fig-floor fig-prop', x1, y1, x2, y2 })),
     small ? null : glow,
-    s('g', ink, far.thigh, far.shin, far.foot, far.upper, far.fore, torso, neck, head, eye, ...nearDrawn));
+    s('g', {}, far.thigh, far.shin, far.foot, far.upper, far.fore, torso, neck, head, eye,
+      near.thigh, near.shin, near.foot, near.upper, near.fore));
 
   // Feet point forward from the ankle (the other way for a body lying face up), along the shin when
   // pointed (lying face down), or are left off when the leg is seen end-on
@@ -144,7 +135,6 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
     const c = [(a[0] + b[0]) / 2 - (dy / l) * bow, (a[1] + b[1]) / 2 + (dx / l) * bow];
     el.setAttribute('d', `M${pt(a)} Q${pt(c)} ${pt(b)}`);
-    el.gap?.setAttribute('d', el.getAttribute('d'));
   };
   // The face looks the way the body faces: forward when upright, up when lying face up
   const lookFrom = p => {
@@ -190,7 +180,7 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
     else if (t < hold * 1.6 + travel) k = 1;
     else if (t < hold * 1.6 + 2 * travel) k = 1 - ease((t - hold * 1.6 - travel) / travel);
     else k = 0;
-    const b = (now - t0 + figId * 700) % 4600;
+    const b = (now - t0 + seed * 700) % 4600;
     draw(poseAt(move, k, Math.sin((now - t0) / 650)), k, b < 140 ? Math.abs(b - 70) / 70 : 1);
     requestAnimationFrame(frame);
   };
