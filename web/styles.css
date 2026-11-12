@@ -1948,10 +1948,22 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 .food-step { gap: 14px; }
 
 /* Every routine tick matches a good day on the check-ins page: the lit teal bead with a white tick */
-.routine-tile .done-mark, .routine-card .well.done-mark, [data-theme="light"] .routine-card .well.done-mark {
+.routine-card .well.done-mark, [data-theme="light"] .routine-card .well.done-mark {
   color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   background: radial-gradient(circle at 32% 26%, color-mix(in srgb, #74d4c0 70%, #fff), #74d4c0 45%, #3f9f92 100%);
   box-shadow: 0 6px 16px -6px #3f9f92, inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Done on the home tile: a glass bead with a clear tick, lit from below with a soft teal glow */
+.routine-tile .well.done-mark {
+  color: #fff; font-weight: 600; text-shadow: none;
+  background: radial-gradient(120% 120% at 30% 15%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08) 60%), rgba(70, 72, 80, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 22px -6px rgba(116, 212, 192, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+[data-theme="light"] .routine-tile .well.done-mark {
+  color: #23866f;
+  background: radial-gradient(120% 120% at 30% 15%, #fff, rgba(255, 255, 255, 0.75) 60%), rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 0 #fff, 0 10px 22px -8px rgba(63, 159, 146, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 /* Chart range past three choices: one pill that opens the phone's picker */
