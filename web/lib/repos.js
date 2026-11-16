@@ -349,6 +349,13 @@ export const routines = {
   },
   get: id => S.table('routines').find(r => r.id === id),
 
+  /** The routine on the Home card: the one picked for it, or the first in the list. */
+  onHome() {
+    const list = routines.all();
+    return list.find(r => r.id === S.settings().homeRoutine) ?? list[0];
+  },
+  showOnHome: id => S.setSettings({ homeRoutine: id }),
+
   /** The routine's own exercise item (what the check-in ticks and the patterns count). */
   factorFor: r => factors.get(r.linkedFactorId),
 

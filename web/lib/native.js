@@ -12,6 +12,7 @@ const plugin = name => (isNative ? Cap.registerPlugin(name) : null);
 const Notes = plugin('LocalNotifications');
 const Health = plugin('Health');
 const Motion = plugin('MotionHistory');
+const App = plugin('AppLaunch');
 let onMotion = null;
 
 // Found by the notifications plugin in the app's bundled web files
@@ -233,4 +234,24 @@ export async function syncHealth(days = 60) {
   const fresh = ['sleepHours', 'steps'].filter(key => !added.includes(key) && R.health.has(key));
   if (fresh.length) R.setSettings({ chartExtras: [...new Set([...(R.settings().chartExtras ?? []), ...fresh])], healthOnChart: [...added, ...fresh] });
   return n;
+}
+
+/**
+ * Keeps the screen on (while following a routine, say), so the phone doesn't sleep between moves.
+ * Returns a function that lets it sleep again. In a browser it asks for a wake lock, and again whenever
+ * the page comes back into view, as the browser drops it when the page is hidden.
+ */
+export function keepAwake() {
+  if (isNative) {
+    App.keepAwake({ on: true }).catch(() => {});
+    return () => App.keepAwake({ on: false }).catch(() => {});
+  }
+  let lock = null, done = false;
+  const ask = () => {
+    if (done || document.visibilityState !== 'visible' || !navigator.wakeLock) return;
+    navigator.wakeLock.request('screen').then(l => { if (done) l.release(); else lock = l; }).catch(() => {});
+  };
+  ask();
+  document.addEventListener('visibilitychange', ask);
+  return () => { done = true; document.removeEventListener('visibilitychange', ask); lock?.release().catch(() => {}); };
 }

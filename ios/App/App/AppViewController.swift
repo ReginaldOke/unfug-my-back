@@ -212,7 +212,10 @@ final class SpineLoader: UIView {
 public class AppLaunchPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "AppLaunchPlugin"
     public let jsName = "AppLaunch"
-    public let pluginMethods: [CAPPluginMethod] = [CAPPluginMethod(name: "setTheme", returnType: CAPPluginReturnPromise)]
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "setTheme", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "keepAwake", returnType: CAPPluginReturnPromise),
+    ]
     private static let key = "themeSetting"
 
     /// The same rule as theme.js: the setting if there is one, otherwise light from 6am and dark from 5pm.
@@ -228,6 +231,13 @@ public class AppLaunchPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setTheme(_ call: CAPPluginCall) {
         UserDefaults.standard.set(call.getString("setting") ?? "auto", forKey: Self.key)
+        call.resolve()
+    }
+
+    /// Keeps the screen on while a routine is playing, so the phone doesn't lock between moves.
+    @objc func keepAwake(_ call: CAPPluginCall) {
+        let on = call.getBool("on") ?? false
+        DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = on }
         call.resolve()
     }
 }

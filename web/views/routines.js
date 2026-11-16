@@ -1,6 +1,6 @@
 // Routines: your list, one page per routine (edit it and log a day's session in the same place),
 // and a one-move-at-a-time player that shares the session in progress.
-import { h, s as svg, toast, iconButton, confirmSheet, vibrate } from '../lib/ui.js';
+import { h, s as svg, toast, iconButton, confirmSheet, sheet, vibrate } from '../lib/ui.js';
 import { progressRows, moveText } from '../lib/progress.js';
 import { smoothPath } from './chart.js';
 import * as R from '../lib/repos.js';
@@ -10,6 +10,7 @@ import { checkinDraft } from './checkin.js';
 import { MoveFigure } from './figure.js';
 import { isTimed, formVideoUrl, startIndex } from '../lib/play.js';
 import { calmFor } from '../lib/calm.js';
+import { keepAwake } from '../lib/native.js';
 import { dragHandles } from './sortable.js';
 import { libraryRoutine } from '../lib/routine-library.js';
 import { emojiFor } from '../lib/labels.js';
@@ -32,10 +33,11 @@ export function RoutinesView() {
     }));
   };
   repaintList();
-  // Hold a card, then drag, to move it; the first one is the routine on Home
+  // Hold a card, then drag, to move it; hold and let go for its options
   dragHandles(cards, {
     hold: true, skip: '.done-toggle',
     onReorder: rows => R.routines.reorder(rows.flatMap(r => r.dataset.ids.split(','))),
+    onHold: row => routineMenu(row.dataset.ids.split(',').map(R.routines.get)),
   });
   return h('div', { class: 'view' },
     h('header', { class: 'top-bar' }, h('h1', {}, 'Routines')),
@@ -45,6 +47,26 @@ export function RoutinesView() {
     h('div', { class: 'routine-ctas' },
       h('a', { class: 'btn dashed', href: '#/routine/new' }, '+ New routine'),
       h('a', { class: 'btn glass', href: '#/routines/browse' }, 'Browse routines')));
+}
+
+/** A held card's options: show it on Home, or delete it (a group goes with all its variations). */
+function routineMenu(list) {
+  const name = list[0].group ?? list[0].name;
+  const onHome = list.some(r => r.id === R.routines.onHome()?.id);
+  sheet(close => h('div', { class: 'stack' },
+    h('h2', {}, name),
+    onHome
+      ? h('p', { class: 'hint' }, 'Showing on Home')
+      : h('button', { type: 'button', class: 'btn glass', onclick: () => { R.routines.showOnHome(list[0].id); close(); toast(`${name} is on Home`); } }, 'Show on Home'),
+    h('button', {
+      type: 'button', class: 'btn danger', onclick: async () => {
+        close();
+        const more = list.length > 1 ? `Its ${list.length} variations go too. ` : '';
+        if (!(await confirmSheet(`Delete ${name}?`, `${more}Past sessions stay in your history.`, 'Delete', { danger: true }))) return;
+        list.forEach(r => R.routines.archive(r.id));
+        repaintList();
+      },
+    }, 'Delete routine')));
 }
 
 /** Routines in list order, the variations of a group kept together where the group first appears. */
@@ -781,6 +803,8 @@ export function RoutineRunView(ctx) {
   const clocks = new Map(); // a running or paused timer per move, so stepping away and back keeps it
   let tick = 0;
   ctx.onCleanup(() => clearInterval(tick));
+  // The screen stays on while you follow along, so the phone doesn't lock mid-move
+  ctx.onCleanup(keepAwake());
   const root = h('div', { class: 'flow' });
   const back = () => { location.replace(`#/routine/${r.id}?date=${date}${fromCheckin ? '&from=checkin' : ''}`); };
   const go = to => { if (to < 0 || to >= moves.length || to === i) return; dir = Math.sign(to - i); i = to; vibrate(4); render(); };

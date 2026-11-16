@@ -69,7 +69,7 @@ function fire(ev, now) {
 }
 
 function showMovementBanner(ev) {
-  const items = R.routines.all()[0]?.items ?? [];
+  const items = R.routines.onHome()?.items ?? [];
   const idea = items.length ? ` Try: ${items[Math.floor(Math.random() * items.length)].name.toLowerCase()}.` : '';
   notify({
     key: 'move',

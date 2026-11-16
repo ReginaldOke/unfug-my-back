@@ -141,7 +141,7 @@ export function makeSortable(grid, { onEditChange = () => {}, onReorder = () => 
  * lift it instead (Today's sections), so ordinary taps and scrolling still work. Near the top or bottom
  * of the screen the page scrolls along. skip: what a hold can't start on. onReorder(rows in their new order) runs on drop if anything moved.
  */
-export function dragHandles(list, { onReorder = () => {}, hold = false, skip = 'input, textarea, .vslider, .grip', onLift = () => {}, onDrop = () => {} }) {
+export function dragHandles(list, { onReorder = () => {}, hold = false, skip = 'input, textarea, .vslider, .grip', onLift = () => {}, onDrop = () => {}, onHold = null }) {
   let drag = null, press = null, swallowUntil = 0, raf = 0;
   const rows = () => [...list.children].filter(el => el.classList.contains('drag-row'));
 
@@ -179,7 +179,7 @@ export function dragHandles(list, { onReorder = () => {}, hold = false, skip = '
 
   function lift(el, e, target) {
     try { target.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
-    drag = { el, offY: e.clientY - el.getBoundingClientRect().top, y: e.clientY, start: rows() };
+    drag = { el, offY: e.clientY - el.getBoundingClientRect().top, y: e.clientY, y0: e.clientY, start: rows() };
     el.classList.add('lifted');
     list.classList.add('dragging');
     vibrate(hold ? 12 : 8);
@@ -216,7 +216,7 @@ export function dragHandles(list, { onReorder = () => {}, hold = false, skip = '
     if (!drag) return;
     cancelAnimationFrame(raf);
     swallowUntil = performance.now() + 400;
-    const { el, start } = drag;
+    const { el, start, y, y0 } = drag;
     drag = null;
     const from = el.style.transform;
     el.style.transform = '';
@@ -225,6 +225,8 @@ export function dragHandles(list, { onReorder = () => {}, hold = false, skip = '
     el.animate([{ transform: from }, { transform: 'none' }], GLIDE);
     const now = rows();
     if (now.some((r, i) => r !== start[i])) onReorder(now);
+    // Held and let go without moving: the row's options, like a long press on iPhone
+    else if (onHold && Math.abs(y - y0) <= SLOP) onHold(el);
     onDrop();
   };
   list.addEventListener('pointerup', drop);

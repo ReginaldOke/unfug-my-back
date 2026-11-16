@@ -601,14 +601,13 @@ function movementTile() {
 
 
 function routineTile(today) {
-  const r = R.routines.all()[0];
+  const r = R.routines.onHome();
   if (!r) return h('a', { class: 'tile static', href: '#/routine/new' }, h('h2', {}, 'Routine'), h('span', { class: 'tile-title' }, '+ Create a movement routine'));
   // A session done more than once (mobility twice in a day) counts each time
   const timesOn = date => R.routines.completionsOn(date, r.id).reduce((n, c) => n + (c.times ?? 1), 0);
   const done = timesOn(today);
   const target = Math.max(1, r.schedule.filter(e => reminderOn(e, today)).length);
   const allDone = done >= target;
-  const week = Array.from({ length: 7 }, (_, i) => timesOn(addDays(today, -i))).reduce((a, b) => a + b, 0);
   // Play the celebration once, on the first render after finishing a routine
   const celebrate = justFinished.id === r.id;
   if (celebrate) setTimeout(() => { justFinished.id = null; }, 1600);
@@ -620,8 +619,25 @@ function routineTile(today) {
       : h('div', {}, h('span', { class: 'num' }, String(done)), h('span', { class: 'unit' }, `/${target} today`)),
     h('div', { class: 'seg-dots', 'aria-hidden': 'true' },
       Array.from({ length: target }, (_, i) => h('i', { class: `${i < done ? 'on' : ''}${celebrate && i === done - 1 ? ' fresh' : ''}` }))),
-    h('span', { class: 'tile-title link' }, `${R.routineLabel(r)} · ${week} this week`),
+    // With more than one routine, the name is a button for picking which one shows here
+    R.routines.all().length > 1
+      ? h('button', {
+        type: 'button', class: 'tile-title link routine-swap', 'aria-label': `${R.routineLabel(r)}. Show a different routine here`,
+        onclick: e => { e.preventDefault(); e.stopPropagation(); pickHomeRoutine(r); },
+      }, R.routineLabel(r), h('span', { class: 'swap-chev', 'aria-hidden': 'true' }))
+      : h('span', { class: 'tile-title link' }, R.routineLabel(r)),
     celebrate ? h('span', { class: 'sr-only', role: 'status' }, `${R.routineLabel(r)} done. Logged as a helper.`) : null);
+}
+
+/** Which routine the Home card shows: tap one and it swaps in. */
+function pickHomeRoutine(current) {
+  sheet(close => h('div', { class: 'stack' },
+    h('h2', {}, 'Show on Home'),
+    h('div', { class: 'pick-list' }, R.routines.all().map(r => h('button', {
+      type: 'button', class: `pick-row${r.id === current.id ? ' on' : ''}`, 'aria-pressed': String(r.id === current.id),
+      onclick: () => { R.routines.showOnHome(r.id); close(); },
+    }, h('span', { class: 'well', 'aria-hidden': 'true' }, R.routineIcon(r)), h('span', { class: 'grow' }, R.routineLabel(r)),
+    r.id === current.id ? h('span', { class: 'pick-tick', 'aria-hidden': 'true' }, '✓') : null)))));
 }
 
 function aiTile() {

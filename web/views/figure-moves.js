@@ -104,9 +104,14 @@ export const MORE_MOVES = [
   { names: ['hip flexor', 'hip flexor stretch', 'half kneeling', 'kneeling lunge', 'couch stretch', 'psoas'], accent: 'hip', hold: 1500, travel: 1600, plant: ['fN'],
     pa: on({ hip: [92, 90], torso: -90, head: -90, bend: 0, armN: [96, 92], armF: [86, 90], legN: [-4, 90], legF: [112, 180] }, ['fN', 'kF']),
     pb: on({ hip: [100, 92], torso: -93, head: -92, bend: 3, armN: [96, 92], armF: [86, 90], legN: [-10, 74], legF: [128, 182] }, ['fN', 'kF']) },
-  { names: ['hinge', 'hip hinge', 'deadlift', 'rdl', 'romanian deadlift', 'single leg hinge', 'kettlebell swing', 'kb swing', 'stiff leg deadlift'], accent: 'hip', hold: 600, travel: 1400, plant: ['fN', 'fF'],
+  { names: ['hinge', 'hip hinge', 'deadlift', 'rdl', 'romanian deadlift', 'kettlebell swing', 'kb swing', 'stiff leg deadlift'], accent: 'hip', hold: 600, travel: 1400, plant: ['fN', 'fF'],
     pa: STAND,
     pb: on({ hip: [86, 82], torso: -12, head: -4, bend: 0, armN: [90, 90], armF: [90, 90], legN: [78, 98], legF: [78, 98] }) },
+  // Single-leg hinge: standing on one leg, the body tips forward as the other leg swings back, one long line
+  // from head to heel
+  { names: ['single leg hinge', 'single leg deadlift', 'single leg rdl', 'single leg romanian deadlift', 'one leg deadlift', 'one leg hinge'], accent: 'hip', hold: 700, travel: 1600, plant: ['fN'],
+    pa: STAND,
+    pb: on({ hip: [100, 80], torso: -8, head: -2, bend: 0, armN: [92, 90], armF: [88, 90], legN: [86, 94], legF: [172, 172] }, ['fN']) },
   { names: ['hamstring', 'hamstring stretch', 'supine hamstring', 'strap hamstring', 'lying hamstring stretch'], accent: 'kN', hold: 1600, travel: 1700, supine: true,
     pa: P(HOOK, { legN: [180, 180], legF: [180, 180] }),
     pb: P(HOOK, { legN: [284, 284], legF: [180, 180], armN: [208, 250], armF: [208, 250] }), grip: { hN: ['hip', 'kN', 0.8], hF: ['hip', 'kN', 0.8] } },
