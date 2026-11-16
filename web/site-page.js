@@ -85,7 +85,8 @@
     addEventListener('load', measure);
 
     // The phone follows the scroll with a little give, so a wheel's steps turn into one smooth movement
-    let follow = scrollY, lastNow = 0;
+    let follow = scrollY, lastNow = 0, dip = 0;
+    const sectionAt = y => { let i = 0; while (i < anchors.length - 1 && y >= anchors[i + 1].at) i++; return i; };
     // The name in the header goes back to the top under a quick fade, rather than racing up through every section
     const veil = document.createElement('div'); veil.className = 'page-veil'; document.body.append(veil);
     document.querySelector('.brand')?.addEventListener('click', e => {
@@ -103,6 +104,15 @@
       requestAnimationFrame(frame);
       const dt = Math.min(64, now - (lastNow || now)); lastNow = now;
       const target = scrollY;
+      // A fast scroll that skips sections would send the phone spinning through each one in turn. Instead it
+      // dips out, jumps to the section before the one being scrolled to, and makes just that last move
+      const from = sectionAt(follow), to = sectionAt(target);
+      if (!still && Math.abs(to - from) > 1) {
+        const near = to > from ? anchors[to].at - 1 : anchors[to + 1].at;
+        follow = clamp(near, Math.min(follow, target), Math.max(follow, target));
+        dip = 1;
+      }
+      dip *= Math.exp(-dt / 260);
       follow = still ? target : follow + (target - follow) * (1 - Math.exp(-dt / 110));
       if (Math.abs(target - follow) < 0.5) follow = target;
       const y = follow;
@@ -138,7 +148,7 @@
       const clip = t < 0.5 ? a.clip : b.clip;
       show(clip, t < 0.5 ? b.clip : (anchors[i + 2] ?? b).clip);
       const sway = still ? 0 : Math.sin(now / 1400) * 1.6;
-      stage.style.opacity = (1 - mix('fade')).toFixed(3);
+      stage.style.opacity = ((1 - mix('fade')) * (1 - 0.85 * dip)).toFixed(3);
       phone.style.transform = `translate3d(${x.toFixed(1)}px, ${yy.toFixed(1)}px, 0) scale(${s.toFixed(4)})
         rotateX(${(rx + sway * 0.6).toFixed(2)}deg) rotateY(${(ry + sway).toFixed(2)}deg) rotateZ(${rz.toFixed(2)}deg)`;
     };
@@ -337,9 +347,11 @@
     paint();
   }
 
-  function read() {
-    const r = track.getBoundingClientRect();
-    const p = clamp(-r.top / (r.height - innerHeight));
+  // How far through the chart the scroll is (0 to 1). The chart eases toward it rather than jumping, so a fast
+  // scroll still shows the days sliding past and the chapters turning, instead of skipping straight to the end
+  let shown = null;
+  const progress = () => { const r = track.getBoundingClientRect(); return clamp(-r.top / (r.height - innerHeight)); };
+  function read(p = progress()) {
     pos = dayAt(p);
     morphT = ease(clamp((p - SPLIT - 0.02) / 0.14));
     chapter = p >= SPLIT ? LAST : CHAPTERS.findIndex(c => c.to > Math.round(pos));
@@ -489,19 +501,26 @@
   let size = `${plot.clientWidth}x${plot.clientHeight}`;
   addEventListener('resize', () => {
     const now = `${plot.clientWidth}x${plot.clientHeight}`;
+    shown = null;
     if (now === size) { read(); paint(); return; }
     size = now; build();
   });
-  let queued = false;
+  let running = false, last = 0;
+  const tick = now => {
+    const r = track.getBoundingClientRect();
+    const target = progress();
+    // Off screen, or with reduced motion, it simply keeps up
+    if (still || r.bottom < -50 || r.top > innerHeight + 50 || shown == null) shown = target;
+    else shown += (target - shown) * (1 - Math.exp(-Math.min(64, now - (last || now)) / 140));
+    last = now;
+    if (Math.abs(target - shown) < 0.0004) shown = target;
+    if (r.bottom >= -50 && r.top <= innerHeight + 50) { read(shown); paint(); }
+    if (shown !== target) requestAnimationFrame(tick); else { running = false; last = 0; }
+  };
   addEventListener('scroll', () => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => {
-      queued = false;
-      const r = track.getBoundingClientRect();
-      if (r.bottom < -50 || r.top > innerHeight + 50) return;
-      read(); paint();
-    });
+    if (running) return;
+    running = true;
+    requestAnimationFrame(tick);
   }, { passive: true });
   onTheme(build);
   // Once the fonts are in, the notes are measured again; nothing is rebuilt
