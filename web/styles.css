@@ -2171,7 +2171,7 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 }
 /* Done ticks in dark mode: a deeper, richer teal, so they sit back with the cards rather than glowing on top */
 :root:not([data-theme="light"]) .done-toggle.on, :root:not([data-theme="light"]) .routine-card .well.done-mark {
-  background: linear-gradient(180deg, #3f9f92, #2c7a70);
+  background: linear-gradient(180deg, #3f9f92, #2c7a70) border-box;
   border-color: transparent;
   box-shadow: 0 3px 10px -3px rgba(63, 159, 146, 0.4);
   color: #e9fbf7; text-shadow: none;
@@ -2194,10 +2194,11 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 }
 [data-theme="light"] .cal-cell.logged.sel { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
 [data-theme="light"] .done-toggle.on, [data-theme="light"] .routine-card .well.done-mark {
-  /* One solid, even bead: no rim, no highlight line along the top, and a soft shadow that sits evenly
+  /* One solid, even bead (the gradient runs under the clear border too, or its dark end repeats as a
+     strip along the top): no rim, no highlight line along the top, and a soft shadow that sits evenly
      underneath, so the circle reads whole rather than clipped at the top and bottom */
   border-color: transparent;
-  background: linear-gradient(180deg, #86dccb, #5bbcab);
+  background: linear-gradient(180deg, #86dccb, #5bbcab) border-box;
   box-shadow: 0 3px 10px -3px rgba(63, 159, 146, 0.45);
   color: #fff; text-shadow: none;
 }
