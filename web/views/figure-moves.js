@@ -112,7 +112,12 @@ export const MORE_MOVES = [
   { names: ['single leg hinge', 'single leg deadlift', 'single leg rdl', 'single leg romanian deadlift', 'one leg deadlift', 'one leg hinge'], accent: 'hip', hold: 700, travel: 1600, plant: ['fN'],
     pa: STAND,
     pb: on({ hip: [100, 80], torso: -8, head: -2, bend: 0, armN: [92, 90], armF: [88, 90], legN: [86, 94], legF: [172, 172] }, ['fN']) },
-  { names: ['hamstring', 'hamstring stretch', 'supine hamstring', 'strap hamstring', 'lying hamstring stretch'], accent: 'kN', hold: 1600, travel: 1700, supine: true,
+  // Hamstring stretch, standing: one heel forward with the leg straight, the back knee soft, then a slow lean
+  // forward from the hips with a long, flat back, hands sliding down the front leg
+  { names: ['hamstring', 'hamstring stretch', 'standing hamstring stretch', 'standing hamstring'], accent: 'kN', hold: 1600, travel: 1700, plant: ['fN', 'fF'],
+    pa: on({ hip: [100, 76], torso: -88, head: -88, bend: 0, armN: [86, 88], armF: [88, 90], legN: [64, 64], legF: [106, 112] }),
+    pb: on({ hip: [92, 80], torso: -20, head: -12, bend: 0, armN: [76, 78], armF: [78, 80], legN: [64, 64], legF: [106, 112] }) },
+  { names: ['supine hamstring', 'strap hamstring', 'lying hamstring stretch', 'lying hamstring', 'hamstring stretch lying', 'supine hamstring stretch'], accent: 'kN', hold: 1600, travel: 1700, supine: true,
     pa: P(HOOK, { legN: [180, 180], legF: [180, 180] }),
     pb: P(HOOK, { legN: [284, 284], legF: [180, 180], armN: [208, 250], armF: [208, 250] }), grip: { hN: ['hip', 'kN', 0.8], hF: ['hip', 'kN', 0.8] } },
   { names: ['squat', 'deep squat', 'goblet squat', 'air squat', 'bodyweight squat', 'sumo squat', 'squat hold', 'back squat', 'barbell squat', 'high bar squat', 'low bar squat', 'dumbbell squat', 'kettlebell squat'], accent: 'hip', hold: 900, travel: 1500, plant: ['fN', 'fF'],
@@ -151,7 +156,8 @@ export const MORE_MOVES = [
   { names: ['figure 4', 'figure four', 'piriformis', 'piriformis stretch', 'figure 4 stretch', 'supine pigeon', 'reclined pigeon', 'glute stretch'], accent: 'hip', hold: 1500, travel: 1700, supine: true,
     pa: P(HOOK, { legN: [-82, 168] }), pb: P(HOOK, { legF: [-72, 176], legN: [-42, 172], armN: [228, 280], armF: [228, 280] }), grip: { hN: ['hip', 'kF', 0.85], hF: ['hip', 'kF', 0.85] } },
   { names: ['wall sit', 'wall squat', 'wall sits'], accent: 'hip', hold: 1800, travel: 1600, props: [[78, 30, 78, 129]], plant: ['fN', 'fF'],
-    pa: { hip: [84, 76], torso: -90, head: -90, bend: 0, armN: [90, 90], armF: [90, 90], legN: [78, 100], legF: [78, 100] },
+    // Feet out from the wall first, so sliding down ends with the thighs level and the shins upright, knees over ankles
+    pa: { hip: [84, 82.3], torso: -90, head: -90, bend: 0, armN: [90, 90], armF: [90, 90], legN: [56, 64], legF: [56, 64] },
     pb: { hip: [84, 102], torso: -90, head: -90, bend: 0, armN: [80, 70], armF: [80, 70], legN: [0, 90], legF: [0, 90] } },
   { names: ['thread the needle', 'thread needle', 'quadruped rotation', 'needle threader'], accent: 'sh', hold: 1300, travel: 1700, plant: ['hF'],
     pa: QUAD, pb: P(QUAD, { torso: -6, head: 30, bend: -2, armN: [146, 146] }) },
@@ -176,7 +182,8 @@ export const MORE_MOVES = [
     pa: P(STAND, { armN: [118, 64], armF: [116, 62] }),
     pb: { hip: [104, 75], torso: -110, head: -124, bend: 8, armN: [130, 60], armF: [128, 58], legN: [92, 88], legF: [92, 88] } },
   { names: ['forward fold', 'forward bend', 'toe touch', 'touch toes', 'standing forward bend', 'ragdoll', 'rag doll', 'uttanasana'], accent: 'hip', hold: 1500, travel: 1800, plant: ['fN', 'fF'],
-    pa: STAND, pb: { hip: [88, 75], torso: 68, head: 84, bend: -9, armN: [94, 90], armF: [92, 88], legN: [84, 96], legF: [84, 96] } },
+    // A comfortable fold, not a full one: knees soft, the back rounding gently, hands hanging towards the shins
+    pa: STAND, pb: { hip: [90, 77], torso: 25, head: 55, bend: -7, armN: [100, 100], armF: [98, 98], legN: [78, 102], legF: [78, 102] } },
 
   // ---- On the side, seen from the front: the top leg lifts in front of you, never through the floor
   { names: ['clamshell', 'clam shell', 'clam', 'side lying clam', 'clamshells'], accent: 'hip', hold: 800, travel: 1400, feet: false, view: 'front',
@@ -194,7 +201,8 @@ export const MORE_MOVES = [
     pa: QUAD, pb: P(QUAD, { legN: [128, 182, 11, 27] }) },
   { names: ['seated forward bend', 'spine stretch forward', 'spine stretch', 'sit and reach', 'seated hamstring stretch', 'seated toe touch', 'seated forward fold', 'paschimottanasana', 'long sit stretch'], accent: 'hip', hold: 1500, travel: 1800,
     pa: { hip: [80, 124], torso: -90, head: -90, armN: [90, 90], armF: [90, 90], legN: [0, 0], legF: [0, 0] },
-    pb: { hip: [80, 124], torso: -28, head: -18, bend: -7, armN: [6, 6], armF: [6, 6], legN: [0, 0], legF: [0, 0] } },
+    // Leaning forward from the hips as far as is comfortable, knees soft, hands reaching along the shins
+    pb: { hip: [80, 124], torso: -42, head: -32, bend: -5, armN: [24, 20], armF: [24, 20], legN: [-8, 8], legF: [-8, 8] } },
   { names: ['pigeon', 'pigeon pose', 'pigeon stretch', 'sleeping pigeon', 'kapotasana'], accent: 'hip', hold: 1600, travel: 1900,
     pa: QUAD, pb: { hip: [84, 118], torso: -52, head: -56, bend: 0, armN: [80, 82], armF: [80, 82], legN: [14, 172, 20, 22], legF: [172, 176] } },
   { names: ['bear plank', 'bear hold', 'bear crawl', 'quadruped hover', 'bear'], accent: 'mid', hold: 1400, travel: 1300, plant: ['hN', 'hF'],

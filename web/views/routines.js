@@ -255,15 +255,19 @@ const templateOf = it => {
 const isTimedEntry = (s, it) => (s.timed ?? []).some(t => t.name === it.name.trim());
 
 /**
- * A move timed in the player: its box takes the time, it's listed with the routine page's timings, and it's
- * saved to today's session straight away, so it's kept (and on the progress chart) even without Finish.
+ * A timed hold, from the player or the routine page's timer: a move's box takes the time, it's listed with
+ * the routine page's timings, and it's saved to the day's session straight away, so it's kept (and on the
+ * progress chart) the moment the timer stops, without Finish or Done.
  */
-function keepTime(s, it, did) {
-  it.did = did; it.done = true; s.touched = true;
-  s.timed = [...(s.timed ?? []).filter(t => t.name !== it.name.trim()), { name: it.name.trim(), did }];
+function keepTime(s, name, did) {
+  const it = s.items.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+  name = it ? it.name.trim() : name.trim();
+  if (it) { it.did = did; it.done = true; }
+  s.touched = true;
+  s.timed = [...(s.timed ?? []).filter(t => t.name !== name), { name, did }];
   if (!s.id) return; // a routine not saved yet keeps the time with the session until it is
   const before = R.routines.sessionOn(s.id, s.date)?.log ?? [];
-  const log = [...before.filter(x => x.name !== it.name.trim()), { name: it.name.trim(), did, timed: true }];
+  const log = [...before.filter(x => x.name !== name), { name, did, timed: true }];
   const live = checkinDraft(s.date);
   R.routines.logSession(s.id, s.date, s.measure === 'count' ? { log, times: s.times } : { log, intensity: s.intensity }, { writeLog: !live });
 }
@@ -294,11 +298,8 @@ function stopwatch(s, repaintMoves, ctx) {
   const save = label => {
     const name = label.trim();
     if (!name) return toast('Name it first');
-    const did = fmtClock(now());
-    const move = s.items.find(it => it.name.trim().toLowerCase() === name.toLowerCase());
-    if (move) { move.did = did; move.done = true; repaintMoves(); }
-    else s.timed = [...(s.timed ?? []).filter(t => t.name !== name), { name, did }];
-    s.touched = true;
+    keepTime(s, name, fmtClock(now()));
+    if (s.items.some(it => it.name.trim().toLowerCase() === name.toLowerCase())) repaintMoves();
     Object.assign(c, { start: null, held: 0, label: name });
     vibrate(8);
     paint();
@@ -803,6 +804,8 @@ export function RoutineRunView(ctx) {
   const clocks = new Map(); // a running or paused timer per move, so stepping away and back keeps it
   let tick = 0;
   ctx.onCleanup(() => clearInterval(tick));
+  // Leaving with a timer still running stops it there, and its time is kept like any other
+  ctx.onCleanup(() => clocks.forEach((c, it) => { if (c.start) keepTime(s, it.name, fmtClock(Date.now() - c.start)); }));
   // The screen stays on while you follow along, so the phone doesn't lock mid-move
   ctx.onCleanup(keepAwake());
   const root = h('div', { class: 'flow' });
@@ -830,7 +833,7 @@ export function RoutineRunView(ctx) {
       let b;
       if (c.start) {
         b = h('button', { type: 'button', class: 'sw-pill glass running', 'aria-label': 'Stop the timer', onclick: () => {
-          keepTime(s, it, fmtClock(ms())); amount.value = it.did; c.start = null; vibrate(8); paint();
+          keepTime(s, it.name, fmtClock(ms())); amount.value = it.did; c.start = null; vibrate(8); paint();
         } }, h('span', { class: 'sw-dot', 'aria-hidden': 'true' }), h('span', { class: 'sw-time' }, fmtClock(ms())));
         tick = setInterval(() => { const t = el.querySelector('.sw-time'); if (t) t.textContent = fmtClock(ms()); }, 250);
       } else {
