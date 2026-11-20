@@ -32,27 +32,42 @@
     layEdge();
     addEventListener('resize', layEdge);
 
-    // Each clip in the look the page is in. Every clip's still frame is set straight away, so the screen is
-    // never blank; the clip showing loads first, and once it can play the others load behind it, so each is
-    // ready by the time the page scrolls to it (they're small: under 700 KB each)
+    // Each clip in the look the page is in. Under each clip sits its still frame, which shows straight
+    // away, so the screen is never blank: the clip fades in over it only once it's really playing. The clip
+    // showing loads first and the others load behind it. iPhone sometimes refuses to start a video on its
+    // own (Low Power Mode, say); then the still stays, and it's tried again on a tap or as the page scrolls.
     const videos = [...phone.querySelectorAll('video')];
     const byClip = new Map(videos.map(v => [v.dataset.clip, v]));
+    const stillOf = new Map(videos.map(v => { const i = new Image(); i.className = 'still'; i.alt = ''; i.decoding = 'async'; v.before(i); return [v, i]; }));
     let showing = null;
+    const current = () => byClip.get(showing);
     const srcFor = v => `assets/site/${v.dataset.clip}-${theme()}.mp4`;
-    const posters = () => videos.forEach(v => { v.poster = srcFor(v).replace('.mp4', '.jpg'); });
-    const load = v => { if (v && v.dataset.loaded !== srcFor(v)) { v.preload = 'auto'; v.src = srcFor(v); v.dataset.loaded = srcFor(v); } };
+    const posters = () => videos.forEach(v => { v.poster = stillOf.get(v).src = srcFor(v).replace('.mp4', '.jpg'); });
+    const load = v => { if (v && v.dataset.loaded !== srcFor(v)) { v.classList.remove('live'); v.preload = 'auto'; v.src = srcFor(v); v.dataset.loaded = srcFor(v); } };
     const loadAll = () => videos.forEach(load);
+    let tried = 0;
+    const play = v => { if (!still && v && v === current() && v.paused) { tried = performance.now(); v.play().catch(() => {}); } };
+    videos.forEach(v => {
+      v.addEventListener('playing', () => v.classList.add('live'));
+      // Ready sooner than expected, or refused before: try again whenever it can play
+      v.addEventListener('canplay', () => play(v));
+      v.addEventListener('loadeddata', () => play(v));
+    });
+    for (const e of ['touchend', 'click', 'keydown']) addEventListener(e, () => play(current()), { passive: true });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) play(current()); });
     posters();
     videos[0].addEventListener('canplay', loadAll, { once: true });
     addEventListener('load', () => setTimeout(loadAll, 1200), { once: true });
     const show = (clip, next) => {
       load(byClip.get(next));
-      if (clip === showing) return;
+      // show runs every frame while scrolling: a refused clip is tried again every couple of seconds
+      if (clip === showing) { if (current()?.paused && performance.now() - tried > 2000) play(current()); return; }
       showing = clip;
       videos.forEach(v => {
         const on = v.dataset.clip === clip;
         v.classList.toggle('on', on);
-        if (on) { load(v); v.currentTime = 0; if (!still) v.play().catch(() => {}); } else v.pause();
+        stillOf.get(v).classList.toggle('on', on);
+        if (on) { load(v); if (v.readyState) v.currentTime = 0; play(v); } else v.pause();
       });
     };
     onTheme(() => { const c = showing; showing = null; posters(); videos.forEach(v => { v.dataset.loaded = ''; }); show(c); loadAll(); });

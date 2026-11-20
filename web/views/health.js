@@ -3,7 +3,7 @@ import { h, iconButton, toast, copyText } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { readHealthExport, parseShortcut } from '../lib/health.js';
 import { dayLabel, localDate } from '../lib/dates.js';
-import { isNative, connectHealth } from '../lib/native.js';
+import { isNative, connectHealth, setHealthExtra, healthExtraOn, HEALTH_EXTRAS } from '../lib/native.js';
 
 export function HealthView(ctx) {
   // Opened by the Shortcut with today's numbers: save them and go back to Today
@@ -20,7 +20,7 @@ export function HealthView(ctx) {
     h('header', { class: 'top-bar' }, iconButton('‹', 'Back', () => history.back()), h('h1', {}, 'Apple Health'), h('span')),
     status(),
     // The app reads Health directly; the browser has to make do with an export or a Shortcut
-    ...(isNative ? [nativeCard(render), syncReport()] : [importCard(render), shortcutCard()]),
+    ...(isNative ? [nativeCard(render), moreCard(render), syncReport()] : [importCard(render), shortcutCard()]),
   ].filter(Boolean)); // replaceChildren would print a null as text
   render();
   return root;
@@ -57,7 +57,7 @@ function nativeCard(render) {
   const on = R.settings().healthSync;
   return h('section', { class: 'card glass stack' },
     h('h2', {}, on ? 'Connected' : 'Connect Apple Health'),
-    h('p', { class: 'hint' }, 'Reads your daily steps and sleep so you can see how they line up with your pain. Nothing leaves your phone.'),
+    h('p', { class: 'hint' }, on ? 'Steps and sleep' : 'Reads your steps and sleep to line them up with your pain.'),
     h('button', {
       type: 'button', class: 'btn primary', onclick: async e => {
         e.currentTarget.disabled = true;
@@ -68,6 +68,23 @@ function nativeCard(render) {
         render();
       },
     }, on ? 'Sync now' : 'Connect'));
+}
+
+/** Once steps and sleep are connected: a switch for each other thing the app can read. */
+function moreCard(render) {
+  if (!R.settings().healthSync) return null;
+  return h('section', { class: 'card glass stack tight health-more' },
+    h('h2', {}, 'More from Apple Health'),
+    HEALTH_EXTRAS.map(t => {
+      const input = h('input', {
+        type: 'checkbox', class: 'switch', checked: healthExtraOn(t.key), 'aria-label': t.label, onchange: async e => {
+          e.target.disabled = true;
+          try { await setHealthExtra(t.key, e.target.checked); } catch { toast('Couldn’t reach Apple Health'); }
+          render();
+        },
+      });
+      return h('label', { class: 'row between' }, h('span', {}, t.label), input);
+    }));
 }
 
 const vsText = (date, key) => {

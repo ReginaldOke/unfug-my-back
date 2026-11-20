@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextActiveTime, isRealMovement, nextReminderTime, evaluateWake } from '../web/lib/reminders-core.js';
+import { nextActiveTime, isRealMovement, nextReminderTime, evaluateWake, stillMinutes } from '../web/lib/reminders-core.js';
 
 const allDays = (start = '08:00', end = '22:00') => Array.from({ length: 7 }, () => ({ on: true, start, end }));
 const cfg = { intervalMin: 45, minWalkMin: 2, minSteps: 150, snoozeMin: 10, activeHours: allDays() };
@@ -54,4 +54,13 @@ test('a due reminder is pushed back while driving', () => {
   const d = evaluateWake({ now: at(10, 31), samples: [], cfg, pendingAt: at(10, 30), drivingNow: true });
   assert.equal(d.action, 'pushBack');
   assert.deepEqual(d.at, at(10, 41));
+});
+
+test('still time starts at the start of the day, so the night is not counted', () => {
+  const lastNight = at(21, 0, 27).toISOString();
+  assert.equal(stillMinutes(lastNight, at(9, 30), cfg.activeHours), 90);
+  assert.equal(stillMinutes(at(9).toISOString(), at(9, 50), cfg.activeHours), 50);
+  assert.equal(stillMinutes(null, at(8, 45), cfg.activeHours), 45);
+  const off = allDays().map(d => ({ ...d, on: false }));
+  assert.equal(stillMinutes(null, at(8, 45), off), null);
 });

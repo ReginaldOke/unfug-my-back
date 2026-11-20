@@ -935,6 +935,9 @@ button.tile.static:active, a.tile.static:active { transform: scale(0.98); }
 
 /* ---------- Drawers ---------- */
 .sheet.tall { height: 92dvh; max-height: 92dvh; padding-top: 10px; }
+.sheet.full { height: 100dvh; max-height: 100dvh; border-radius: 0; padding-top: calc(10px + env(safe-area-inset-top)); }
+/* A screen of its own: solid, so the page behind doesn't show through */
+.sheet.full, [data-theme="light"] .sheet.full { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .section-label { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-top: 10px; }
 hr.sep { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .is-off .dim-off { opacity: 0.4; pointer-events: none; transition: opacity .2s; }
@@ -1077,6 +1080,9 @@ button.list-row { width: 100%; background: none; border: 0; border-radius: 0; te
 .fig-seg.kit.near, .fig-torso { stroke: #ff5a4f; }
 .fig-seg.kit.far { stroke: rgba(255, 90, 79, 0.45); }
 .fig-torso { stroke-width: 9; }
+/* Seen from behind, both sides are as near as each other */
+.move-figure.from-back .fig-seg.far, [data-theme="light"] .move-figure.from-back .fig-seg.far { stroke: var(--ink); }
+.move-figure.from-back .fig-seg.kit.far, [data-theme="light"] .move-figure.from-back .fig-seg.kit.far { stroke: #ff5a4f; }
 .fig-neck { stroke-width: 6; }
 .fig-head { fill: var(--ink); }
 .fig-band { stroke: #ff5a4f; stroke-width: 4.5; }
@@ -1181,6 +1187,21 @@ a.routine-card:active { transform: scale(0.98); background: rgba(255, 255, 255, 
 .play-btn { color: var(--ink); }
 .icon-btn.done-btn { width: auto; border-radius: 22px; padding: 0 18px; font-size: 16px; font-weight: 500; color: var(--ink); }
 .play-btn svg { transform: translateX(1px); }
+/* Import: paste or open a file, and see what it reads as it reads it */
+.icon-btn[hidden] { display: none; }
+.sheet.full .import-sheet { min-height: 100%; display: flex; flex-direction: column; }
+.import-sheet textarea.import-text { min-height: 120px; max-height: 32dvh; font-size: 15px; padding: 14px 16px; border-radius: 18px; flex: none; transition: min-height .3s var(--ease-out), max-height .3s var(--ease-out); }
+.import-sheet textarea.import-text.read { min-height: 76px; max-height: 76px; }
+/* Cancel and Add stay at the bottom of the screen, over a fade, however long the list gets */
+.import-actions { position: sticky; bottom: calc(-26px - env(safe-area-inset-bottom)); margin: auto -22px calc(-26px - env(safe-area-inset-bottom)); padding: 18px 22px calc(18px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 22px); z-index: 1; }
+.import-preview { display: grid; gap: 10px; }
+.import-preview:empty { display: none; }
+.import-title { font-weight: 500; }
+.import-day .section-label { margin: 2px 0 4px; }
+.import-moves { list-style: none; margin: 0; padding: 0; }
+.import-moves li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.import-moves li:last-child { border-bottom: 0; }
+.import-dose { color: var(--ink-3); text-align: right; flex: none; max-width: 55%; }
 
 .routine-page .log-row { position: relative; display: block; padding: 0; overflow: hidden; border-radius: 0; transition: height .24s var(--ease-out), opacity .2s; }
 .routine-page .log-row.lifted { border-radius: 16px; overflow: visible; }
@@ -2037,9 +2058,15 @@ a.list-row, a.help-link { -webkit-touch-callout: none; }
 [data-theme="light"] .run-progress button.now::before { background: #1d1c1f; box-shadow: 0 0 10px rgba(29, 28, 31, 0.2); }
 /* The figure, with the video button tucked in its top right corner */
 .move-art { position: relative; width: min(100%, 320px); display: grid; place-items: center; }
-.move-art .form-video { position: absolute; top: -6px; right: 0; height: 34px; padding: 0 13px 0 10px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); text-decoration: none; }
-.move-art .form-video .fv-icon { display: inline-flex; }
-.move-art .form-video:active { transform: scale(.94); }
+/* Equal room above and below the move: See form sits centred in the room above */
+.move-stage .stage-room { flex: 1 1 0; min-height: 34px; display: grid; place-items: center; }
+.move-stage .form-video { height: 34px; padding: 0 14px 0 11px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); text-decoration: none; transition: scale .15s var(--ease-out); }
+.move-stage .form-video .fv-icon { display: inline-flex; }
+.move-stage .form-video:active { scale: .94; }
+.move-orb.orb-form { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 400; transition: transform .15s var(--ease-out); }
+.move-orb.orb-form .fv-icon svg { width: 30px; height: 30px; }
+.move-orb.orb-form:active { transform: scale(.96); }
+[data-theme="light"] .move-orb { background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35) 70%); border-color: rgba(0, 0, 0, 0.1); }
 /* Moving between moves: the new one slides in from the side you're heading */
 .move-stage.enter-next > * { animation: move-in-next .42s var(--ease-out) both; }
 .move-stage.enter-prev > * { animation: move-in-prev .42s var(--ease-out) both; }

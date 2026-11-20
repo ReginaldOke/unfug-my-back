@@ -4,6 +4,7 @@ import * as R from '../lib/repos.js';
 import { localDate, addDays, dayLabel, weekdayLetter } from '../lib/dates.js';
 import { VSlider, FactorTile, defaultAmount, PENCIL } from './controls.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
+import { workoutTicks } from '../lib/health-days.js';
 import { sleepWord } from '../lib/labels.js';
 import { Body3D, RegionList, webglAvailable } from './body3d.js';
 import { quickAddFactor } from './factor.js';
@@ -22,6 +23,12 @@ const has3D = webglAvailable();
 
 function freshDraft(date) {
   const existing = R.checkins.entryFor(date);
+  const selections = R.checkins.factorValues(date);
+  // A new check-in starts with that day's workouts from Apple Health ticked, where one fits an item
+  if (!existing) {
+    const items = R.factors.forCheckin([], { exercise: true }).concat(R.factors.forCheckin(['helper', 'trigger', 'unsure']));
+    for (const [id, v] of workoutTicks(R.health.day(date)?.workouts, items)) if (!selections.has(id)) selections.set(id, v);
+  }
   return {
     startedAt: Date.now(), step: 0,
     pain: existing?.painScore ?? null, stress: existing?.stressScore ?? null,
@@ -33,7 +40,7 @@ function freshDraft(date) {
     // Routines counted in times today: how many times, by their check-in item
     times: R.routines.timesOn(date),
     notes: existing?.notes ?? '',
-    selections: R.checkins.factorValues(date),
+    selections,
     markers: existing ? R.checkins.markersFor(existing.id).map(({ regionId, side, intensity, quality, modelPoint }) => ({ regionId, side, intensity, quality, modelPoint })) : [],
   };
 }

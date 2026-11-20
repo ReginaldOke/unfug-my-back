@@ -5,6 +5,7 @@ import { localDate } from './dates.js';
 import { parseHM } from './reminders-core.js';
 import { parseReminder, reminderOn } from './labels.js';
 import { careNotice } from './care.js';
+import { sumByDay, averageByDay, standHoursByDay, workoutsByDay } from './health-days.js';
 
 const Cap = globalThis.Capacitor;
 export const isNative = !!Cap?.isNativePlatform?.();
@@ -183,14 +184,38 @@ function covered(spans) {
   return total / 60_000;
 }
 
+// Steps and sleep are asked for when connecting. Everything else is switched on one at a time from the
+// Apple Health screen, and only what's switched on is asked for and read.
+const HEALTH_CORE = ['steps', 'sleep'];
+export const HEALTH_EXTRAS = [
+  { key: 'workouts', label: 'Workouts', read: ['workouts'] },
+  { key: 'stand', label: 'Stand hours', read: ['appleStandHour'] },
+  { key: 'exercise', label: 'Exercise minutes', read: ['exerciseTime'] },
+  { key: 'distance', label: 'Walking distance', read: ['distance'] },
+  { key: 'heart', label: 'Heart rate', read: ['restingHeartRate', 'heartRateVariability'] },
+];
+const extraOn = key => (R.settings().healthTypes ?? []).includes(key);
+export { extraOn as healthExtraOn };
+
 /** Asks for read access to steps and sleep (iOS shows its own sheet the first time). */
 export async function connectHealth() {
   if (!isNative) return false;
   const { available } = await Health.isAvailable();
   if (!available) return false;
-  await Health.requestAuthorization({ read: ['steps', 'sleep'] });
+  await Health.requestAuthorization({ read: HEALTH_CORE });
   R.setSettings({ healthSync: true });
   return syncHealth();
+}
+
+/** Switches one extra on (asking iOS for it the first time) or off, then syncs. */
+export async function setHealthExtra(key, on) {
+  if (!isNative) return false;
+  const t = HEALTH_EXTRAS.find(x => x.key === key);
+  if (on) await Health.requestAuthorization({ read: t.read });
+  const now = new Set(R.settings().healthTypes ?? []);
+  if (on) now.add(key); else now.delete(key);
+  R.setSettings({ healthTypes: [...now] });
+  return on ? syncHealth() : 0;
 }
 
 /** Pulls the last 60 days of daily steps and nightly sleep into the diary. Returns how many days changed. */
@@ -226,6 +251,8 @@ export async function syncHealth(days = 60) {
     if (min >= 60) Object.assign(row(date), { sleepHours: Math.round(min / 6) / 10, inBed: slept ? 0 : 1 });
   }
 
+  await syncMoreHealth(range, row, report, failed);
+
   const n = R.health.merge([...rows.values()], 'healthkit');
   report.sleepNights = [...rows.values()].filter(r => r.sleepHours != null).length;
   R.setSettings({ healthReport: report }, { quiet: true });
@@ -234,6 +261,38 @@ export async function syncHealth(days = 60) {
   const fresh = ['sleepHours', 'steps'].filter(key => !added.includes(key) && R.health.has(key));
   if (fresh.length) R.setSettings({ chartExtras: [...new Set([...(R.settings().chartExtras ?? []), ...fresh])], healthOnChart: [...added, ...fresh] });
   return n;
+}
+
+/**
+ * Workouts, Watch stand hours and exercise minutes, walking distance, resting heart rate and heart rate
+ * variability, each only once it's switched on. Without a Watch most stay empty, except workouts that another
+ * app (Strava, a surf app) saved to Health.
+ */
+async function syncMoreHealth(range, row, report, failed) {
+  if (extraOn('workouts')) {
+    const { workouts = [] } = await Health.queryWorkouts({ ...range, limit: 1000 }).catch(failed('Workouts'));
+    report.workouts = workouts.length;
+    for (const [date, list] of workoutsByDay(workouts)) row(date).workouts = list;
+  }
+  if (extraOn('stand')) {
+    const { samples = [] } = await Health.readSamples({ dataType: 'appleStandHour', ...range, limit: 5000 }).catch(failed('Stand hours'));
+    for (const [date, n] of standHoursByDay(samples)) row(date).standHours = n;
+  }
+  if (extraOn('exercise')) {
+    const { samples = [] } = await Health.readSamples({ dataType: 'exerciseTime', ...range, limit: 20000 }).catch(failed('Exercise minutes'));
+    for (const [date, min] of sumByDay(samples)) if (min > 0) row(date).exerciseMinutes = Math.round(min);
+  }
+  if (extraOn('distance')) {
+    const { samples = [] } = await Health.queryAggregated({ dataType: 'distance', ...range, bucket: 'day', aggregation: 'sum' }).catch(failed('Walking distance'));
+    for (const x of samples) if (x.value > 0) row(localDate(new Date(x.startDate))).walkingKm = Math.round(x.value / 100) / 10;
+  }
+  // Resting heart rate and heart rate variability, which can drop when pain or stress is up
+  if (extraOn('heart')) {
+    const { samples: rhr = [] } = await Health.queryAggregated({ dataType: 'restingHeartRate', ...range, bucket: 'day', aggregation: 'average' }).catch(failed('Resting heart rate'));
+    for (const x of rhr) if (x.value > 0) row(localDate(new Date(x.startDate))).restingHeartRate = Math.round(x.value);
+    const { samples: hrv = [] } = await Health.readSamples({ dataType: 'heartRateVariability', ...range, limit: 5000 }).catch(failed('Heart rate variability'));
+    for (const [date, ms] of averageByDay(hrv)) if (ms > 0) row(date).hrvMs = Math.round(ms);
+  }
 }
 
 /**

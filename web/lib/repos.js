@@ -3,10 +3,11 @@ import * as S from './store.js';
 import { localDate, addDays } from './dates.js';
 import { SEED_FACTORS, SEED_ROUTINE, SEED_GYM } from './seed.js';
 import { DEFAULT_ROUTINES, libraryRoutine, fromLibrary, OLD_DOSES } from './routine-library.js';
-import { defaultUnit, emojiFor } from './labels.js';
+import { defaultUnit, emojiFor, measureOf } from './labels.js';
 import { regionAt, H } from './regions3d.js';
 import { regionById } from './regions.js';
 import { planImport, planRestore } from './import.js';
+import { describeRoutineChange, meaningfulChanges } from './routine-changes.js';
 
 export const settings = S.settings;
 export const setSettings = S.setSettings;
@@ -283,6 +284,9 @@ export const checkins = {
         S.insert('painMarkers', { dailyEntryId: entry.id, flareId: null, regionId: m.regionId, side: m.side, intensity: m.intensity, quality: m.quality, modelPoint: m.modelPoint ?? null });
       }
 
+      // A routine ticked for the first time starts it, for before and after comparisons
+      for (const r of routines.all()) if (draft.selections.has(r.linkedFactorId) && !routines.everDone(r.id)) routines.logChange(r.id, `Started ${routineLabel(r)}`, date);
+
       // One log per factor per day. Replaces earlier manual logs for the date, including routine
       // completions, whose total the draft was pre-filled with.
       S.removeWhere('factorLogs', l => l.date === date && l.source === 'manual');
@@ -320,23 +324,9 @@ export const flares = {
   },
 };
 
-/** "Added Bird dog", "Removed Cat-cow and Open book", "New order"… for a routine's moves before and after. */
-export function describeRoutineChange(before, after) {
-  const names = items => items.map(it => it.name);
-  const b = names(before), a = names(after);
-  const list = xs => (xs.length <= 2 ? xs.join(' and ') : `${xs.length} moves`);
-  const added = a.filter(n => !b.includes(n)), removed = b.filter(n => !a.includes(n));
-  const parts = [];
-  if (added.length) parts.push(`Added ${list(added)}`);
-  if (removed.length) parts.push(`${parts.length ? 'removed' : 'Removed'} ${list(removed)}`);
-  if (parts.length) return parts.join(', ');
-  const doses = after.filter(it => before.find(x => x.name === it.name)?.dose !== it.dose).map(it => it.name);
-  if (doses.length) return `Changed ${doses.length <= 2 ? `the dose of ${doses.join(' and ')}` : `${doses.length} doses`}`;
-  return b.join() !== a.join() ? 'New order' : null;
-}
+export { describeRoutineChange };
 
-/** How a routine's sessions are measured: as set on it, else times today for mobility and stretching, else how hard. */
-export const measureOf = r => r?.measure ?? (/mobility|stretch/i.test(`${r?.group ?? ''} ${r?.name ?? ''}`) ? 'count' : 'effort');
+export { measureOf };
 
 export const routines = {
   /** In the order the user arranged them (routines made since go last, in the order they were made). */
@@ -370,7 +360,8 @@ export const routines = {
       else if (f.name !== routineLabel(row)) S.update('factors', f.id, { name: routineLabel(row) });
       // A new emoji for the routine shows on its check-in item too
       if (f?.routineId && fields.icon && f.icon !== fields.icon) S.update('factors', f.id, { icon: fields.icon });
-      const what = before ? describeRoutineChange(before, row.items) : `Started ${routineLabel(row)}`;
+      // Only a routine that's been done can change: its start is logged with its first session
+      const what = before && routines.everDone(row.id) ? describeRoutineChange(before, row.items) : null;
       if (what) routines.logChange(row.id, what);
       return row;
     });
@@ -401,9 +392,19 @@ export const routines = {
     S.batch(() => {
       const r = S.update('routines', id, { isArchived: true });
       if (factors.get(r.linkedFactorId)?.routineId) S.update('factors', r.linkedFactorId, { isArchived: true });
-      routines.logChange(id, `Stopped ${r.name}`);
+      if (routines.everDone(id)) routines.logChange(id, `Stopped ${routineLabel(r)}`);
     });
   },
+
+  /** Every day a routine was done, from its sessions and from check-ins that ticked it, as [{ routineId, date }]. */
+  doneDays() {
+    const byFactor = new Map(S.table('routines').filter(r => r.linkedFactorId).map(r => [r.linkedFactorId, r.id]));
+    return [
+      ...S.table('routineCompletions').filter(c => c.completed).map(c => ({ routineId: c.routineId, date: c.date ?? localDate(new Date(c.timestamp)) })),
+      ...S.table('factorLogs').filter(l => byFactor.has(l.factorId) && l.value > 0).map(l => ({ routineId: byFactor.get(l.factorId), date: l.date })),
+    ];
+  },
+  everDone: id => routines.doneDays().some(d => d.routineId === id),
 
   lastDoneDate: id => S.table('routineCompletions').filter(c => c.routineId === id && c.completed)
     .map(c => c.date ?? localDate(new Date(c.timestamp))).sort().at(-1) ?? null,
@@ -437,6 +438,7 @@ export const routines = {
     return S.batch(() => {
       const timestamp = date === localDate() ? S.nowISO() : new Date(`${date}T12:00:00`).toISOString();
       const existing = routines.sessionOn(id, date);
+      if (r && !routines.everDone(id)) routines.logChange(id, `Started ${routineLabel(r)}`, date);
       if (existing) S.update('routineCompletions', existing.id, { log, intensity: intensity ?? existing.intensity ?? null, times: times ?? existing.times ?? null });
       else S.insert('routineCompletions', { routineId: id, date, timestamp, completed: true, log, intensity, times });
       if (writeLog && r?.linkedFactorId) {
@@ -456,7 +458,7 @@ export const routines = {
   /** Changes by date: Map date → [{ routine name, summary }]. */
   changesByDate() {
     const m = new Map();
-    for (const c of S.table('routineChanges')) {
+    for (const c of meaningfulChanges(S.table('routineChanges'), routines.doneDays())) {
       if (!m.has(c.date)) m.set(c.date, []);
       const r = routines.get(c.routineId), name = r ? routineLabel(r) : 'Routine';
       // "Started …" and "Stopped …" already name the routine
@@ -510,7 +512,7 @@ export const reminders = {
   update: (id, patch) => S.update('reminderEvents', id, patch),
 };
 
-/** Daily totals brought in from Apple Health (steps, and sleep for the night ending that morning). */
+/** Daily totals brought in from Apple Health: steps, sleep for the night ending that morning, workouts and activity. */
 export const health = {
   day: date => S.table('healthDays').find(d => d.date === date),
   all: () => [...S.table('healthDays')].sort((a, b) => a.date.localeCompare(b.date)),
@@ -532,12 +534,12 @@ export const health = {
     return nights.filter(d => d.inBed).length > nights.length / 2 ? 'In bed' : 'Asleep';
   },
 
-  /** Merges rows of { date, steps?, sleepHours? } into what's stored. Returns how many days changed. */
+  /** Merges rows of { date, steps?, sleepHours?, workouts?, … } into what's stored. Returns how many days changed. */
   merge(rows, source) {
     let n = 0;
     S.batch(() => {
       for (const { date, ...vals } of rows) {
-        const clean = Object.fromEntries(Object.entries(vals).filter(([, v]) => v != null && Number.isFinite(v)));
+        const clean = Object.fromEntries(Object.entries(vals).filter(([, v]) => v != null && (Number.isFinite(v) || Array.isArray(v))));
         if (!Object.keys(clean).length) continue;
         const row = health.day(date);
         if (row) S.update('healthDays', row.id, { ...clean, source }); else S.insert('healthDays', { date, ...clean, source });

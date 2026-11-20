@@ -75,11 +75,31 @@ export function doseResponse(pain, amounts, checkinDates, lag = 0) {
   });
 }
 
+export const FLARE_PAIN = 5; // a check-in at this pain or more counts as a flare day
+
+/**
+ * Flares: any day with pain at FLARE_PAIN or more, plus any flare logged on its own. Days in a row
+ * make one flare, as { start, end, days, peakPain }, oldest first.
+ */
+export function flareEpisodes(entries, logged = []) {
+  const peak = new Map();
+  for (const e of entries) if (e.painScore >= FLARE_PAIN) peak.set(e.date, Math.max(peak.get(e.date) ?? 0, e.painScore));
+  for (const f of logged) { const d = localDate(new Date(f.timestamp)); peak.set(d, Math.max(peak.get(d) ?? 0, f.intensity ?? FLARE_PAIN)); }
+  const out = [];
+  for (const d of [...peak.keys()].sort()) {
+    const last = out.at(-1);
+    if (last && addDays(last.end, 1) === d) { last.end = d; last.days++; last.peakPain = Math.max(last.peakPain, peak.get(d)); }
+    else out.push({ start: d, end: d, days: 1, peakPain: peak.get(d) });
+  }
+  return out;
+}
+
 /** Share of flares that had the factor logged within the 24 hours before (same or previous calendar day). */
 export function flareAssociation(flares, amounts) {
   if (!flares.length) return null;
+  // Each flare counts once, from the day it started
   const hits = flares.filter(f => {
-    const d = localDate(new Date(f.timestamp));
+    const d = f.start;
     return (amounts.get(d) || 0) > 0 || (amounts.get(addDays(d, -1)) || 0) > 0;
   }).length;
   return { hits, total: flares.length };
@@ -107,7 +127,7 @@ export function analyseFactor(factor, data, today = localDate(), minDays = MIN_D
   return {
     factor, lags, best, early: !!best && (best.nWith < MIN_DAYS || best.nWithout < MIN_DAYS),
     dose: ['minutes', 'count'].includes(factor.measureType) ? doseResponse(pain, amounts, checkinDates, best?.lag ?? 0) : [],
-    flares: flareAssociation(data.flares, amounts),
+    flares: flareAssociation(flareEpisodes(data.dailyEntries, data.flares ?? []), amounts),
     consistency: consistency(amounts, today),
     daysLogged: amounts.size,
   };

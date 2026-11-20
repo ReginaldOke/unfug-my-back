@@ -224,9 +224,11 @@ export const MORE_MOVES = [
   { names: ['bent over row', 'bentover row', 'barbell row', 'dumbbell row', 'db row', 'row', 'single arm row', 'one arm row', 'cable row', 'seated row'], accent: 'sh', hold: 600, travel: 1100, plant: ['fN', 'fF'],
     pa: on({ hip: [94, 76], torso: -25, head: -20, armN: [90, 90], armF: [90, 90], legN: [70, 100], legF: [70, 100] }),
     pb: on({ hip: [94, 76], torso: -25, head: -20, armN: [195, 95], armF: [195, 95], legN: [70, 100], legF: [70, 100] }) },
-  { names: ['pull up', 'pullup', 'chin up', 'chinup', 'lat pulldown', 'pulldown', 'pull down', 'hang', 'dead hang'], accent: 'sh', hold: 700, travel: 1200, floor: false, props: BAR, plant: ['hN', 'hF'],
-    pa: { hip: [100, 88], torso: -90, head: -90, armN: [-90, -90], armF: [-90, -90], legN: [95, 100], legF: [95, 100] },
-    pb: { hip: [100, 64], torso: -90, head: -90, armN: [-15, -160], armF: [-15, -160], legN: [95, 100], legF: [95, 100] } },
+  // Pull-up, seen from behind: hands on the bar a little wider than the shoulders, arms straight in a
+  // hang, then the elbows drive down and out with the forearms upright until the chin clears the bar
+  { names: ['pull up', 'pullup', 'chin up', 'chinup', 'lat pulldown', 'pulldown', 'pull down', 'hang', 'dead hang'], view: 'back', feet: false, accent: 'sh', hold: 700, travel: 1200, floor: false, props: BAR, plant: ['hN', 'hF'],
+    pa: { hip: [100, 83.2], torso: -90, head: -90, bend: 0, armN: [-60, -60], armF: [-120, -120], legN: [84, 88], legF: [96, 92] },
+    pb: { hip: [100, 70], torso: -90, head: -90, bend: 0, armN: [0, -90], armF: [-180, -90], legN: [84, 88], legF: [96, 92] } },
   { names: ['bench press', 'bench', 'chest press', 'dumbbell press', 'db press', 'floor press', 'dumbbell bench'], accent: 'sh', hold: 600, travel: 1100, props: BENCH, supine: true,
     pa: { hip: [92, 100], torso: 0, head: 0, armN: [115, 300], armF: [115, 300], legN: [180, 90], legF: [180, 90] },
     pb: { hip: [92, 100], torso: 0, head: 0, armN: [270, 270], armF: [270, 270], legN: [180, 90], legF: [180, 90] } },

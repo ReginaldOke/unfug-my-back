@@ -7,13 +7,16 @@ import * as R from '../lib/repos.js';
 import { localDate, dayLabel, parseDate } from '../lib/dates.js';
 import { bumpLastNumber, parseReminder, formatReminder } from '../lib/labels.js';
 import { checkinDraft } from './checkin.js';
-import { MoveFigure } from './figure.js';
+import { MoveFigure, figureTop } from './figure.js';
 import { isTimed, formVideoUrl, startIndex } from '../lib/play.js';
 import { calmFor } from '../lib/calm.js';
 import { keepAwake } from '../lib/native.js';
 import { dragHandles } from './sortable.js';
 import { libraryRoutine } from '../lib/routine-library.js';
 import { emojiFor } from '../lib/labels.js';
+import { readRoutine } from '../lib/routine-import.js';
+import { readRoutineFile } from '../lib/routine-files.js';
+import { nameForMoves, nameForSplit, nameDays, freshName } from '../lib/routine-name.js';
 
 /** Set when a routine is finished, read once by the Today screen to play its celebration. */
 export const justFinished = { id: null };
@@ -208,9 +211,16 @@ function saveSession(s, { fromCheckin }) {
   return r;
 }
 
+/** A new routine left unnamed is named for what's in it ("Push", "Hip and hamstring stretch"), unlike any other. */
+function autoName(s) {
+  const n = nameForMoves(s.items);
+  return n ? freshName(n, R.routines.all().filter(r => r.id !== s.id).map(R.routineLabel)) : '';
+}
+
 /** Saves one routine (or variation) and, if any move is ticked, its session. Returns the routine, or null. */
 /** markDone: Done on an existing routine's own page logs it as done today, whatever was entered. */
 function saveOne(s, { markDone = false } = {}) {
+  if (!s.name.trim() && s.group === null && !s.id) s.name = autoName(s);
   const name = s.name.trim();
   const items = s.items.filter(it => it.name.trim());
   if (s.group !== null && !s.group.trim()) { toast('Give the routine a name'); return null; }
@@ -490,7 +500,7 @@ export function RoutineView(ctx) {
   function moveRow(it) {
     const name = h('input', {
       type: 'text', class: 'log-name', value: it.name, placeholder: 'Move', 'aria-label': 'Move name', enterkeyhint: 'next',
-      oninput: e => { it.name = e.target.value; },
+      oninput: e => { it.name = e.target.value; paintActions(); },
       onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
     });
     // Touching the name doesn't open the keyboard straight away, so a hold can still lift the row
@@ -528,7 +538,7 @@ export function RoutineView(ctx) {
       row.style.height = `${row.offsetHeight}px`;
       row.classList.add('removing');
       requestAnimationFrame(() => { row.style.height = '0px'; });
-      setTimeout(() => { s.items.splice(s.items.indexOf(it), 1); row.remove(); openRow = null; }, 240);
+      setTimeout(() => { s.items.splice(s.items.indexOf(it), 1); row.remove(); openRow = null; paintActions(); }, 240);
       vibrate(8);
     }
 
@@ -599,6 +609,7 @@ export function RoutineView(ctx) {
     s.items.push(it);
     list.append(moveRow(it));
     addName.value = ''; addReps.value = '';
+    paintActions();
   }
 
   // How it went: how hard (Easy to Hard), or how many times today, whichever this routine measures
@@ -673,9 +684,39 @@ export function RoutineView(ctx) {
     },
   });
   play.innerHTML = PLAY;
+  const done = h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done');
+  // A routine with no moves yet can't be played or done: Import takes their place until a move is added
+  const importBtn = h('button', { type: 'button', class: 'icon-btn glass done-btn import-btn', onclick: () => importSheet(s, imported) }, 'Import');
+  function paintActions() {
+    const empty = !s.items.some(it => it.name.trim());
+    importBtn.hidden = !empty; play.hidden = empty; done.hidden = empty;
+    // Unnamed, a new routine shows the name it'll get from its moves, kept unless one is typed
+    if (!s.id) title.placeholder = autoName(s) || 'Routine name';
+  }
+  paintActions();
+  // What came in: one day fills this page to look over; several become variations, saved straight away
+  function imported({ title: name, days }) {
+    const items = d => d.items.map(it => ({ name: it.name, dose: it.dose, did: it.dose, done: false, extra: it.extra ?? '', extraDose: it.extra ?? '' }));
+    if (days.length === 1) {
+      s.items.splice(0, s.items.length, ...items(days[0]));
+      const named = name ?? days[0].name ?? autoName(s);
+      if (!title.value.trim() && named) { title.value = named; if (s.group !== null) s.group = named; else s.name = named; }
+      paint(); paintActions();
+      return;
+    }
+    const group = title.value.trim() || name || freshName(nameForSplit(days) ?? 'Imported routine', R.routines.all().map(r => r.group ?? r.name));
+    const dayNames = nameDays(days);
+    const made = days.map((d, i) => R.routines.save(null, {
+      group, name: dayNames[i], groupOrder: i, schedule: [], items: items(d).map(templateOf), ...(s.icon ? { icon: s.icon } : {}),
+    }));
+    sessions.delete(s.key);
+    toast(`${days.length} variations added`);
+    location.replace(`#/routine/${made[0].id}?${stay}`);
+  }
 
   // A new routine has to exist before the player can open it
   function saveDraftRoutine() {
+    if (!s.name.trim()) { s.name = autoName(s); title.value = s.name; }
     if (!s.name.trim()) { toast('Give the routine a name'); title.focus(); return null; }
     const r2 = R.routines.save(null, { name: s.name.trim(), items: s.items.filter(it => it.name.trim()).map(templateOf), schedule: s.schedule, ...(s.icon ? { icon: s.icon } : {}) });
     sessions.delete(s.key);
@@ -712,8 +753,7 @@ export function RoutineView(ctx) {
     h('header', { class: 'top-bar' },
       iconButton('‹', 'Back', () => history.back()),
       date === localDate() ? h('span') : h('span', { class: 'eyebrow' }, dayLabel(date)),
-      h('div', { class: 'row tight' }, chartBtn, info, play,
-        h('button', { type: 'button', class: 'icon-btn glass done-btn', onclick: () => saveSession(s, { fromCheckin }) }, 'Done'))),
+      h('div', { class: 'row tight' }, chartBtn, info, importBtn, play, done)),
     h('div', { class: 'title-row' }, picker.btn, title),
     picker.row,
     variationTabs(),
@@ -728,7 +768,7 @@ export function RoutineView(ctx) {
     stopwatch(s, paint, ctx),
     field,
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
-    r ? h('button', {
+    ...[r ? h('button', {
       type: 'button', class: 'link-danger', onclick: async () => {
         if (await confirmSheet(`Delete ${R.routineLabel(r)}?`, 'Past sessions stay in your history.', 'Delete', { danger: true })) {
           sessions.delete(s.key);
@@ -738,9 +778,96 @@ export function RoutineView(ctx) {
           location.hash = left.length ? `#/routine/${left[0].id}?${stay}` : '#/routines';
         }
       },
-    }, r.group ? 'Delete this variation' : 'Delete routine') : null);
+    }, r.group ? 'Delete this variation' : 'Delete routine') : null].filter(Boolean));
     return body;
   }
+}
+
+/**
+ * Import: paste a routine (from Notes, Messages, an email, a web page) or open a file (a document, a
+ * spreadsheet, a PDF, an export from another workout app). What it reads shows as it's read, so it can be
+ * checked before it's added.
+ */
+function importSheet(s, onImport) {
+  let found = null;
+  sheet(close => {
+    const text = h('textarea', { class: 'notes glass import-text', rows: 6, placeholder: 'Paste it here', 'aria-label': 'Routine to import', oninput: () => show(readRoutine(text.value)) });
+    const preview = h('div', { class: 'import-preview', 'aria-live': 'polite' });
+    const add = h('button', { type: 'button', class: 'btn primary', disabled: true, onclick: () => { if (found) { close(); onImport(found); } } }, 'Add');
+    const file = h('input', {
+      type: 'file', hidden: true, accept: '.txt,.text,.md,.csv,.tsv,.json,.html,.htm,.rtf,.eml,.docx,.xlsx,.pdf,text/*,application/pdf,application/json',
+      onchange: async () => {
+        const f = file.files[0];
+        file.value = '';
+        if (!f) return;
+        try {
+          const t = await readRoutineFile(f);
+          const read = t && readRoutine(t, { fileName: f.name });
+          if (!read) return toast(/\.pdf$/i.test(f.name) ? 'Couldn’t read this PDF. Copy its text and paste it instead.' : 'No moves found in that file');
+          text.value = t.trim();
+          show(read);
+        } catch { toast('Couldn’t open that file'); }
+      },
+    });
+    const paste = h('button', {
+      type: 'button', class: 'chip glass', onclick: async () => {
+        try {
+          const t = await navigator.clipboard.readText();
+          if (t?.trim()) { text.value = t; show(readRoutine(t)); return; }
+        } catch { /* not allowed: paste by hand */ }
+        text.focus();
+      },
+    }, 'Paste');
+    const open = h('button', { type: 'button', class: 'chip glass', onclick: () => file.click() }, 'Open a file');
+
+    function show(read) {
+      found = read;
+      add.disabled = !read;
+      // Once something's read, the text steps back to a few lines and what was found takes the room
+      text.classList.toggle('read', !!read);
+      if (!read) { preview.replaceChildren(text.value.trim() ? h('p', { class: 'hint' }, 'No moves found yet') : ''); add.textContent = 'Add'; return; }
+      const moves = read.days.reduce((n, d) => n + d.items.length, 0);
+      add.textContent = read.days.length > 1 ? `Add ${read.days.length} variations` : `Add ${moves} move${moves === 1 ? '' : 's'}`;
+      // Named as it will be: its own title, else from what's in it; days the same way
+      const name = s.group ?? s.name;
+      const title = name?.trim() || read.title || (read.days.length > 1 ? nameForSplit(read.days) : nameForMoves(read.days[0].items));
+      const days = nameDays(read.days);
+      preview.replaceChildren(
+        title ? h('p', { class: 'import-title' }, title) : '',
+        ...read.days.map((d, i) => h('div', { class: 'import-day' },
+          read.days.length > 1 ? h('h3', { class: 'section-label' }, days[i]) : '',
+          h('ul', { class: 'import-moves' }, d.items.map(it => h('li', {},
+            h('span', { class: 'import-name' }, it.name),
+            h('span', { class: 'import-dose' }, [it.dose, it.extra].filter(Boolean).join(' · ')))))))
+      );
+    }
+    setTimeout(() => text.focus(), 300);
+    return h('div', { class: 'stack import-sheet' },
+      h('h2', {}, 'Import a routine'),
+      h('div', { class: 'row tight' }, paste, open, file),
+      text, preview,
+      // Always in reach, however long the list
+      h('div', { class: 'row end import-actions' }, h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Cancel'), add));
+  }, { full: true });
+}
+
+/**
+ * See form sits exactly halfway between the progress bar and the highest point the figure reaches as it
+ * moves (a figure lying on a bench sits low in its box; one hanging from a bar reaches the top).
+ */
+function centreForm(name, figure, video, bar, tries = 20) {
+  // The first move is drawn before the player is on screen: wait for it
+  if (!figure.isConnected) { if (tries) setTimeout(() => centreForm(name, figure, video, bar, tries - 1), 30); return; }
+  const units = figureTop(name);
+  if (units == null) return;
+  // From the layout, not the screen, so the slide-in as the move arrives doesn't throw it off
+  const top = el => { let y = 0; for (let e = el; e; e = e.offsetParent) y += e.offsetTop; return y; };
+  const art = figure.closest('.move-art'), room = video.parentElement;
+  const box = figure.getBoundingClientRect(), artBox = art.getBoundingClientRect();
+  const scale = Math.min(box.width / 200, box.height / 140);
+  const figureTopPx = top(art) + (box.top - artBox.top) + (box.height - 140 * scale) / 2 + units * scale;
+  const want = (top(bar) + bar.offsetHeight + figureTopPx) / 2;
+  video.style.transform = `translateY(${Math.round(want - (top(room) + room.offsetHeight / 2))}px)`;
 }
 
 const SCRUB_STEP = 14; // px of finger travel per step
@@ -757,7 +884,11 @@ function fitWidth(input) {
   measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
   const text = input.value || input.placeholder || '';
   const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2;
-  input.style.width = `${Math.min(190, Math.max(48, Math.ceil(measure.measureText(text).width + pad)))}px`;
+  const w = Math.min(190, Math.max(48, Math.ceil(measure.measureText(text).width + pad)));
+  input.style.width = `${w}px`;
+  // The boxes use even-width digits, which the measuring doesn't: widen by whatever still doesn't fit
+  const over = input.scrollWidth - input.clientWidth;
+  if (over > 0) input.style.width = `${Math.min(190, w + over + 2)}px`;
 }
 
 function scrubNumber(input, seed, onChange = () => {}) {
@@ -867,21 +998,34 @@ export function RoutineRunView(ctx) {
       onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
     }) : null;
     if (extra) scrubNumber(extra, () => it.extraDose || '0');
-    // Its figure (or, for breathing and meditation, a calm guide), with a way to watch it in the corner
+    // Its figure (or, for breathing and meditation, a calm guide), with a way to watch it above
     const calm = calmFor(it.name);
     const video = h('a', { class: 'glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': calm ? `Guided ${it.name} videos` : `See form videos for ${it.name}` },
       h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', {}, calm ? 'Guided' : 'See form'));
     video.firstChild.innerHTML = WATCH;
-    const art = h('div', { class: 'move-art' }, MoveFigure(it.name) ?? h('div', { class: 'move-orb', 'aria-hidden': 'true' }, String(i + 1)), video);
+    // With no figure for the move, the circle itself is the way to see how it's done
+    const figure = MoveFigure(it.name);
+    let art;
+    if (figure) art = h('div', { class: 'move-art' }, figure);
+    else {
+      const orb = h('a', { class: 'move-orb orb-form', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': `See form videos for ${it.name}` },
+        h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', { class: 'orb-label' }, 'See form'));
+      orb.firstChild.innerHTML = WATCH;
+      art = h('div', { class: 'move-art' }, orb);
+    }
     // A line on how to do it, for the calm activities that come with one
     const how = r.items.find(x => x.name === it.name)?.how;
     // Story-style progress: done, this one, still to come; tap one to go to it
     const bar = h('div', { class: 'progress run-progress', role: 'tablist', 'aria-label': 'Moves' }, moves.map((m, k) => h('button', {
       type: 'button', class: k < i ? 'done' : k === i ? 'now' : '', role: 'tab', 'aria-selected': String(k === i), 'aria-label': `${k + 1}. ${m.name}`, onclick: () => go(k),
     })));
+    // See form sits centred in the space above the figure, with the same space below the move, so the
+    // move stays in the middle of the screen
     const stage = h('div', { class: `flow-body move-stage${dir ? ` enter-${dir > 0 ? 'next' : 'prev'}` : ''}` },
+      h('div', { class: 'stage-room' }, figure ? video : null),
       art, h('h1', { tabindex: -1 }, it.name), how ? h('p', { class: 'run-how' }, how) : null,
-      extra ? h('div', { class: 'did-pair' }, amount, extra) : amount, isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null);
+      extra ? h('div', { class: 'did-pair' }, amount, extra) : amount, isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null,
+      h('div', { class: 'stage-room', 'aria-hidden': 'true' }));
     root.replaceChildren(
       h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, R.routineLabel(r)), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),
       bar, stage,
@@ -894,6 +1038,7 @@ export function RoutineRunView(ctx) {
           },
         }, last ? 'Finish' : 'Next')));
     root.querySelector('h1').focus({ preventScroll: true });
+    if (figure && !calm) centreForm(it.name, figure, video, bar);
   }
   render();
   return root;

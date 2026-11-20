@@ -25,6 +25,19 @@ test('export filters by date range and keeps related markers', () => {
   assert.doesNotThrow(() => JSON.parse(JSON.stringify(out)));
 });
 
+test('export lists flares from high pain days and leaves out the old ache label', () => {
+  const d = {
+    ...data,
+    dailyEntries: [{ id: 'a', date: '2026-11-06', painScore: 6 }, { id: 'b', date: '2026-11-07', painScore: 5 }, { id: 'c', date: '2026-11-08', painScore: 2 }],
+    painMarkers: [{ dailyEntryId: 'a', regionId: 'right_foot', quality: 'ache' }],
+    healthDays: [{ date: '2026-11-06', steps: 5000, sleepHours: 7.1, inBed: 0 }],
+  };
+  const out = buildExport(d, {});
+  assert.deepEqual(out.flares, [{ start: '2026-11-06', end: '2026-11-07', days: 2, peakPain: 6 }]);
+  assert.equal('quality' in out.painMarkers[0], false);
+  assert.equal('inBed' in out.healthDays[0], false);
+});
+
 test('CSV escapes quotes, commas and newlines, and serialises objects', () => {
   const csv = toCSV([{ a: 'x, y', b: 'say "hi"' }, { a: 'line\nbreak', c: { k: 1 } }]);
   assert.equal(csv, 'a,b,c\n"x, y","say ""hi""",\n"line\nbreak",,"{""k"":1}"');

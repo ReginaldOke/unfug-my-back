@@ -13,7 +13,8 @@ export const STATUS_LABEL = Object.fromEntries(STATUS_OPTIONS);
 /** How a 0–10 night's sleep reads in words: 0 is terrible, 10 is great. */
 export const sleepWord = v => (v <= 2 ? 'Terribly' : v <= 4 ? 'Poorly' : v <= 6 ? 'OK' : v <= 8 ? 'Well' : 'Great');
 
-export const QUALITIES = ['ache', 'sharp', 'burning', 'tingling', 'numbness', 'stiffness'];
+/** How a routine's sessions are measured: as set on it, else times today for mobility and stretching, else how hard. */
+export const measureOf = r => r?.measure ?? (/mobility|stretch/i.test(`${r?.group ?? ''} ${r?.name ?? ''}`) ? 'count' : 'effort');
 
 export function defaultUnit(measureType) {
   return { minutes: 'min', count: 'times', yesno: '', rating: '/10' }[measureType] ?? '';

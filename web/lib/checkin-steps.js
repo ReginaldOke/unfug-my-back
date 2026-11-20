@@ -3,7 +3,7 @@
 
 export const BUILT_IN = [
   { id: 'pain', title: 'How much does your back hurt?', locked: true },
-  { id: 'where', title: 'Where do you feel it most?', sub: 'Tap where it hurts.', name: 'Where it hurts' },
+  { id: 'where', title: 'Where do you feel it most?', name: 'Where it hurts' },
   { id: 'stress', title: 'How stressed were you today?', name: 'Stress' },
   { id: 'sleep', title: 'How did you sleep last night?', name: 'Sleep' },
   { id: 'food', title: 'How well did you eat today?', name: 'Eating' },

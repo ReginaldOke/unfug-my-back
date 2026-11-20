@@ -61,7 +61,7 @@ function runWake() {
 function fire(ev, now) {
   const s = R.settings();
   for (const old of R.reminders.awaiting()) R.reminders.update(old.id, { outcome: 'ignored' });
-  const still = s.lastMovementAt ? Math.round(minutesSince(s.lastMovementAt, now)) : s.reminder.intervalMin;
+  const still = core.stillMinutes(s.lastMovementAt, now, s.reminder.activeHours) ?? s.reminder.intervalMin;
   R.reminders.update(ev.id, { firedAt: now.toISOString(), stationaryMinutesBefore: still });
   showMovementBanner(R.reminders.awaiting()[0]);
   // Dead man's switch: there is always exactly one reminder ahead

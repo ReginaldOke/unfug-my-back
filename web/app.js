@@ -172,8 +172,12 @@ finishBoot();
 reminders.start();
 
 // Installable app: offline support and updates on each open (see sw.js)
-// The iOS app ships its files inside the app, so it needs no offline cache
-if ('serviceWorker' in navigator && !globalThis.Capacitor?.isNativePlatform?.()) {
+// The iOS app ships its files inside the app, so it needs no offline cache. Nor does a copy running on
+// this computer while it's being worked on, where a cache would only serve yesterday's files.
+const local = /^(?:localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+if ('serviceWorker' in navigator && local) {
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(() => {});
+} else if ('serviceWorker' in navigator && !globalThis.Capacitor?.isNativePlatform?.()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline support unavailable', e));
   });

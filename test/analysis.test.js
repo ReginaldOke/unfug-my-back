@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lagComparison, painByDate, amountsByDate, doseResponse, flareAssociation, consistency, analyseFactor, rankInsights, MIN_DAYS } from '../web/lib/analysis.js';
+import { lagComparison, painByDate, amountsByDate, doseResponse, flareAssociation, flareEpisodes, consistency, analyseFactor, rankInsights, MIN_DAYS } from '../web/lib/analysis.js';
 import { addDays } from '../web/lib/dates.js';
 
 const START = '2026-09-01';
@@ -87,13 +87,20 @@ test('dose response buckets pain by amount', () => {
 
 test('flare association counts factor on the flare day or the day before', () => {
   const amounts = new Map([['2026-09-02', 30]]);
-  const flares = [
-    { timestamp: new Date(2026, 8, 2, 15).toISOString() }, // same day
-    { timestamp: new Date(2026, 8, 3, 9).toISOString() },  // next day
-    { timestamp: new Date(2026, 8, 6, 9).toISOString() },  // unrelated
-  ];
+  const flares = [{ start: '2026-09-02' }, { start: '2026-09-03' }, { start: '2026-09-06' }]; // same day, next day, unrelated
   assert.deepEqual(flareAssociation(flares, amounts), { hits: 2, total: 3 });
   assert.equal(flareAssociation([], amounts), null);
+});
+
+test('a day at pain 5 or more is a flare, and days in a row are one flare', () => {
+  const entries = [['11-05', 3], ['11-06', 6], ['11-07', 5], ['11-08', 4], ['11-12', 7]].map(([d, p]) => ({ date: `2026-${d}`, painScore: p }));
+  const logged = [{ timestamp: new Date(2026, 10, 15, 10).toISOString(), intensity: 8 }];
+  assert.deepEqual(flareEpisodes(entries, logged), [
+    { start: '2026-11-06', end: '2026-11-07', days: 2, peakPain: 6 },
+    { start: '2026-11-12', end: '2026-11-12', days: 1, peakPain: 7 },
+    { start: '2026-11-15', end: '2026-11-15', days: 1, peakPain: 8 },
+  ]);
+  assert.deepEqual(flareEpisodes([{ date: '2026-11-01', painScore: 4 }]), []);
 });
 
 test('helper consistency counts days done in the window', () => {

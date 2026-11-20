@@ -3,6 +3,8 @@
 addEventListener('DOMContentLoaded', () => {
   const phone = document.querySelector('.phone'), screen = phone.querySelector('.screen');
   const device = phone.querySelector('.device'), frame = phone.querySelector('iframe');
+  // try.html#/routine/new opens the phone on that screen
+  if (location.hash.length > 2) frame.src = `./${location.hash}`;
   const fit = () => { device.style.transform = `scale(${screen.clientWidth / 402})`; };
   fit();
   addEventListener('resize', fit);

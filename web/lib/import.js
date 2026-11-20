@@ -70,6 +70,11 @@ const CLEAN = {
   healthDays: d => day(d.date) && {
     id: id(d.id) ?? `h-${d.date}`, date: d.date, steps: num(d.steps, 0, 200000) ?? undefined, sleepHours: num(d.sleepHours, 0, 24) ?? undefined,
     inBed: d.inBed ? 1 : 0, source: text(d.source, 30) || 'import',
+    standHours: num(d.standHours, 0, 24) ?? undefined, exerciseMinutes: num(d.exerciseMinutes, 0, 1440) ?? undefined,
+    walkingKm: num(d.walkingKm, 0, 500) ?? undefined, restingHeartRate: num(d.restingHeartRate, 20, 250) ?? undefined, hrvMs: num(d.hrvMs, 0, 500) ?? undefined,
+    workouts: Array.isArray(d.workouts) ? d.workouts.slice(0, 20).filter(w => w && typeof w === 'object').map(w => ({
+      type: text(w.type, 40) || 'other', name: text(w.name, 60) || 'Workout', minutes: num(w.minutes, 0, 1440) ?? 0, km: num(w.km, 0, 1000) ?? undefined, start: text(w.start, 40),
+    })) : undefined,
   },
 };
 
@@ -77,7 +82,9 @@ const CLEAN = {
 export function cleanDiary(raw) {
   const out = {};
   for (const [name, clean] of Object.entries(CLEAN)) {
-    out[name] = list(raw?.[name], MAX_ROWS).map(row => (row && typeof row === 'object' ? clean(row) : null)).filter(Boolean)
+    // Exports list flares as days in a row of high pain; the ones logged on their own are under loggedFlares
+    const key = name === 'flares' && Array.isArray(raw?.loggedFlares) ? 'loggedFlares' : name;
+    out[name] = list(raw?.[key], MAX_ROWS).map(row => (row && typeof row === 'object' ? clean(row) : null)).filter(Boolean)
       .map(row => Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)));
   }
   return out;

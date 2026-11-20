@@ -2,14 +2,14 @@
 // when there's a connection.
 //  - App files: network first (so every new deploy shows up on the next open), cached copy when offline.
 //  - api/*: never cached (it needs the live server).
-const CACHE = 'back-story-v180';
+const CACHE = 'back-story-v182';
 
 // Everything the app needs to start offline. test/sw.test.js checks this list against web/.
 const ASSETS = [
   './', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'assets/body.obj', 'nudge.wav',
   'icons/apple-touch-icon.png', 'icons/favicon-32.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  'lib/ai.js', 'lib/analysis.js', 'lib/dates.js', 'lib/export.js', 'lib/health.js', 'lib/care.js', 'lib/import.js', 'lib/interpret.js', 'lib/move-names.js', 'lib/labels.js',
+  'lib/ai.js', 'lib/analysis.js', 'lib/dates.js', 'lib/export.js', 'lib/health.js', 'lib/health-days.js', 'lib/routine-changes.js', 'lib/routine-import.js', 'lib/routine-files.js', 'lib/routine-name.js', 'lib/care.js', 'lib/import.js', 'lib/interpret.js', 'lib/move-names.js', 'lib/labels.js',
   'lib/motion.js', 'lib/checkin-steps.js', 'lib/progress.js', 'lib/play.js', 'lib/calm.js', 'lib/routine-library.js', 'views/library.js', 'lib/insights.js', 'lib/notify.js', 'lib/native.js', 'lib/theme.js', 'views/checkins.js', 'privacy.html', 'support.html', 'about.html', 'try.html', 'assets/fonts/outfit.woff2', 'assets/fonts/italiana.woff2', 'site.js', 'site-page.js', 'try.js', 'lib/regions.js', 'lib/regions3d.js', 'lib/reminders-core.js',
   'lib/reminders.js', 'lib/repos.js', 'lib/seed.js', 'lib/store.js', 'lib/ui.js', 'lib/voice.js',
   'views/body3d.js', 'views/calendar.js', 'views/chart.js', 'views/checkin.js', 'views/controls.js',

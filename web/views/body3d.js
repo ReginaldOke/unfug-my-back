@@ -19,7 +19,7 @@ export function webglAvailable() {
   } catch { return false; }
 }
 
-/** markers: array of { regionId, side, intensity, quality, modelPoint? }, mutated in place. */
+/** markers: array of { regionId, side, intensity, modelPoint? }, mutated in place. */
 export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {}, onAdd = () => {} }) {
   const canvas = h('canvas', { class: 'body3d-canvas', role: 'img', 'aria-label': '3D body. Drag to turn it, pinch to zoom, tap where it hurts.' });
   const label = h('div', { class: 'body3d-label', 'aria-live': 'polite' });
@@ -148,7 +148,7 @@ export function Body3D({ markers, defaultIntensity = () => 5, onChange = () => {
     const regionId = regionAt(point, normal, H, depthAt(point));
     if (markers.some(m => m.regionId === regionId)) return removeRegion(regionId);
     markers.push({
-      regionId, side: regionById[regionId].side, intensity: defaultIntensity(), quality: 'ache',
+      regionId, side: regionById[regionId].side, intensity: defaultIntensity(),
       modelPoint: { x: +point.x.toFixed(4), y: +point.y.toFixed(4), z: +point.z.toFixed(4) },
     });
     vibrate(8);
@@ -395,7 +395,7 @@ export function RegionList({ markers, defaultIntensity = () => 5, onChange = () 
       onclick: () => {
         const i = markers.findIndex(m => m.regionId === r.regionId);
         if (i >= 0) markers.splice(i, 1);
-        else markers.push({ regionId: r.regionId, side: r.side, intensity: defaultIntensity(), quality: 'ache', modelPoint: null });
+        else markers.push({ regionId: r.regionId, side: r.side, intensity: defaultIntensity(), modelPoint: null });
         render();
         onChange(markers);
         if (i < 0) onAdd(r.regionId);

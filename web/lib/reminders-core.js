@@ -32,6 +32,17 @@ export function nextActiveTime(date, activeHours) {
   return null;
 }
 
+/**
+ * Minutes still before a reminder, counted from the later of the last real movement and the start of
+ * today's active hours, so a night's sleep never counts as sitting still.
+ */
+export function stillMinutes(lastMovementAt, now, activeHours) {
+  const ah = activeHours?.[now.getDay()];
+  const dayStart = ah?.on ? atMinutes(now, parseHM(ah.start)) : null;
+  const from = Math.max(lastMovementAt ? +new Date(lastMovementAt) : -Infinity, dayStart && dayStart <= now ? +dayStart : -Infinity);
+  return Number.isFinite(from) ? Math.max(0, Math.round((now - from) / 60_000)) : null;
+}
+
 /** Real movement: at least `minWalkMin` of walking/running, or at least `minSteps` steps. */
 export function isRealMovement(sample, cfg) {
   const moving = sample.type === 'walking' || sample.type === 'running' || sample.type === 'cycling';

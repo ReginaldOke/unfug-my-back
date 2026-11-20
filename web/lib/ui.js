@@ -83,10 +83,11 @@ const SHEET_EASE = 'cubic-bezier(.32, .72, 0, 1)'; // the iOS sheet curve
 
 /**
  * Bottom sheet built on <dialog>, so focus trapping and Escape come for free. It slides up on open;
- * swipe it down (it follows the finger) or tap outside to close.
+ * swipe it down (it follows the finger) or tap outside to close. full: it covers the whole screen, so
+ * nothing behind it can be tapped by mistake (Import, with a paste in progress).
  */
-export function sheet(build, { onClose, tall = false } = {}) {
-  const dlg = h('dialog', { class: `sheet${tall ? ' tall' : ''}`, tabindex: -1 });
+export function sheet(build, { onClose, tall = false, full = false } = {}) {
+  const dlg = h('dialog', { class: `sheet${tall ? ' tall' : ''}${full ? ' full' : ''}`, tabindex: -1 });
   let closing = false;
   const close = () => slideOut(0);
 

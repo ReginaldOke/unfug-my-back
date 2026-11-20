@@ -65,6 +65,17 @@ export const ALL_MOVES = [...MORE_MOVES, OPEN_BOOK, ...LIBRARY_MOVES];
 
 /** Whether there's an animation for a move name (however it's spelt). */
 export const hasFigure = name => !!findByName([...ALL_MOVES, ...CALM], name);
+/** The highest point a move's figure reaches, in the figure's own units (0 at the top of its 200 × 140 box), or null. */
+export function figureTop(name) {
+  const move = findByName(ALL_MOVES, name);
+  if (!move) return null;
+  let top = Infinity;
+  for (let k = 0; k <= 1; k += 0.1) {
+    const p = poseAt(move, k);
+    for (const [key, v] of Object.entries(p)) if (Array.isArray(v) && typeof v[0] === 'number') top = Math.min(top, v[1] - (key === 'head' ? HEAD_R : 3));
+  }
+  return Number.isFinite(top) ? top : null;
+}
 const pt = p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
 // Quadratic through the middle point: control = 2·mid − (start + end) / 2
 const through = (a, m, b) => `M${pt(a)} Q${pt([2 * m[0] - (a[0] + b[0]) / 2, 2 * m[1] - (a[1] + b[1]) / 2])} ${pt(b)}`;
@@ -122,8 +133,10 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
   const eye = s('path', { class: 'fig-feature' });
   const mouth = s('path', { class: 'fig-feature' });
   face.append(eye, mouth);
+  // Seen from behind there's no face, just the headband round the back of the head
+  if (move.view === 'back') for (const el of [eye, mouth, face.querySelector('.fig-blush')]) el.style.display = 'none';
   const glow = s('circle', { class: 'fig-glow', r: 15 });
-  const svg = s('svg', { viewBox: small ? fitBox(move) : '0 0 200 140', class: `move-figure${small ? ' small' : ''}`, 'aria-hidden': 'true' },
+  const svg = s('svg', { viewBox: small ? fitBox(move) : '0 0 200 140', class: `move-figure${small ? ' small' : ''}${move.view === 'back' ? ' from-back' : ''}`, 'aria-hidden': 'true' },
     s('defs', {},
       s('radialGradient', { id: 'fig-glow' },
         s('stop', { offset: '0%', 'stop-color': '#ff5a4f', 'stop-opacity': 0.7 }),
@@ -146,7 +159,7 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
   const along = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
   // The face looks the way the body faces: forward when upright, up when lying face up. The face is drawn
   // side-on with x toward the front and y toward the chin, then turned (and flipped, lying face up) to fit.
-  const faceAngle = p => Math.atan2(p.head[1] - p.sh[1], p.head[0] - p.sh[0]) + (move.supine ? -1 : 1) * Math.PI / 2 * (move.view ? 0.4 : 1);
+  const faceAngle = p => Math.atan2(p.head[1] - p.sh[1], p.head[0] - p.sh[0]) + (move.supine ? -1 : 1) * Math.PI / 2 * (move.view === 'front' ? 0.4 : 1);
   const onFace = (p, x, y) => {
     const a = faceAngle(p), f = move.supine ? -1 : 1;
     return [p.head[0] + Math.cos(a) * x - Math.sin(a) * y * f, p.head[1] + Math.sin(a) * x + Math.cos(a) * y * f];

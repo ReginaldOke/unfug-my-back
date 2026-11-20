@@ -129,7 +129,7 @@ export function CheckinDetailView(ctx) {
       ...(R.settings().customSliders ?? []).filter(c => e.custom?.[c.id] != null).map(c => score(c.name, e.custom[c.id]))),
 
     block('Where it hurt', date, 'where', markers.length
-      ? markers.map(m => lineRow(null, regionById[m.regionId]?.displayName ?? m.regionId, m.intensity != null ? `${m.intensity}/10` : null, m.quality ? m.quality[0].toUpperCase() + m.quality.slice(1) : null))
+      ? markers.map(m => lineRow(null, regionById[m.regionId]?.displayName ?? m.regionId, m.intensity != null ? `${m.intensity}/10` : null, m.quality && m.quality !== 'ache' ? m.quality[0].toUpperCase() + m.quality.slice(1) : null))
       : h('p', { class: 'hint' }, 'Nowhere specific')),
 
     exercise.length || sessions.length ? block('Exercise', date, 'move',

@@ -113,8 +113,11 @@ export const LIBRARY_MOVES = [
     // The front foot a long step ahead, so at the bottom the front shin is upright, not the knee far past the toes
     pa: on({ hip: [100, 78], torso: -88, head: -88, bend: 0, armN: [92, 92], armF: [88, 88], legN: [71, 71], legF: [130, 175] }, ['fN']),
     pb: on({ hip: [94, 96], torso: -84, head: -84, bend: 0, armN: [92, 92], armF: [88, 88], legN: [12, 96], legF: [110, 165] }, ['fN']) },
-  { names: ['side lunge', 'lateral lunge', 'cossack squat', 'skater squat'], accent: 'hip', hold: 500,
-    pa: STAND, pb: on({ hip: [94, 98], torso: -68, head: -74, bend: 0, armN: [10, 10], armF: [10, 10], legN: [24, 110], legF: [96, 96] }, ['fN']) },
+  // Side lunge, seen from the front: a wide stance, then the hips sit out over one foot, that knee
+  // bending over the toes (it comes toward us, so thigh and shin look shorter), while the other leg stays long
+  { names: ['side lunge', 'lateral lunge', 'cossack squat', 'skater squat'], view: 'front', feet: false, accent: 'hip', hold: 500, plant: ['fF'],
+    pa: { hip: [100, 81.7], torso: -90, head: -90, bend: 0, armN: [100, 80], armF: [80, 100], legN: [61, 61, 27, 27], legF: [117, 121] },
+    pb: { hip: [114, 99], torso: -96, head: -92, bend: 0, armN: [120, 40], armF: [60, 140], legN: [24.8, 92.4, 14.3, 24], legF: [141, 145] } },
   { names: ['pistol squat', 'pistol', 'single leg squat', 'one leg squat'], accent: 'hip', hold: 600, plant: ['fN'],
     pa: on(P(STAND, { armN: [0, 0], armF: [0, 0], legF: [70, 80] }), ['fN']),
     pb: on({ hip: [86, 104], torso: -55, head: -66, bend: 0, armN: [0, 0], armF: [0, 0], legN: [10, 118], legF: [-2, -2] }, ['fN']) },

@@ -20,12 +20,12 @@ Romanian deadlift 3x10`;
   const { routines } = readWorkoutText(note);
   assert.deepEqual(routines.map(r => [r.group, r.name]), [['My gym plan', 'Push'], ['My gym plan', 'Pull'], ['My gym plan', 'Legs']]);
   assert.deepEqual(routines[0].items, [
-    { name: 'Bench press', dose: '3x8', extra: '60kg' },
+    { name: 'Bench press', dose: '3 × 8', extra: '60 kg' },
     { name: 'Overhead press', dose: '3 × 10' },
     { name: 'Dips', dose: '' },
   ]);
-  assert.deepEqual(routines[1].items[1], { name: 'Barbell row', dose: '3x8', extra: '50 kg' });
-  assert.equal(routines[2].items[0].dose, '5x5');
+  assert.deepEqual(routines[1].items[1], { name: 'Barbell row', dose: '3 × 8', extra: '50 kg' });
+  assert.equal(routines[2].items[0].dose, '5 × 5');
 });
 
 test('a plain list under one title is a single routine', () => {
@@ -33,7 +33,7 @@ test('a plain list under one title is a single routine', () => {
   assert.equal(routines.length, 1);
   assert.equal(routines[0].name, 'Morning stretches');
   assert.equal(routines[0].group, undefined);
-  assert.deepEqual(routines[0].items.map(i => i.dose), ['x 6', '30 s', '2 min']);
+  assert.deepEqual(routines[0].items.map(i => i.dose), ['6 reps', '30 s', '2 min']);
 });
 
 test('text with no moves in it is not a workout', () => {

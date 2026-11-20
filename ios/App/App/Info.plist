@@ -31,7 +31,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Back Story reads your sleep and step counts so it can show how they line up with your back pain. Your health data stays on your phone.</string>
+	<string>Back Story reads your steps, sleep, workouts and activity so it can show how they line up with your back pain. Your health data stays on your phone.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Back Story only reads your Health data. It never writes or changes anything in Health.</string>
 	<key>NSMicrophoneUsageDescription</key>

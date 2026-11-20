@@ -6,73 +6,32 @@
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 const fragment = () => ({ factors: [], routines: [], dailyEntries: [], painMarkers: [], factorLogs: [], factorChanges: [], flares: [], routineCompletions: [], routineChanges: [], healthDays: [] });
 const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+import { readRoutine } from './routine-import.js';
+import { nameForMoves, nameForSplit, nameDays } from './routine-name.js';
 const routine = (fields, items) => ({ id: newId(), measure: 'effort', schedule: [], linkedFactorId: null, isArchived: false, ...fields, items });
 
 // ---------- Workouts written as text (a note, a message, a list) ----------
 
-// "3x8", "3 × 8", "4 sets of 10", "10 reps", "30 s", "2 min", "x 6 each side"
-const DOSE = /(\d+\s*[x×]\s*\d+|\b[x×]\s*\d+|\d+\s*sets?\b|\d+\s*(?:reps?|rounds?|s|secs?|seconds?|mins?|minutes?)\b)/i;
-// "60kg", "135 lb", "@ 20 kg", "bodyweight"
-const WEIGHT = /@?\s*(\d+(?:\.\d+)?\s*(?:kg|kgs|lb|lbs|pounds?)\b|bodyweight|bw\b)/i;
-const SECTION_WORDS = /^(day\s*\d+|week\s*\d+|push|pull|legs?|upper|lower|full\s*body|chest|back|arms|shoulders|core|cardio|warm[\s-]?up|cool[\s-]?down|mobility|stretch(?:ing)?|workout\s*[a-z0-9]?|session\s*[a-z0-9]?|[a-z]+\s+day)\b/i;
-
-/** Splits one line into a move: { name, dose, extra }, or null for a blank line. */
-function moveFrom(line) {
-  let text = line.replace(/^\s*(?:[-*•–]|\d+[.)]|\[[ x]\])\s*/i, '').trim();
-  if (!text) return null;
-  const weight = text.match(WEIGHT);
-  if (weight) text = (text.slice(0, weight.index) + text.slice(weight.index + weight[0].length)).trim();
-  const dose = text.match(DOSE);
-  const name = (dose ? text.slice(0, dose.index) : text).replace(/[\s:,–-]+$/, '').trim();
-  return { name: titleCase(name || text), dose: dose ? text.slice(dose.index).replace(/^[\s:,–-]+/, '').trim() : '', extra: weight ? weight[1].replace(/\s+/g, ' ').trim() : '' };
-}
-
-const isHeading = (line, next) => {
-  const t = line.trim();
-  if (/^#{1,6}\s/.test(t) || /:\s*$/.test(t)) return true;
-  if (DOSE.test(t) || WEIGHT.test(t) || /^\s*(?:[-*•–]|\d+[.)]|\[[ x]\])\s/.test(line)) return false;
-  return SECTION_WORDS.test(t) || (t === t.toUpperCase() && /[A-Z]/.test(t)) || (next !== undefined && next.trim() === '');
-};
-const cleanHeading = t => titleCase(t.replace(/^#{1,6}\s*/, '').replace(/:\s*$/, '').trim());
-
 /**
- * Reads a workout written in plain text into routines. Headings ("Push:", "Day 1", "## Legs") become
- * variations of one routine named by the first line (or "Imported workout"); lines under them become moves,
- * with sets and reps as the target and any weight in the extra box.
+ * Reads a workout written in plain text into routines, the same way the routine page's Import does
+ * (routine-import.js): days ("Push:", "Day 1", "## Legs") become variations of one routine named by the
+ * title (or a name from what's in it); lines under them become moves, with sets and reps as the target and any
+ * weight in the extra box.
  */
 export function readWorkoutText(text) {
-  const lines = text.replace(/\r/g, '').split('\n');
-  const sections = [];
-  let title = null, current = null;
-  const plain = l => !DOSE.test(l) && !WEIGHT.test(l) && !/^\s*(?:[-*•–]|\d+[.)]|\[[ x]\])\s/.test(l);
-  lines.forEach((line, i) => {
-    if (!line.trim()) return;
-    // A first line with no sets or reps, with more after it, names the whole thing
-    if (!title && !sections.length && plain(line) && lines.slice(i + 1).some(l => l.trim())) { title = cleanHeading(line); return; }
-    if (isHeading(line, lines[i + 1])) {
-      // The very first heading is the routine's name when another heading or a plain list follows it
-      if (!title && !sections.length && !current) { title = cleanHeading(line); return; }
-      current = { name: cleanHeading(line), items: [] };
-      sections.push(current);
-      return;
-    }
-    const move = moveFrom(line);
-    if (!move?.name) return;
-    if (!current) { current = { name: null, items: [] }; sections.push(current); }
-    current.items.push(move);
-  });
-  const filled = sections.filter(s => s.items.length);
-  if (!filled.length) return null;
-  // A weight in the note starts off the move's second box (the routine page fills it in)
-  const items = list => list.map(({ extra, ...m }) => (extra ? { ...m, extra } : m));
+  const read = readRoutine(text);
+  if (!read) return null;
   const out = fragment();
-  if (filled.length === 1) {
-    const name = filled[0].name ?? title ?? 'Imported workout';
-    const group = filled[0].name && title ? title : null;
-    out.routines.push(routine(group ? { group, name, groupOrder: 0 } : { name }, items(filled[0].items)));
+  const items = list => list.map(({ extra, ...m }) => (extra ? { ...m, extra } : m));
+  if (read.days.length === 1) {
+    const d = read.days[0];
+    const name = d.name ?? read.title ?? nameForMoves(d.items) ?? 'Imported workout';
+    const group = d.name && read.title ? read.title : null;
+    out.routines.push(routine(group ? { group, name, groupOrder: 0 } : { name }, items(d.items)));
   } else {
-    const group = title ?? 'Imported workout';
-    filled.forEach((s, i) => out.routines.push(routine({ group, name: s.name ?? `Day ${i + 1}`, groupOrder: i }, items(s.items))));
+    const group = read.title ?? nameForSplit(read.days) ?? 'Imported workout';
+    const names = nameDays(read.days);
+    read.days.forEach((d, i) => out.routines.push(routine({ group, name: names[i], groupOrder: i }, items(d.items))));
   }
   return out;
 }
