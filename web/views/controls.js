@@ -415,6 +415,6 @@ export function Ruler({ value, max, alertAt = max, count = 30 }) {
 /** Off unless switched on: whether a shared or exported diary includes Apple Health steps and sleep. Null with no Health data. */
 export function healthSwitch() {
   if (!R.health.all().length) return null;
-  const input = h('input', { type: 'checkbox', class: 'switch', 'aria-label': 'Include Apple Health steps and sleep' });
-  return { input, row: h('label', { class: 'row between' }, h('span', {}, 'Include Apple Health steps and sleep'), input) };
+  const input = h('input', { type: 'checkbox', class: 'switch', 'aria-label': 'Include Apple Health data' });
+  return { input, row: h('label', { class: 'row between' }, h('span', {}, 'Include Apple Health data'), input) };
 }

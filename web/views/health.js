@@ -68,7 +68,8 @@ function nativeCard(render) {
         } catch { toast('Couldn’t reach Apple Health'); }
         render();
       },
-    }, on ? 'Sync now' : 'Connect'));
+    // Apple asks for a neutral word before its own permission sheet, not "Connect" or "Allow"
+    }, on ? 'Sync now' : 'Continue'));
 }
 
 /** Once steps and sleep are connected: a switch for each other thing the app can read. */

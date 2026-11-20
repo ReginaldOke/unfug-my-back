@@ -685,17 +685,32 @@ function aiTile() {
 }
 
 /**
- * Sharing the diary with an AI chat: says what goes and to whom, right above the buttons that send it.
- * The app sends nothing itself; the person picks where it goes. Apple Health data stays out unless switched on.
+ * Sharing the diary with another app, usually an AI chat. Before anything goes, it says exactly what is sent and who receives
+ * it, and nothing can be shared until the person agrees. The app sends nothing itself: the share sheet or
+ * the clipboard hands it to the app the person picks. Apple Health data stays out unless switched on.
  */
 function openShareSheet() {
   if (!R.checkins.all().length) return toast('Check in at least once first');
   const health = healthSwitch();
   const opts = () => ({ health: health?.input.checked });
-  sheet(close => h('div', { class: 'stack' },
-    h('h2', {}, 'Analyse with AI'),
-    h('p', { class: 'muted' }, 'Shares your pain, notes and activity with the AI app you choose, under its own privacy terms. Its answers aren’t medical advice.'),
-    health?.row,
-    h('button', { type: 'button', class: 'btn primary', onclick: async () => { await shareDiary(opts()); close(); } }, 'Share'),
-    h('button', { type: 'button', class: 'btn glass', onclick: async () => { toast((await copyDiary(opts())) ? 'Copied. Paste it into an AI chat.' : 'Couldn’t copy'); close(); } }, 'Copy as text')));
+  const share = h('button', { type: 'button', class: 'btn primary', disabled: true, onclick: async () => { await shareDiary(opts()); closeSheet(); } }, 'Share');
+  const copy = h('button', { type: 'button', class: 'btn glass', disabled: true, onclick: async () => { toast((await copyDiary(opts())) ? 'Copied. Paste it into an AI chat.' : 'Couldn’t copy'); closeSheet(); } }, 'Copy as text');
+  const agree = h('input', { type: 'checkbox', class: 'switch', 'aria-label': 'I agree to share this with the app I choose', onchange: e => { share.disabled = copy.disabled = !e.target.checked; } });
+  let closeSheet = () => {};
+  sheet(close => {
+    closeSheet = close;
+    return h('div', { class: 'stack ai-consent' },
+      h('h2', {}, 'Share your diary'),
+      h('div', { class: 'stack tight' },
+        h('h3', { class: 'section-label' }, 'What’s sent'),
+        h('p', {}, 'Your check-ins (pain, stress, sleep, eating, notes and meals), where it hurt, the stressors, helpers and routines you logged, and your reminders.'),
+        health ? h('p', { class: 'muted' }, 'Apple Health steps, sleep and activity only if you switch them on below.') : null),
+      h('div', { class: 'stack tight' },
+        h('h3', { class: 'section-label' }, 'Where it goes'),
+        h('p', {}, 'To the app you pick next, like ChatGPT (OpenAI), Gemini (Google), Notes or Mail, or wherever you paste it. The company behind that app receives it under its own privacy policy. Back Story never sends it anywhere itself.'),
+        h('p', { class: 'muted' }, 'An AI’s answers aren’t medical advice.')),
+      health?.row,
+      h('label', { class: 'row between' }, h('span', {}, 'I agree to share this with the app I choose'), agree),
+      share, copy);
+  });
 }
