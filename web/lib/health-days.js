@@ -80,3 +80,22 @@ export function workoutTicks(workouts, factors) {
   for (const [id, v] of out) if (!(v > 0)) out.delete(id);
   return out;
 }
+
+const workoutMinutes = d => (d?.workouts ? d.workouts.reduce((n, w) => n + (w.minutes ?? 0), 0) : null);
+
+/**
+ * The other things Apple Health brings in, as optional lines on Home's chart: what each day's value is,
+ * how it's scaled (0 to 1) and how it reads. warm: more is worse (drawn in warm colours).
+ */
+export const HEALTH_LINES = [
+  { key: 'workouts', title: 'Workouts', value: workoutMinutes, top: vals => Math.max(60, ...vals), fmt: (v, d) => (v ? `${d.workouts.map(w => w.name).join(', ')} · ${v} min` : 'None') },
+  { key: 'walkingKm', title: 'Walking distance', value: d => d?.walkingKm ?? null, top: vals => Math.max(5, ...vals), fmt: v => `${v} km` },
+  { key: 'standHours', title: 'Stand hours', value: d => d?.standHours ?? null, top: () => 16, fmt: v => `${v} h` },
+  { key: 'exerciseMinutes', title: 'Exercise minutes', value: d => d?.exerciseMinutes ?? null, top: vals => Math.max(60, ...vals), fmt: v => `${v} min` },
+  { key: 'restingHeartRate', title: 'Resting heart rate', warm: true, value: d => d?.restingHeartRate ?? null, bottom: 40, top: vals => Math.max(90, ...vals), fmt: v => `${v} bpm` },
+  { key: 'hrvMs', title: 'Heart rate variability', value: d => d?.hrvMs ?? null, top: vals => Math.max(100, ...vals), fmt: v => `${v} ms` },
+];
+
+/** How many days have a value for each of an extra's fields, by the Apple Health screen's switch key. */
+export const EXTRA_FIELDS = { workouts: ['workouts'], stand: ['standHours'], exercise: ['exerciseMinutes'], distance: ['walkingKm'], heart: ['restingHeartRate', 'hrvMs'] };
+export const daysWith = (days, fields) => days.filter(d => fields.some(f => (Array.isArray(d[f]) ? d[f].length : d[f] != null))).length;

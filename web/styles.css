@@ -1645,6 +1645,7 @@ body:not(.on-home) .ambient::after {
 
 /* Chart data sheet: one row per line, with a switch */
 .data-list { display: flex; flex-direction: column; }
+.data-group .section-label { margin: 6px 0 0; }
 .data-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; cursor: pointer; }
 .data-row + .data-row { border-top: 1px solid var(--line); }
 .data-swatch { flex: none; width: 18px; height: 4px; border-radius: 2px; background: var(--c); margin: 0 7px; box-shadow: 0 0 8px var(--c); }

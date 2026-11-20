@@ -112,6 +112,19 @@ export function consistency(amounts, today, days = 14) {
   return { done, days };
 }
 
+/**
+ * How closely something rises and falls with pain, from -1 to 1 (Pearson's r over days with a check-in
+ * and a value), or null with fewer than five such days or nothing changing. value(date) → number or null.
+ */
+export function painLink(entries, value) {
+  const pairs = entries.filter(e => e.painScore != null).map(e => [value(e.date), e.painScore]).filter(([v]) => v != null && Number.isFinite(v));
+  if (pairs.length < 5) return null;
+  const mx = mean(pairs.map(p => p[0])), my = mean(pairs.map(p => p[1]));
+  let sxy = 0, sxx = 0, syy = 0;
+  for (const [x, y] of pairs) { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; syy += (y - my) ** 2; }
+  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+}
+
 /** Full analysis for one factor. */
 export function analyseFactor(factor, data, today = localDate(), minDays = MIN_DAYS) {
   const pain = painByDate(data.dailyEntries);

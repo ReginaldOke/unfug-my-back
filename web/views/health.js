@@ -3,6 +3,7 @@ import { h, iconButton, toast, copyText } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import { readHealthExport, parseShortcut } from '../lib/health.js';
 import { dayLabel, localDate } from '../lib/dates.js';
+import { daysWith, EXTRA_FIELDS } from '../lib/health-days.js';
 import { isNative, connectHealth, setHealthExtra, healthExtraOn, HEALTH_EXTRAS } from '../lib/native.js';
 
 export function HealthView(ctx) {
@@ -83,7 +84,10 @@ function moreCard(render) {
           render();
         },
       });
-      return h('label', { class: 'row between' }, h('span', {}, t.label), input);
+      // Whether it's working: how many days have come in, once it's on
+      const on = healthExtraOn(t.key), n = daysWith(R.health.all(), EXTRA_FIELDS[t.key]);
+      return h('label', { class: 'row between' },
+        h('span', {}, t.label, on ? h('span', { class: 'hint block' }, n ? `${n} day${n === 1 ? '' : 's'}` : 'No data yet') : null), input);
     }));
 }
 

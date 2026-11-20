@@ -4,8 +4,9 @@ import * as R from '../lib/repos.js';
 import * as reminders from '../lib/reminders.js';
 import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
+import { HEALTH_LINES } from '../lib/health-days.js';
 import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
-import { quickSummary, trendFindings, factorStory, scoreSplits } from '../lib/analysis.js';
+import { quickSummary, trendFindings, factorStory, scoreSplits, painLink } from '../lib/analysis.js';
 import { findInsights } from '../lib/insights.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
@@ -292,7 +293,7 @@ function trendCard(today) {
       return w ? near.reduce((t, [j, k]) => t + raw[j] * k, 0) / w : v;
     });
     return {
-      key, label: f.name, palette,
+      key, label: f.name, palette, factorId: f.id,
       values: smooth.map(v => 0.04 + v * 0.86),
       format: i => (amounts[i] ? fmtAmount(f, amounts[i]) : 'none'),
     };
@@ -334,6 +335,17 @@ function trendCard(today) {
         key: 'steps', label: 'Steps', palette,
         values: steps.map(v => (v == null ? null : 0.04 + (v / max) * 0.86)),
         format: i => (steps[i] == null ? '–' : steps[i].toLocaleString()),
+      });
+    } else if (healthLine(x)) {
+      // Workouts, walking, stand hours, heart rate… from Apple Health; a day with no workout reads as none
+      const line = healthLine(x);
+      const days = dates.map(d => R.health.day(d));
+      const vals = days.map(d => line.value(d) ?? (x === 'workouts' && d ? 0 : null));
+      const lo = line.bottom ?? 0, hi = line.top(vals.filter(v => v != null));
+      series.push({
+        key: x, label: line.title, palette,
+        values: vals.map(v => (v == null ? null : 0.04 + Math.max(0, Math.min(1, (v - lo) / (hi - lo))) * 0.86)),
+        format: i => (vals[i] == null ? '–' : line.fmt(vals[i], days[i])),
       });
     } else if (x === 'food') {
       const food = entries.map(e => e?.dietScore ?? null);
@@ -419,11 +431,12 @@ function rangeControl(ranges) {
 }
 
 // Chart lines that aren't stressors or helpers; the user's own sliders are 'c:<id>'
-const METRICS = ['stress', 'sleep', 'sleepHours', 'steps', 'food'];
+const METRICS = ['stress', 'sleep', 'sleepHours', 'steps', 'food', ...HEALTH_LINES.map(l => l.key)];
+const healthLine = key => HEALTH_LINES.find(l => l.key === key);
 const customSlider = key => (R.settings().customSliders ?? []).find(c => `c:${c.id}` === key) ?? null;
 const isMetric = x => METRICS.includes(x) || !!customSlider(x);
 /** Whether more of a line is bad: stressors, stress and sliders where higher is worse are drawn warm. */
-const isBadLine = x => (x === 'stress' ? true : METRICS.includes(x) ? false
+const isBadLine = x => (x === 'stress' || healthLine(x)?.warm ? true : METRICS.includes(x) ? false
   : x.startsWith('c:') ? customSlider(x)?.good === 'low' : R.factors.get(x)?.role !== 'helper');
 
 /** Pick extra lines for the chart: stress, sleep, steps, or any stressor or helper. */
@@ -441,41 +454,64 @@ function toggleHidden(key) {
 }
 
 /**
- * Everything the chart can show, each with a switch: pain and your main stressor and top helper
- * (switching these hides them), then stress, sleep and every other stressor or helper (switching
- * these adds them).
+ * Everything the chart can show, each with a switch, in groups: pain, then Apple Health, the check-in's
+ * own scores, stressors and helpers. Within a group, whatever rises and falls most closely with pain comes
+ * first. The automatic lines (your main stressor and top helper) sit in their groups; switching them off
+ * hides them, while switching anything else on adds it.
  */
 function openDataSheet(autoLines, autoIds) {
   const chosen = new Set(R.settings().chartExtras ?? []);
-  const options = [
-    { id: 'stress', title: 'Stress', detail: 'From your check-ins' },
-    { id: 'sleep', title: 'Sleep', detail: 'How well, out of 10' },
-    { id: 'food', title: 'Eating', detail: 'How well, out of 10' },
-    ...(R.settings().customSliders ?? []).map(c => ({ id: `c:${c.id}`, title: c.name, detail: 'Your slider, out of 10' })),
-    ...(HEALTH_IMPORT && R.health.has('sleepHours') ? [{ id: 'sleepHours', title: R.health.sleepWord() === 'In bed' ? 'Time in bed' : 'Hours slept', detail: 'From Apple Health' }] : []),
-    ...(HEALTH_IMPORT && R.health.has('steps') ? [{ id: 'steps', title: 'Steps', detail: 'From Apple Health' }] : []),
-    ...R.factors.all().filter(f => !autoIds.includes(f.id)).map(f => ({
-      id: f.id, title: f.name, detail: f.role === 'helper' ? 'Helper' : 'Stressor',
-    })),
+  const entries = R.snapshot().dailyEntries;
+  const entryOn = new Map(entries.map(e => [e.date, e]));
+  const link = value => Math.abs(painLink(entries, value) ?? 0);
+  const health = key => d => { const day = R.health.day(d); return healthLine(key) ? healthLine(key).value(day) ?? (key === 'workouts' && day ? 0 : null) : day?.[key] ?? null; };
+  const amount = id => d => R.checkins.factorValues(d).get(id) ?? 0;
+  const autoBy = new Map(autoLines.map(sr => [sr.key === 'pain' ? 'pain' : sr.factorId, sr]));
+  const AUTO_DETAIL = { stressor: 'Main stressor', helper: 'Top helper' };
+
+  const healthItems = HEALTH_IMPORT ? [
+    ...(R.health.has('sleepHours') ? [{ id: 'sleepHours', title: R.health.sleepWord() === 'In bed' ? 'Time in bed' : 'Hours slept', value: health('sleepHours') }] : []),
+    ...(R.health.has('steps') ? [{ id: 'steps', title: 'Steps', value: health('steps') }] : []),
+    ...HEALTH_LINES.filter(l => R.health.has(l.key)).map(l => ({ id: l.key, title: l.title, value: health(l.key) })),
+  ] : [];
+  const score = field => d => entryOn.get(d)?.[field] ?? null;
+  const checkinItems = [
+    { id: 'stress', title: 'Stress', detail: 'Out of 10', value: score('stressScore') },
+    { id: 'sleep', title: 'Sleep', detail: 'How well, out of 10', value: score('sleepQuality') },
+    { id: 'food', title: 'Eating', detail: 'How well, out of 10', value: score('dietScore') },
+    ...(R.settings().customSliders ?? []).map(c => ({ id: `c:${c.id}`, title: c.name, detail: 'Your slider, out of 10', value: d => entryOn.get(d)?.custom?.[c.id] ?? null })),
   ];
-  const AUTO_DETAIL = { pain: 'From your check-ins', stressor: 'Main stressor', helper: 'Top helper' };
+  const factorItem = f => ({ id: f.id, title: f.name, auto: autoBy.get(f.id), detail: AUTO_DETAIL[autoBy.get(f.id)?.key], value: amount(f.id) });
+  const factors = R.factors.all();
+  const byLink = list => list.map(o => [o, link(o.value)]).sort((a, b) => b[1] - a[1]).map(([o]) => o);
+  const groups = [
+    ['Apple Health', byLink(healthItems)],
+    ['Check-in', byLink(checkinItems)],
+    ['Stressors', byLink(factors.filter(f => f.role !== 'helper').map(factorItem))],
+    ['Helpers', byLink(factors.filter(f => f.role === 'helper').map(factorItem))],
+  ].filter(([, list]) => list.length);
+
   const swatch = c => h('i', { class: `data-swatch${c ? '' : ' off'}`, style: c ? `--c:${c}` : null, 'aria-hidden': 'true' });
   // Each added line shows the colour it has on the chart: warm if more is bad, cool if more is good
-  const swatches = new Map(options.map(o => [o.id, swatch(null)]));
+  const added = groups.flatMap(([, list]) => list).filter(o => !o.auto);
+  const swatches = new Map(added.map(o => [o.id, swatch(null)]));
   const paintSwatches = () => {
     const colours = extraPalettes([...chosen].filter(id => swatches.has(id)), isBadLine);
     for (const [id, el] of swatches) el.replaceWith(swatches.set(id, swatch(colours.get(id)?.[0] ?? null)).get(id));
   };
   const row = (lead, title, detail, on, onChange) => h('label', { class: 'data-row' },
-    lead, h('span', { class: 'grow' }, title, h('span', { class: 'hint block' }, detail)),
+    lead, h('span', { class: 'grow' }, title, detail ? h('span', { class: 'hint block' }, detail) : null),
     h('input', { type: 'checkbox', class: 'switch', checked: on, 'aria-label': `Show ${title}`, onchange: e => onChange(e.target.checked) }));
+  const itemRow = o => (o.auto
+    ? row(swatch(o.auto.palette[0]), o.title, o.detail, !removedLines().has(o.auto.key), on => setRemoved(o.auto.key, !on))
+    : row(swatches.get(o.id), o.title, o.detail, chosen.has(o.id), on => { on ? chosen.add(o.id) : chosen.delete(o.id); R.setSettings({ chartExtras: [...chosen] }); paintSwatches(); }));
+  const pain = autoBy.get('pain');
   const body = h('div', { class: 'stack data-sheet' },
     h('h2', {}, 'Chart data'),
-    h('div', { class: 'data-list' },
-      autoLines.map(sr => row(swatch(sr.palette[0]), sr.label, AUTO_DETAIL[sr.key],
-        !removedLines().has(sr.key), on => setRemoved(sr.key, !on))),
-      options.map(o => row(swatches.get(o.id), o.title, o.detail,
-        chosen.has(o.id), on => { on ? chosen.add(o.id) : chosen.delete(o.id); R.setSettings({ chartExtras: [...chosen] }); paintSwatches(); }))));
+    pain ? h('div', { class: 'data-list' }, row(swatch(pain.palette[0]), pain.label, null, !removedLines().has('pain'), on => setRemoved('pain', !on))) : null,
+    groups.map(([name, list]) => h('div', { class: 'data-group' },
+      h('h3', { class: 'section-label' }, name),
+      h('div', { class: 'data-list' }, list.map(itemRow)))));
   paintSwatches();
   sheet(() => body,
   { onClose: () => rerender(), tall: true });

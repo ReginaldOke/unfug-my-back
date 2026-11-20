@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lagComparison, painByDate, amountsByDate, doseResponse, flareAssociation, flareEpisodes, consistency, analyseFactor, rankInsights, MIN_DAYS } from '../web/lib/analysis.js';
+import { lagComparison, painByDate, amountsByDate, doseResponse, flareAssociation, flareEpisodes, painLink, consistency, analyseFactor, rankInsights, MIN_DAYS } from '../web/lib/analysis.js';
 import { addDays } from '../web/lib/dates.js';
 
 const START = '2026-09-01';
@@ -204,4 +204,14 @@ test('time is compared by more against less, with a rate, and so are stress and 
   assert.ok(st.best.perUnit > 0 && st.best.r > 0.9);
   const splits = scoreSplits({ dailyEntries }, today);
   assert.deepEqual(splits.map(x => [x.name, x.split.delta]), [['Stress', 4]]);
+});
+
+test('pain link: how closely something rises and falls with pain', () => {
+  const entries = [2, 4, 6, 8, 5, 3].map((p, i) => ({ date: `2026-11-0${i + 1}`, painScore: p }));
+  const sitting = new Map(entries.map(e => [e.date, e.painScore * 30]));
+  const walking = new Map(entries.map(e => [e.date, 10 - e.painScore]));
+  assert.equal(Math.round(painLink(entries, d => sitting.get(d)) * 100), 100);
+  assert.equal(Math.round(painLink(entries, d => walking.get(d)) * 100), -100);
+  assert.equal(painLink(entries.slice(0, 4), d => sitting.get(d)), null);
+  assert.equal(painLink(entries, () => 1), null);
 });

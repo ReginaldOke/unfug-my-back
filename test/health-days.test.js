@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sumByDay, averageByDay, standHoursByDay, workoutsByDay, workoutName, workoutTicks } from '../web/lib/health-days.js';
+import { sumByDay, averageByDay, standHoursByDay, workoutsByDay, workoutName, workoutTicks, daysWith, EXTRA_FIELDS, HEALTH_LINES } from '../web/lib/health-days.js';
 
 const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).toISOString();
 
@@ -30,4 +30,14 @@ test('workouts tick the check-in items they fit', () => {
   ];
   assert.deepEqual([...workoutTicks(workouts, items)], [['surf', 80], ['swim', 1], ['bike', 1]]);
   assert.equal(workoutTicks(undefined, items).size, 0);
+});
+
+test('each Health switch counts the days its data came in, and chart lines read clearly', () => {
+  const days = [{ date: 'a', walkingKm: 3.2, workouts: [] }, { date: 'b', walkingKm: 1, restingHeartRate: 58 }, { date: 'c', hrvMs: 40, workouts: [{ name: 'Surfing', minutes: 60 }] }];
+  assert.equal(daysWith(days, EXTRA_FIELDS.distance), 2);
+  assert.equal(daysWith(days, EXTRA_FIELDS.heart), 2);
+  assert.equal(daysWith(days, EXTRA_FIELDS.workouts), 1);
+  assert.equal(daysWith(days, EXTRA_FIELDS.stand), 0);
+  const workouts = HEALTH_LINES.find(l => l.key === 'workouts');
+  assert.equal(workouts.fmt(workouts.value(days[2]), days[2]), 'Surfing · 60 min');
 });
