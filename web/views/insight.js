@@ -16,6 +16,8 @@ import { TrendChart, PALETTES, WARM, COOL } from './chart.js';
 
 const lower = n => (/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n);
 const pts = v => v.toFixed(1);
+// A routine's change as a share of the pain before it: "30%"
+const pct = x => `${Math.round((Math.abs(x.delta) / Math.max(x.before, 0.1)) * 100)}%`;
 const dayTitle = d => parseDate(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const longDay = d => parseDate(d).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
 
@@ -210,7 +212,7 @@ function trendPage(id, data, today) {
   return {
     title: name,
     body: [
-      storyCard(`Your pain has been ${pts(Math.abs(x.delta))} ${up ? 'higher' : 'lower'} since you started ${name} on ${longDay(x.start)}.`, 'Average pain',
+      storyCard(`Your pain has been ${pct(x)} ${up ? 'higher' : 'lower'} since you started ${name} on ${longDay(x.start)}.`, 'Average pain',
         [['Since you started', x.since, up ? 'with' : 'with lower'], ['Before', x.before, 'without']]),
       chartCard(dates.length > 35 ? 'Before and since' : 'Since you started', chart(data, dates, [], startI, { routineDays, marks: [{ i: startI, texts: [`Started ${name}`] }] })),
     ],
@@ -224,7 +226,7 @@ export function patternsFor(data, factors, insights, today = localDate()) {
   if (flare) out.push({ id: 'flare', kind: 'flare', title: flare.k === flare.n ? `Last ${flare.n} flares followed ${subjectPhrase(flare.subject)}` : `${subjectPhrase(flare.subject)[0].toUpperCase()}${subjectPhrase(flare.subject).slice(1)} before most flares`, bad: true });
   for (const x of insights) out.push({ id: x.id, kind: x.kind, title: x.title, bad: x.delta > 0 });
   for (const t of routineShifts(data, R.routines.all(), R.routines.doneDays(), today).slice(0, 1)) {
-    out.push({ id: `trend.${t.routine.id}`, kind: 'trend', title: `Pain is ${t.delta < 0 ? 'down' : 'up'} ${pts(Math.abs(t.delta))} since ${t.routine.name}`, bad: t.delta > 0 });
+    out.push({ id: `trend.${t.routine.id}`, kind: 'trend', title: `Pain is ${t.delta < 0 ? 'down' : 'up'} ${pct(t)} since ${t.routine.name}`, bad: t.delta > 0 });
   }
   return out.slice(0, 3);
 }
