@@ -254,7 +254,7 @@
   const pillEls = CHAPTERS.map((c, k) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'chapter'; b.innerHTML = '<span></span>'; b.firstChild.textContent = c.pill;
-    b.onclick = () => scrollTo({ top: track.offsetTop + chapterStart(k) * (track.offsetHeight - innerHeight) + 2, behavior: still ? 'auto' : 'smooth' });
+    b.onclick = () => scrollTo({ top: track.offsetTop + restAt(k) * (track.offsetHeight - innerHeight), behavior: still ? 'auto' : 'smooth' });
     b.onpointerenter = () => { hoverChapter = k; paint(); };
     b.onpointerleave = () => { hoverChapter = null; paint(); };
     pills.append(b);
@@ -266,6 +266,25 @@
   const dayAt = p => FIRST_DAY + clamp(p / SPLIT) * (N - 1 - FIRST_DAY);
   // Where each chapter rests: its example, or the finished progress view
   const chapterStart = k => (k < LAST ? ((CALLOUTS[k].b[1] - FIRST_DAY) / (N - 1 - FIRST_DAY)) * SPLIT : SPLIT + 0.17);
+  // The scroll holds still for a stretch at each chapter, so its note can be read before the days move on.
+  // Scroll (s) maps to the chart's place (p): travel between chapters, eased in and out, then a hold on each.
+  const HOLD = 0.08;
+  const knots = (() => {
+    const rests = CHAPTERS.map((_, k) => chapterStart(k)), travel = 1 - HOLD * rests.length, out = [[0, 0]];
+    let s = 0, prev = 0;
+    for (const r of rests) { s += (r - prev) * travel; out.push([s, r]); s += HOLD; out.push([s, r]); prev = r; }
+    out.push([1, 1]);
+    return out;
+  })();
+  const toPlace = s => {
+    for (let i = 1; i < knots.length; i++) {
+      const [s0, p0] = knots[i - 1], [s1, p1] = knots[i];
+      if (s <= s1) return s1 === s0 ? p1 : lerp(p0, p1, ease(clamp((s - s0) / (s1 - s0))));
+    }
+    return 1;
+  };
+  // Where in the scroll each chapter rests: the middle of its hold
+  const restAt = k => knots[2 * k + 1][0] + HOLD / 2;
 
   // Hovering the chart picks the day under the pointer (mouse only: on a touch screen the scroll does it)
   // In the routine view the pointer (or a finger) runs along the weeks instead, as on the app's progress page
@@ -355,7 +374,7 @@
     // Resting points for the scroll on phones (where the page snaps): each chapter's example, then the progress view
     track.querySelectorAll('.snap').forEach(m => m.remove());
     const span = track.offsetHeight - innerHeight;
-    CHAPTERS.map((_, k) => chapterStart(k)).forEach(p => {
+    CHAPTERS.map((_, k) => restAt(k)).forEach(p => {
       const m = document.createElement('div'); m.className = 'snap'; m.style.top = `${Math.round(p * span)}px`; track.append(m);
     });
     built = true;
@@ -365,7 +384,7 @@
   // How far through the chart the scroll is (0 to 1). The chart eases toward it rather than jumping, so a fast
   // scroll still shows the days sliding past and the chapters turning, instead of skipping straight to the end
   let shown = null;
-  const progress = () => { const r = track.getBoundingClientRect(); return clamp(-r.top / (r.height - innerHeight)); };
+  const progress = () => { const r = track.getBoundingClientRect(); return toPlace(clamp(-r.top / (r.height - innerHeight))); };
   function read(p = progress()) {
     pos = dayAt(p);
     morphT = ease(clamp((p - SPLIT - 0.02) / 0.14));
@@ -526,7 +545,8 @@
     const target = progress();
     // Off screen, or with reduced motion, it simply keeps up
     if (still || r.bottom < -50 || r.top > innerHeight + 50 || shown == null) shown = target;
-    else shown += (target - shown) * (1 - Math.exp(-Math.min(64, now - (last || now)) / 140));
+    // A slow follow: a flick of the wheel becomes an unhurried glide the eye can keep up with
+    else shown += (target - shown) * (1 - Math.exp(-Math.min(64, now - (last || now)) / 380));
     last = now;
     if (Math.abs(target - shown) < 0.0004) shown = target;
     if (r.bottom >= -50 && r.top <= innerHeight + 50) { read(shown); paint(); }

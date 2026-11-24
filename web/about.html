@@ -143,7 +143,9 @@
 
     /* ---- The example diary as a big chart. It stays put while the page scrolls, and the days slide past the
        line in the middle. Drawn by site-page.js. */
-    .vis-track { position: relative; height: 330vh; }
+    /* Room to scroll through the chart: enough for the days to slide past slowly and for it to rest a while on each chapter */
+    .vis-track { position: relative; height: 560vh; }
+    @media (max-width: 820px) { .vis-track { height: 460vh; } }
     .vis { position: sticky; top: 0; height: 100vh; height: 100lvh; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding-top: 60px; padding-bottom: calc(max(32px, 5vh) + 100lvh - 100svh); }
     .message { text-align: center; margin: 1vh auto 2vh; min-height: 96px; padding: 0 20px; max-width: 900px; display: grid; place-items: center; }
     .msg { font: 400 clamp(34px, 4.4vw, 58px)/1.08 'Italiana', serif; -webkit-text-stroke: .5px currentColor; margin: 10px 0 12px; text-wrap: balance; }
