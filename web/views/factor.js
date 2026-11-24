@@ -162,7 +162,8 @@ function compare(f, st, labels = null) {
   const nx = st.next;
   return h('div', { class: 'cmp' },
     h('span', { class: 'eyebrow' }, b.lag ? 'Pain the next day' : 'Average pain'),
-    row(labels?.[0] ?? amountLabels?.[0] ?? 'With', b.meanWith, 'with'),
+    // In pain's colour when it goes with more pain, a helper's teal when less, plain when about the same
+    row(labels?.[0] ?? amountLabels?.[0] ?? 'With', b.meanWith, `with${b.delta <= -SAME_BAND ? ' lower' : b.delta < SAME_BAND ? ' same' : ''}`),
     row(labels?.[1] ?? amountLabels?.[1] ?? 'Without', b.meanWithout, 'without'),
     nx && Math.abs(nx.delta) >= SAME_BAND && Math.sign(nx.delta) === Math.sign(b.delta)
       ? h('p', { class: 'hint' }, `It carries into the next day too: ${nx.meanWith.toFixed(1)} after it, ${nx.meanWithout.toFixed(1)} after days without.`) : null);

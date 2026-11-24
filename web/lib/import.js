@@ -43,7 +43,10 @@ const CLEAN = {
     id: r.id, name: text(r.name, 80).trim(), group: str(r.group, 80), groupOrder: num(r.groupOrder, 0, 1000) ?? 0,
     measure: oneOf(r.measure, ['effort', 'count'], 'effort'), isArchived: bool(r.isArchived), linkedFactorId: id(r.linkedFactorId),
     schedule: list(r.schedule, 12).filter(x => typeof x === 'string' && REMINDER.test(x)),
-    items: list(r.items, 100).filter(it => it && text(it.name, 80).trim()).map(it => ({ name: text(it.name, 80).trim(), dose: text(it.dose, 40), ...(it.extra ? { extra: text(it.extra, 40) } : {}) })),
+    items: list(r.items, 100).filter(it => it && text(it.name, 80).trim()).map(it => ({
+      name: text(it.name, 80).trim(), dose: text(it.dose, 40), ...(it.extra ? { extra: text(it.extra, 160) } : {}),
+      ...(Array.isArray(it.sets) && it.sets.length ? { sets: list(it.sets, 20).filter(x => x && typeof x === 'object').map(x => ({ dose: text(x.dose, 40), ...(x.extra ? { extra: text(x.extra, 160) } : {}), ...(x.label ? { label: text(x.label, 40) } : {}) })) } : {}),
+    })),
   },
   dailyEntries: e => id(e.id) && day(e.date) && num(e.painScore, 0, 10) != null && {
     id: e.id, date: e.date, painScore: Math.round(num(e.painScore, 0, 10)), stressScore: num(e.stressScore, 0, 10), sleepQuality: num(e.sleepQuality, 0, 10),
@@ -64,7 +67,10 @@ const CLEAN = {
   routineCompletions: c => id(c.id) && id(c.routineId) && (day(c.date) || when(c.timestamp)) && {
     id: c.id, routineId: c.routineId, date: day(c.date), timestamp: when(c.timestamp) ?? new Date(`${c.date}T12:00:00`).toISOString(), completed: c.completed !== false,
     intensity: num(c.intensity, 1, 3), times: num(c.times, 1, 10),
-    log: list(c.log, 100).filter(x => x && text(x.name, 80)).map(x => ({ name: text(x.name, 80), did: text(x.did, 40), ...(x.extra ? { extra: text(x.extra, 40) } : {}), ...(x.timed ? { timed: true } : {}) })),
+    log: list(c.log, 100).filter(x => x && text(x.name, 80)).map(x => ({
+      name: text(x.name, 80), did: text(x.did, 200), ...(x.extra ? { extra: text(x.extra, 160) } : {}), ...(x.timed ? { timed: true } : {}),
+      ...(Array.isArray(x.sets) && x.sets.length ? { sets: list(x.sets, 20).filter(y => y && typeof y === 'object').map(y => ({ did: text(y.did, 40), ...(y.extra ? { extra: text(y.extra, 160) } : {}), ...(y.label ? { label: text(y.label, 40) } : {}) })) } : {}),
+    })),
   },
   routineChanges: c => id(c.id) && id(c.routineId) && day(c.date) && { id: c.id, routineId: c.routineId, date: c.date, summary: text(c.summary, 200) },
   healthDays: d => day(d.date) && {

@@ -436,6 +436,41 @@ export function factorStory(factor, data, today = localDate()) {
   return { ...base, state, best, next: next.enough && best !== next ? next : null, early: Math.min(best.nWith, best.nWithout) < MIN_DAYS };
 }
 
+// Once the window has this many check-ins, an item on fewer days than PATTERN_MIN_SIDE (or missing on
+// fewer) is too thin to put beside the rest
+const PATTERN_FULL_WINDOW = 10, PATTERN_MIN_SIDE = 3;
+
+/**
+ * How much a gap in pain counts when ranking what goes with it: the gap, scaled down when either side
+ * rests on only a few days, so something logged twice doesn't outrank what's logged most days. Null
+ * when it's too thin to show at all. nSmall: days on the smaller side; nCheckins: check-ins in the window.
+ */
+export function patternWeight(delta, nSmall, nCheckins) {
+  if (nCheckins >= PATTERN_FULL_WINDOW && nSmall < PATTERN_MIN_SIDE) return null;
+  return delta * (nSmall / (nSmall + 6));
+}
+
+/**
+ * Heads-ups: things that have gone with more pain, logged above their usual on each of the last two
+ * check-ins (the latest today or yesterday). For an amount, above the usual is over the split between
+ * more and less; for a yes or no, it has to be something done on fewer than most days. Biggest gap first,
+ * as [{ factor, delta, amount }] (amount: measured in time or counts, not yes or no).
+ */
+export function painRisks(factors, data, today = localDate()) {
+  const last = [...new Set(data.dailyEntries.filter(e => e.date <= today).map(e => e.date))].sort().slice(-2);
+  if (last.length < 2 || last[1] < addDays(today, -1)) return [];
+  const out = [];
+  for (const factor of factors) {
+    const st = factorStory(factor, data, today), b = st.best;
+    if (!b || st.early || b.delta < SAME_BAND) continue;
+    if (patternWeight(b.delta, Math.min(b.nWith, b.nWithout), st.nCheckins) == null) continue;
+    if (!st.amount && st.nWith >= st.nCheckins * 0.6) continue;
+    const amounts = amountsByDate(data.factorLogs, factor.id);
+    if (last.every(d => (amounts.get(d) || 0) > (st.amount ? b.cut : 0))) out.push({ factor, delta: b.delta, amount: st.amount });
+  }
+  return out.sort((a, b) => b.delta - a.delta);
+}
+
 /**
  * The check-in's own scores against pain, over the same four weeks as factorStory: days with higher
  * stress (or sleep, or eating) against days with lower. [{ key, name, split }] where there's enough.

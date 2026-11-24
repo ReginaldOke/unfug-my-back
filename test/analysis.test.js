@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lagComparison, painByDate, amountsByDate, doseResponse, flareAssociation, flareEpisodes, painLink, consistency, analyseFactor, rankInsights, MIN_DAYS } from '../web/lib/analysis.js';
+import { lagComparison, painByDate, amountsByDate, doseResponse, flareAssociation, flareEpisodes, painLink, consistency, analyseFactor, rankInsights, patternWeight, painRisks, MIN_DAYS } from '../web/lib/analysis.js';
 import { addDays } from '../web/lib/dates.js';
 
 const START = '2026-09-01';
@@ -214,4 +214,31 @@ test('pain link: how closely something rises and falls with pain', () => {
   assert.equal(Math.round(painLink(entries, d => walking.get(d)) * 100), -100);
   assert.equal(painLink(entries.slice(0, 4), d => sitting.get(d)), null);
   assert.equal(painLink(entries, () => 1), null);
+});
+
+test('patterns rank well-logged items above ones logged once or twice', () => {
+  // Two days out of 27 is too thin to show; early on, with few check-ins, it still counts
+  assert.equal(patternWeight(0.9, 2, 27), null);
+  assert.ok(patternWeight(0.9, 2, 6) > 0);
+  // A smaller gap seen on many days outranks a bigger one seen on a few
+  assert.ok(patternWeight(0.5, 12, 27) > patternWeight(0.9, 3, 27));
+  assert.ok(patternWeight(-0.9, 12, 27) < patternWeight(-0.9, 4, 27));
+});
+
+test('a heads-up when something that goes with more pain is up two check-ins running', () => {
+  // Sitting 2 to 9 hours: the long days come with more pain
+  const today = addDays(START, 20), sitting = { id: 'sit', name: 'Long sitting', measureType: 'minutes' };
+  const diary = lastTwo => {
+    const dailyEntries = [], factorLogs = [];
+    for (let i = 0; i <= 20; i++) {
+      const date = addDays(START, i), long = i >= 19 ? lastTwo : i % 2 === 0;
+      dailyEntries.push({ date, painScore: long ? 6 : 3 });
+      factorLogs.push({ factorId: 'sit', date, value: long ? 480 : 180 });
+    }
+    return { dailyEntries, factorLogs, flares: [] };
+  };
+  assert.equal(painRisks([sitting], diary(true), today)[0]?.factor.id, 'sit');
+  assert.deepEqual(painRisks([sitting], diary(false), today), []);
+  // Nothing when the last check-in is days old
+  assert.deepEqual(painRisks([sitting], diary(true), addDays(today, 3)), []);
 });

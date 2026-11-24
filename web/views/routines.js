@@ -17,6 +17,9 @@ import { emojiFor } from '../lib/labels.js';
 import { readRoutine } from '../lib/routine-import.js';
 import { readRoutineFile } from '../lib/routine-files.js';
 import { nameForMoves, nameForSplit, nameDays, freshName } from '../lib/routine-name.js';
+import { spokenMoves, matchMove, spokenAmount } from '../lib/voice-moves.js';
+import { normName } from '../lib/move-names.js';
+import { voiceSupported, startDictation } from '../lib/voice.js';
 
 /** Set when a routine is finished, read once by the Today screen to play its celebration. */
 export const justFinished = { id: null };
@@ -171,24 +174,32 @@ function sessionFor(r, date, fromCheckin) {
   const key = `${r?.id ?? 'new'}|${date}`;
   if (sessions.has(key)) return sessions.get(key);
   const logged = r ? R.routines.sessionOn(r.id, date) : null;
-  const before = r ? R.routines.lastDid(r.id, date) : new Map();
-  const didNow = new Map((logged?.log ?? []).map(x => [x.name, x.did]));
-  const extraNow = new Map((logged?.log ?? []).filter(x => x.extra).map(x => [x.name, x.extra]));
-  const extraBefore = r ? R.routines.lastExtra(r.id, date) : new Map();
+  const now = new Map((logged?.log ?? []).map(x => [x.name, x]));
+  const before = r ? R.routines.lastEntries(r.id, date) : new Map();
   const draft = fromCheckin && r ? checkinDraft(date) : null;
-  // Each box starts with what you did today if logged, else last time, else the target
+  // Each box starts with what you did today if logged, else last time, else the target. A move done in
+  // sets has a row for each set after the first.
   const s = {
     key, id: r?.id ?? null, date, name: r?.name ?? '', group: r?.group ?? null, schedule: [...(r?.schedule ?? [])], icon: r?.icon ?? null,
     items: (r?.items ?? []).map(it => {
-      const now = didNow.get(it.name);
+      const today = now.get(it.name), last = before.get(it.name);
+      const first = x => x?.sets?.[0] ?? x;
+      const pick = (k, plan) => first(today)?.[k] || first(last)?.[k] || plan || '';
+      const sets = today?.sets ?? last?.sets ?? (it.sets ? [{}, ...it.sets.map(x => ({ did: x.dose, extra: x.extra, label: x.label }))] : null);
       // extraDose is the routine's own second box (a hold, say), kept apart from what's typed today
-      return { name: it.name, dose: it.dose, extraDose: it.extra, did: now || before.get(it.name) || it.dose || '', done: !!now, extra: extraNow.get(it.name) ?? extraBefore.get(it.name) ?? it.extra ?? '' };
+      return {
+        name: it.name, dose: it.dose, extraDose: it.extra, done: !!today,
+        did: pick('did', it.dose), extra: first(today)?.extra ?? first(last)?.extra ?? it.extra ?? '',
+        rows: (sets ?? []).slice(1).map(x => ({ did: x.did ?? x.dose ?? '', extra: x.extra ?? '', ...(x.label ? { label: x.label } : {}) })),
+      };
     }),
     intensity: draft?.intensity.get(r.linkedFactorId) ?? logged?.intensity ?? 2,
     measure: r?.measure ?? defaultMeasure(`${r?.group ?? ''} ${r?.name ?? ''}`),
     times: logged?.times ?? 1,
     // Timed on this day, with the routine page's stopwatch or in the player (today's log only)
-    timed: (logged?.log ?? []).filter(x => x.timed).map(x => ({ name: x.name, did: x.did })),
+    timed: (logged?.log ?? []).filter(x => x.timed && (x.loose || !(r?.items ?? []).some(it => it.name === x.name)))
+      .map(x => ({ id: R.uuid(), name: x.name === LOOSE ? '' : x.name, did: x.did })),
+    timedMoves: new Set((logged?.log ?? []).filter(x => x.timed && !x.loose).map(x => x.name)),
   };
   sessions.set(key, s);
   return s;
@@ -238,9 +249,9 @@ function saveOne(s, { markDone = false } = {}) {
   const logIt = (markDone && !!s.id) || s.touched || items.some(it => it.done);
   if (logIt) {
     const log = [
-      ...items.map(it => ({ name: it.name.trim(), did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}), ...(isTimedEntry(s, it) ? { timed: true } : {}) })),
+      ...items.map(it => ({ name: it.name.trim(), ...logOf(it), ...(isTimedEntry(s, it) ? { timed: true } : {}) })),
       // Timings of the routine's own moves are already in their rows above
-      ...(s.timed ?? []).filter(t => !items.some(it => it.name.trim() === t.name)).map(t => ({ name: t.name, did: t.did, timed: true })),
+      ...looseLog(s),
     ];
     // A check-in in progress saves the tick itself; otherwise the routine is ticked for that day now
     const live = checkinDraft(s.date);
@@ -258,11 +269,47 @@ function saveOne(s, { markDone = false } = {}) {
  */
 const templateOf = it => {
   const extra = it.extraDose !== undefined ? it.extraDose : it.extra?.trim();
-  return { name: it.name.trim(), dose: it.dose || it.did.trim(), ...(extra ? { extra } : {}) };
+  // Sets after the first are part of the routine too, as they were last filled in
+  const sets = (it.rows ?? []).map(x => ({ dose: x.did.trim(), ...(x.extra?.trim() ? { extra: x.extra.trim() } : {}), ...(x.label?.trim() ? { label: x.label.trim() } : {}) }));
+  return { name: it.name.trim(), dose: it.dose || it.did.trim(), ...(extra ? { extra } : {}), ...(sets.length ? { sets } : {}) };
 };
 
+/**
+ * What a move logs for the day. In sets, each set is kept ({ did, extra }) and `did` reads them all
+ * ("10, 10, 8"), so the history and charts still have one line per move.
+ */
+function logOf(it) {
+  const one = { did: it.did.trim() || '✓', ...(it.extra?.trim() ? { extra: it.extra.trim() } : {}) };
+  if (!it.rows?.length) return one;
+  const sets = [{ did: it.did.trim(), extra: it.extra?.trim() ?? '' }, ...it.rows.map(x => ({ did: x.did.trim(), extra: x.extra?.trim() ?? '', label: x.label?.trim() ?? '' }))];
+  return { ...one, did: sets.map(x => x.did || '✓').join(', '), sets: sets.map(x => ({ did: x.did || '✓', ...(x.extra ? { extra: x.extra } : {}), ...(x.label ? { label: x.label } : {}) })) };
+}
+
 /** Whether a move's time came from a timer, so it's listed under the routine page's stopwatch. */
-const isTimedEntry = (s, it) => (s.timed ?? []).some(t => t.name === it.name.trim());
+const isTimedEntry = (s, it) => s.timedMoves?.has(it.name.trim());
+
+// A recording with no name yet is kept under this name, and shown blank
+const LOOSE = 'Timed';
+/** Today's recordings that aren't (yet) a move's, as they're logged. */
+const looseLog = s => (s.timed ?? []).filter(t => t.did?.trim()).map(t => ({ name: t.name.trim() || LOOSE, did: t.did.trim(), timed: true, loose: true }));
+
+/**
+ * Saves the day's recordings straight away, so a time is kept the moment it's taken, edited or moved.
+ * moved: a move a recording was just dropped onto, saved with it.
+ */
+function saveRecordings(s, moved = null) {
+  s.touched = true;
+  if (!s.id) return;
+  const before = R.routines.sessionOn(s.id, s.date)?.log ?? [];
+  const isMove = name => s.items.some(it => it.name.trim() === name);
+  const log = [
+    ...before.filter(x => !(x.timed && (x.loose || !isMove(x.name))) && x.name !== moved?.name.trim()),
+    ...(moved ? [{ name: moved.name.trim(), ...logOf(moved) }] : []),
+    ...looseLog(s),
+  ];
+  const live = checkinDraft(s.date);
+  R.routines.logSession(s.id, s.date, s.measure === 'count' ? { log, times: s.times } : { log, intensity: s.intensity }, { writeLog: !live });
+}
 
 /**
  * A timed hold, from the player or the routine page's timer: a move's box takes the time, it's listed with
@@ -272,9 +319,9 @@ const isTimedEntry = (s, it) => (s.timed ?? []).some(t => t.name === it.name.tri
 function keepTime(s, name, did) {
   const it = s.items.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
   name = it ? it.name.trim() : name.trim();
-  if (it) { it.did = did; it.done = true; }
+  if (it) { it.did = did; it.done = true; (s.timedMoves ??= new Set()).add(name); }
+  else s.timed = [...(s.timed ?? []).filter(t => t.name !== name), { id: R.uuid(), name, did }];
   s.touched = true;
-  s.timed = [...(s.timed ?? []).filter(t => t.name !== name), { name, did }];
   if (!s.id) return; // a routine not saved yet keeps the time with the session until it is
   const before = R.routines.sessionOn(s.id, s.date)?.log ?? [];
   const log = [...before.filter(x => x.name !== name), { name, did, timed: true }];
@@ -291,65 +338,83 @@ export function fmtClock(ms) {
 const CLOCK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M10 2.5h4"/></svg>';
 
 /**
- * A small stopwatch under the moves, on the right, for timed holds like a dead hang. Tap to start, tap to
- * stop, name it, save. A name that matches a move fills that move's box (so it's tracked like reps);
- * any other name joins today's session only, listed under the timer. The clock lives in the session,
- * so it keeps running while you switch variations or open the player.
+ * A small stopwatch under the moves, on the right, for timing anything. Tap to start, tap to stop: the time
+ * is kept straight away as a row like a move's, with an optional name, both editable. Hold a row and drag
+ * it onto a move to make it that move's (its box if empty, else another set, named by the row's name).
+ * Swipe a row left to delete it. The clock lives in the session, so it keeps running while you switch
+ * variations or open the player.
  */
-function stopwatch(s, repaintMoves, ctx) {
-  s.clock ??= { start: null, held: 0, label: '' };
+function stopwatch(s, ctx, { moveAt, onDrop }) {
+  s.clock ??= { start: null, held: 0 };
   const c = s.clock;
   const el = h('div', { class: 'stopwatch' });
+  const list = h('div', { class: 'log-list sw-list' });
   const now = () => c.held + (c.start ? Date.now() - c.start : 0);
   let tick = 0;
   const run = () => { clearInterval(tick); if (c.start) tick = setInterval(() => { const t = el.querySelector('.sw-time'); if (t) t.textContent = fmtClock(now()); }, 250); };
   ctx.onCleanup(() => clearInterval(tick));
 
-  const save = label => {
-    const name = label.trim();
-    if (!name) return toast('Name it first');
-    keepTime(s, name, fmtClock(now()));
-    if (s.items.some(it => it.name.trim().toLowerCase() === name.toLowerCase())) repaintMoves();
-    Object.assign(c, { start: null, held: 0, label: name });
+  const stop = () => {
+    const t = { id: R.uuid(), name: '', did: fmtClock(now()) };
+    s.timed = [...(s.timed ?? []), t];
+    Object.assign(c, { start: null, held: 0 });
+    saveRecordings(s);
     vibrate(8);
-    paint();
+    paint(t);
   };
 
-  function paint() {
-    const ms = now();
-    const pill = (cls, label, onclick, inner) => {
-      const b = h('button', { type: 'button', class: `sw-pill glass ${cls}`, 'aria-label': label, onclick }, ...inner);
-      return b;
-    };
-    let row;
+  function paint(fresh = null) {
+    let pill;
     if (c.start) {
-      // Running: the time, and a tap stops it
-      row = pill('running', 'Stop the timer', () => { c.held = now(); c.start = null; vibrate(6); paint(); },
-        [h('span', { class: 'sw-dot', 'aria-hidden': 'true' }), h('span', { class: 'sw-time' }, fmtClock(ms))]);
-    } else if (ms > 0) {
-      // Stopped: name it and save, carry on, or let it go
-      const name = h('input', {
-        type: 'text', class: 'sw-name', value: c.label, placeholder: 'What was it?', maxlength: 40, 'aria-label': 'What you timed', enterkeyhint: 'done',
-        onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); save(name.value); } },
-      });
-      row = h('div', { class: 'sw-stopped glass' },
-        h('button', { type: 'button', class: 'sw-time', 'aria-label': 'Carry on timing', onclick: () => { c.start = Date.now(); paint(); } }, fmtClock(ms)),
-        name,
-        h('button', { type: 'button', class: 'sw-save', onclick: () => save(name.value) }, 'Save'),
-        h('button', { type: 'button', class: 'sw-x', 'aria-label': 'Discard this time', onclick: () => { c.held = 0; paint(); } }, '✕'));
-      setTimeout(() => { if (!c.label) name.focus({ preventScroll: true }); }, 30);
+      pill = h('button', { type: 'button', class: 'sw-pill glass running', 'aria-label': 'Stop the timer', onclick: stop },
+        h('span', { class: 'sw-dot', 'aria-hidden': 'true' }), h('span', { class: 'sw-time' }, fmtClock(now())));
     } else {
-      const b = pill('idle', 'Start a timer', () => { c.start = Date.now(); vibrate(6); paint(); }, [h('span', { class: 'sw-icon' }), h('span', {}, 'Timer')]);
-      b.querySelector('.sw-icon').innerHTML = CLOCK;
-      row = b;
+      pill = h('button', { type: 'button', class: 'sw-pill glass idle', 'aria-label': 'Start a timer', onclick: () => { c.start = Date.now(); vibrate(6); paint(); } },
+        h('span', { class: 'sw-icon' }), h('span', {}, 'Timer'));
+      pill.querySelector('.sw-icon').innerHTML = CLOCK;
     }
-    // What's been timed today that isn't one of the moves
-    const saved = (s.timed ?? []).map(t => h('div', { class: 'sw-saved' },
-      h('span', { class: 'grow' }, t.name), h('span', { class: 'sw-saved-time' }, t.did),
-      h('button', { type: 'button', class: 'sw-x', 'aria-label': `Remove ${t.name}`, onclick: () => { s.timed = s.timed.filter(x => x !== t); s.touched = true; paint(); } }, '✕')));
-    el.replaceChildren(row, ...saved);
+    list.replaceChildren(...(s.timed ?? []).map(t => recording(t, t === fresh)));
+    el.replaceChildren(pill, list);
     run();
   }
+
+  /** One recording: its name and its time, both editable, like a move's row */
+  function recording(t, fresh) {
+    const name = h('input', {
+      type: 'text', class: 'log-name', value: t.name, placeholder: 'What was it?', maxlength: 40, 'aria-label': 'What you timed', enterkeyhint: 'done',
+      oninput: e => { t.name = e.target.value; }, onchange: () => saveRecordings(s),
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+    });
+    const time = h('input', {
+      type: 'text', class: 'did-input', value: t.did, inputmode: 'text', enterkeyhint: 'done', 'aria-label': `Time for ${t.name || 'this'}`,
+      oninput: e => { t.did = e.target.value; fitWidth(time); }, onchange: () => saveRecordings(s),
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+    });
+    requestAnimationFrame(() => fitWidth(time));
+    // Touching a box doesn't open the keyboard straight away, so a hold can still pick the row up
+    for (const box of [name, time]) {
+      box.addEventListener('pointerdown', e => { if (document.activeElement !== box) e.preventDefault(); });
+      box.addEventListener('click', () => { if (performance.now() > swallowUntil && document.activeElement !== box) box.focus(); });
+    }
+    const inner = h('div', { class: 'log-inner' }, h('div', { class: 'log-line' }, name, time));
+    const row = h('div', { class: `log-row sw-row${fresh ? ' fresh' : ''}` },
+      h('button', { type: 'button', class: 'log-del', 'aria-label': `Delete ${t.name || 'this time'}`, onclick: () => remove() }, 'Delete'), inner);
+    function remove() {
+      row.style.height = `${row.offsetHeight}px`;
+      row.classList.add('removing');
+      requestAnimationFrame(() => { row.style.height = '0px'; });
+      setTimeout(() => { s.timed = s.timed.filter(x => x !== t); saveRecordings(s); row.remove(); }, 240);
+      vibrate(8);
+    }
+    let swallowUntil = 0;
+    gestures(row, inner, {
+      onDelete: remove,
+      drag: { moveAt, onDrop: target => { s.timed = s.timed.filter(x => x !== t); onDrop(t, target); paint(); }, label: () => t.name || t.did },
+      swallow: ms => { swallowUntil = performance.now() + ms; },
+    });
+    return row;
+  }
+
   paint();
   return el;
 }
@@ -422,6 +487,10 @@ function progressView(session, past) {
 
 // A play mark in a rounded frame: watch a video
 const WATCH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="4"/><path d="M10.5 9.5v5l4.2-2.5z" fill="currentColor"/></svg>';
+// A move's boxes and sets: reps plus up to four more boxes, and up to ten sets
+const MAX_BOXES = 5, MAX_SETS = 10, SEP = ' · ';
+const MIC = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>';
+const REPEAT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
 const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>';
 const INFO = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>';
 // Emoji offered when changing a routine's own; any other can be typed in the box after them
@@ -509,27 +578,114 @@ export function RoutineView(ctx) {
       e.preventDefault();
     });
     name.addEventListener('click', () => { if (document.activeElement !== name) name.focus(); });
-    const did = h('input', {
-      type: 'text', class: 'did-input', value: it.did, inputmode: 'text', enterkeyhint: 'next', placeholder: 'Reps',
-      'aria-label': `Reps: ${it.name}`,
-      oninput: e => { it.did = e.target.value; s.touched = true; fitWidth(did); },
-      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); const next = row.nextElementSibling?.querySelector('.did-input'); next ? next.focus() : e.target.blur(); } },
+    // Boxes: reps, then up to four more (weight, a hold, a note…), in the same columns on every set. A
+    // move done in sets has a line for each set after the first, under its name. Too many boxes to fit
+    // scroll sideways, all of a move's lines together.
+    const cells = x => (x.extra ? x.extra.split(SEP) : []);
+    const store = (x, arr) => { const a = [...arr]; while (a.length && !a.at(-1)?.trim()) a.pop(); x.extra = a.join(SEP); };
+    const lines = () => [it, ...(it.rows ??= [])];
+    let cols = Math.max(0, ...lines().map(x => cells(x).length));
+    const scrollers = [];
+    let syncing = false;
+    const fitAll = () => requestAnimationFrame(() => {
+      const byCol = new Map();
+      for (const sc of scrollers) [...sc.children].forEach((el, k) => { fitWidth(el); byCol.set(k, [...(byCol.get(k) ?? []), el]); });
+      // Each column as wide as its widest box, so sets line up
+      for (const els of byCol.values()) { const w = Math.max(...els.map(el => parseFloat(el.style.width) || 0)); for (const el of els) el.style.width = `${w}px`; }
+      scrollers.forEach(edges);
     });
-    scrubNumber(did, () => it.dose || '0', () => { s.touched = true; fitWidth(did); });
-    // A second box for anything else (weight, a note…): + adds it, emptying it takes it away again
-    const extra = h('input', {
-      type: 'text', class: 'did-input extra-input', value: it.extra ?? '', placeholder: '…', enterkeyhint: 'done',
-      'aria-label': `Extra for ${it.name}, like weight or a note`,
-      oninput: e => { it.extra = e.target.value; s.touched = true; fitWidth(extra); },
-      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
-      onblur: () => { if (!extra.value.trim()) { it.extra = ''; if (it.extraDose) it.extraDose = ''; showExtra(false); } },
-    });
-    const plus = h('button', { type: 'button', class: 'extra-add', 'aria-label': `Add another box for ${it.name || 'this move'}`, onclick: () => { showExtra(true); extra.focus(); } }, '+');
-    const showExtra = on => { extra.hidden = !on; plus.hidden = on; };
-    showExtra(!!it.extra);
-    requestAnimationFrame(() => { fitWidth(did); fitWidth(extra); });
+    const edges = sc => {
+      sc.classList.toggle('more-left', sc.scrollLeft > 2);
+      sc.classList.toggle('more-right', sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 2);
+    };
+    const onScroll = e => {
+      edges(e.target);
+      if (syncing) return;
+      syncing = true;
+      for (const sc of scrollers) if (sc !== e.target) { sc.scrollLeft = e.target.scrollLeft; edges(sc); }
+      syncing = false;
+    };
+    const focusNext = from => {
+      const all = [...row.querySelectorAll('.log-fields .did-input:not(.extra-input)')];
+      const next = all[all.indexOf(from) + 1] ?? row.nextElementSibling?.querySelector('.did-input');
+      next ? next.focus() : from.blur();
+    };
+    function fields(x, i) {
+      const did = h('input', {
+        type: 'text', class: 'did-input', value: x.did ?? '', inputmode: 'text', enterkeyhint: 'next', placeholder: 'Reps',
+        'aria-label': i ? `Set ${i + 1} of ${it.name}` : `Reps: ${it.name}`,
+        oninput: e => { x.did = e.target.value; s.touched = true; fitAll(); },
+        onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(did); } },
+      });
+      scrubNumber(did, () => it.dose || '0', () => { s.touched = true; fitAll(); });
+      const extras = Array.from({ length: cols }, (_, k) => h('input', {
+        type: 'text', class: 'did-input extra-input', value: cells(x)[k] ?? '', placeholder: '…', enterkeyhint: 'done',
+        'aria-label': `Box ${k + 2} for ${it.name}${i ? `, set ${i + 1}` : ''}, like weight or a note`,
+        oninput: e => { const a = cells(x); while (a.length <= k) a.push(''); a[k] = e.target.value; store(x, a); s.touched = true; fitAll(); },
+        onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
+        onblur: () => setTimeout(() => dropEmpty(k), 0),
+      }));
+      const sc = h('div', { class: 'log-fields', onscroll: onScroll }, did, ...extras);
+      scrollers.push(sc);
+      return sc;
+    }
+    // A box emptied on every set (and not being typed in) goes; the routine keeps the boxes that are left
+    function dropEmpty(k) {
+      if (k >= cols || lines().some(x => cells(x)[k]?.trim()) || row.contains(document.activeElement) && document.activeElement.classList.contains('extra-input')) return;
+      for (const x of lines()) { const a = cells(x); a.splice(k, 1); store(x, a); }
+      cols--;
+      it.extraDose = undefined;
+      paintMove();
+    }
 
-    const inner = h('div', { class: 'log-inner' }, name, plus, did, extra);
+    const repeatBtn = h('button', {
+      type: 'button', class: 'extra-add sets-add', 'aria-label': `Add a set of ${it.name || 'this move'}`, title: 'Add a set',
+      onclick: () => {
+        // "3 × 8" becomes three sets of 8. After that a new set starts as a copy of the last, so it's
+        // one tap for the same again
+        const split = !it.rows.length && /^\s*(\d+)\s*[×x*]\s*(.+)$/i.exec(it.did ?? '');
+        if (split && Number(split[1]) > 1 && Number(split[1]) <= MAX_SETS) {
+          it.did = it.dose = split[2].trim();
+          for (let k = 1; k < Number(split[1]); k++) it.rows.push({ did: it.did, extra: it.extra ?? '' });
+        } else {
+          const last = lines().at(-1);
+          it.rows.push({ did: last.did ?? '', extra: last.extra ?? '' });
+        }
+        s.touched = true;
+        vibrate(6);
+        paintMove();
+      },
+    });
+    repeatBtn.innerHTML = REPEAT;
+    const plus = h('button', {
+      type: 'button', class: 'extra-add', 'aria-label': `Add another box for ${it.name || 'this move'}`, title: 'Add a box',
+      onclick: () => { cols++; it.extraDose = undefined; paintMove(); main.querySelectorAll('.extra-input')[cols - 1]?.focus(); },
+    }, '+');
+    const main = h('div', { class: 'log-line' });
+    const setLines = h('div', { class: 'log-sets' });
+    function paintMove() {
+      scrollers.length = 0;
+      plus.hidden = cols >= MAX_BOXES - 1;
+      repeatBtn.hidden = it.rows.length >= MAX_SETS - 1;
+      main.replaceChildren(name, h('span', { class: 'log-tools' }, repeatBtn, plus), fields(it, 0));
+      setLines.replaceChildren(...it.rows.map((x, j) => h('div', { class: 'log-line log-set' },
+        // A set dropped in from the timer keeps its name, as a subheading ("Side plank" under "Plank + side plank")
+        x.label != null ? h('input', {
+          type: 'text', class: 'log-gap set-label', value: x.label, placeholder: '', 'aria-label': `Name of set ${j + 2}`, maxlength: 40,
+          oninput: e => { x.label = e.target.value; s.touched = true; }, onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+        }) : h('span', { class: 'log-gap', 'aria-hidden': 'true' }),
+        h('span', { class: 'log-tools' },
+          h('button', {
+            type: 'button', class: 'extra-add set-remove', 'aria-label': `Remove set ${j + 2} of ${it.name}`, title: 'Remove this set',
+            onclick: () => { it.rows.splice(j, 1); s.touched = true; vibrate(6); paintMove(); },
+          }, '−'),
+          h('span', { class: 'extra-add ghost', 'aria-hidden': 'true' })),
+        fields(x, j + 1))));
+      fitAll();
+    }
+    paintMove();
+
+    const inner = h('div', { class: 'log-inner' }, main, setLines);
     const del = h('button', { type: 'button', class: 'log-del', 'aria-label': `Delete ${it.name || 'move'}`, onclick: () => remove() }, 'Delete');
     const row = h('div', { class: 'log-row drag-row' }, del, inner);
     rowItem.set(row, it);
@@ -547,7 +703,7 @@ export function RoutineView(ctx) {
     row.slide = x => { inner.style.transform = x ? `translateX(${x}px)` : ''; row.classList.toggle('open', x < 0); };
     let swallowUntil = 0;
     inner.addEventListener('pointerdown', e => {
-      if (e.target.closest('.did-input, .extra-add') || e.button > 0) return;
+      if (e.target.closest('.did-input, .extra-add, .log-fields') || e.button > 0) return;
       sw = { x: e.clientX, y: e.clientY, base: openRow === row ? -84 : 0, on: false };
     });
     inner.addEventListener('pointermove', e => {
@@ -579,10 +735,25 @@ export function RoutineView(ctx) {
   }
 
   const paint = () => list.replaceChildren(...s.items.map(moveRow));
+  // A recording from the timer, carried over a move
+  const moveAt = (x, y) => {
+    const el = document.elementFromPoint(x, y)?.closest('.log-row');
+    return el && list.contains(el) && rowItem.get(el)?.name.trim() ? { el, it: rowItem.get(el) } : null;
+  };
+  // Dropped on a move: its box if nothing's in it yet today, else another set, named by the recording
+  function dropRecording(t, { it }) {
+    const fresh = !it.done && !it.rows?.length && (!it.did.trim() || it.did === it.dose);
+    if (fresh) it.did = t.did;
+    else (it.rows ??= []).push({ did: t.did, extra: '', ...(t.name.trim() && t.name.trim().toLowerCase() !== it.name.trim().toLowerCase() ? { label: t.name.trim() } : {}) });
+    it.done = true;
+    (s.timedMoves ??= new Set()).add(it.name.trim());
+    saveRecordings(s, it);
+    paint();
+  }
   paint();
   // Hold a row (its name or the space around it, not the box) to lift it, then drag
   dragHandles(list, {
-    hold: true, skip: '.did-input, .extra-add, .log-name:focus, .log-del', onLift: closeOpen,
+    hold: true, skip: '.did-input, .extra-add, .log-fields, .log-name:focus, .log-del', onLift: closeOpen,
     onReorder: rows => { s.items.splice(0, s.items.length, ...rows.map(x => rowItem.get(x))); },
   });
   const closeOnTapAway = e => { if (openRow && !openRow.contains(e.target)) closeOpen(); };
@@ -595,10 +766,46 @@ export function RoutineView(ctx) {
     onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addReps.focus(); } },
   });
   const addReps = h('input', {
-    type: 'text', class: 'did-input log-add-reps', placeholder: 'Reps', 'aria-label': 'Reps for the new move', enterkeyhint: 'done',
+    type: 'text', class: 'did-input log-add-reps', placeholder: '', 'aria-label': 'Reps, weight or time for the new move', enterkeyhint: 'done',
     onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); commitAdd(); addName.focus(); } },
   });
-  const add = h('div', { class: 'log-add-row' }, addName, addReps);
+  // Say moves as you do them ("20 Bulgarian split squats", "10 more push ups"): a new one gets a row, one
+  // already here gets its box filled, or another set
+  const voice = voiceSupported ? micButton({ label: 'Say what you did', onSaid: heard, onListen: on => { addName.placeholder = on ? 'Listening…' : '+ Add a move'; } }) : null;
+  const add = h('div', { class: 'log-add-row' }, addName, voice, addReps);
+  function heard(text) {
+    const said = spokenMoves(text);
+    if (!said.length) return;
+    const touched = [];
+    for (const m of said) {
+      const it = matchMove(s.items.filter(x => x.name.trim()), m.name);
+      if (it) {
+        const fresh = !it.done && !it.rows?.length && (!it.did.trim() || it.did === it.dose);
+        if (fresh || !it.did.trim()) { it.did = m.did || it.did; if (m.extra) it.extra = m.extra; }
+        // Said as part of a move's name ("plank" for "Plank + side plank"): the set is named for what was said
+        else {
+          const part = normName(m.name).replace(/ /g, '') !== normName(it.name).replace(/ /g, '');
+          (it.rows ??= []).push({ did: m.did || '✓', extra: m.extra ?? '', ...(part ? { label: m.name } : {}) });
+        }
+        it.done = true;
+        touched.push(it);
+      } else {
+        // The first empty row (a new routine starts with one) takes it before a new one is added
+        const blank = s.items.find(x => !x.name.trim());
+        const item = blank ?? { name: '', dose: '', did: '', done: false };
+        Object.assign(item, { name: m.name, dose: m.did, did: m.did, done: true, ...(m.extra ? { extra: m.extra } : {}) });
+        if (!blank) s.items.push(item);
+        touched.push(item);
+      }
+    }
+    s.touched = true;
+    vibrate(8);
+    paint();
+    paintActions();
+    // What changed glows for a moment
+    for (const [row, it] of rowItem) if (touched.includes(it) && row.isConnected) row.classList.add('heard');
+  }
+  ctx.onCleanup(() => voice?.stop());
   // Leaving the pair (not moving between its two boxes) adds what's there
   add.addEventListener('focusout', e => { if (!add.contains(e.relatedTarget)) commitAdd(); });
   function commitAdd() {
@@ -765,7 +972,7 @@ export function RoutineView(ctx) {
     body.append(
     list,
     add,
-    stopwatch(s, paint, ctx),
+    stopwatch(s, ctx, { moveAt, onDrop: dropRecording }),
     field,
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Reminders'), times),
     ...[r ? h('button', {
@@ -868,6 +1075,136 @@ function centreForm(name, figure, video, bar, tries = 20) {
   const figureTopPx = top(art) + (box.top - artBox.top) + (box.height - 140 * scale) / 2 + units * scale;
   const want = (top(bar) + bar.offsetHeight + figureTopPx) / 2;
   video.style.transform = `translateY(${Math.round(want - (top(room) + room.offsetHeight / 2))}px)`;
+}
+
+/**
+ * A small round mic. Tap to listen, tap again to stop. onSaid gets each finished phrase as it's heard
+ * (with once, it stops after the first). onListen(on) tells when it starts and stops.
+ */
+function micButton({ label, onSaid, onListen = () => {}, once = false }) {
+  let stop = null;
+  const b = h('button', {
+    type: 'button', class: 'extra-add mic-btn', 'aria-label': label, 'aria-pressed': 'false', title: label,
+    onclick: e => {
+      e.preventDefault();
+      if (stop) { stop(); return; }
+      let used = 0;
+      b.classList.add('rec'); b.setAttribute('aria-pressed', 'true');
+      onListen(true);
+      vibrate(6);
+      stop = startDictation({
+        onText: final => {
+          if (final.length <= used) return;
+          const phrase = final.slice(used);
+          used = final.length;
+          onSaid(phrase);
+          if (once) stop?.();
+        },
+        onEnd: err => {
+          stop = null;
+          b.classList.remove('rec'); b.setAttribute('aria-pressed', 'false');
+          onListen(false);
+          if (err === 'not-allowed' || err === 'service-not-allowed') toast('Microphone access is off for Back Story');
+        },
+      });
+    },
+  });
+  b.innerHTML = MIC;
+  b.stop = () => stop?.();
+  return b;
+}
+
+/**
+ * A row's touch: swipe left to show Delete (a short swipe springs back), and, with drag, hold to pick it up
+ * and carry it onto a move. The row floats under the finger; a move it's over lights up; letting go there
+ * drops it in with a small settle, anywhere else it glides home.
+ */
+function gestures(row, inner, { onDelete, drag = null, swallow = () => {} }) {
+  const HOLD = 380, SLOP = 8;
+  let sw = null, hold = 0, lifted = null, target = null;
+  row.slide = x => { inner.style.transform = x ? `translateX(${x}px)` : ''; row.classList.toggle('open', x < 0); };
+  const end = () => { clearTimeout(hold); hold = 0; };
+  inner.addEventListener('pointerdown', e => {
+    if (e.button > 0 || e.target.closest('.log-del') || document.activeElement?.closest?.('.sw-row') === row && e.target === document.activeElement) return;
+    sw = { x: e.clientX, y: e.clientY, base: row.classList.contains('open') ? -84 : 0, on: false, id: e.pointerId };
+    if (drag) hold = setTimeout(() => { if (sw && !sw.on) lift(e); }, HOLD);
+  });
+  function lift(e) {
+    try { inner.setPointerCapture(sw.id); } catch { /* gone */ }
+    const box = row.getBoundingClientRect();
+    const ghost = inner.cloneNode(true);
+    ghost.classList.add('sw-ghost');
+    Object.assign(ghost.style, { position: 'fixed', left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, margin: 0, zIndex: 50, pointerEvents: 'none' });
+    document.body.append(ghost);
+    lifted = { ghost, dx: sw.x - box.left, dy: sw.y - box.top, x: sw.x, y: sw.y };
+    row.classList.add('carried');
+    vibrate(12);
+    ghost.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }], { duration: 180, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'forwards' });
+  }
+  const move = e => {
+    if (lifted) {
+      e.preventDefault();
+      lifted.x = e.clientX; lifted.y = e.clientY;
+      lifted.ghost.style.left = `${e.clientX - lifted.dx}px`;
+      lifted.ghost.style.top = `${e.clientY - lifted.dy}px`;
+      const next = drag.moveAt(e.clientX, e.clientY);
+      if (next?.el !== target?.el) { target?.el.classList.remove('drop-target'); next?.el.classList.add('drop-target'); if (next) vibrate(4); }
+      target = next;
+      // Near the top or bottom of the screen, the page scrolls to reach moves out of view
+      const edge = 80, speed = e.clientY < edge ? -(edge - e.clientY) / 5 : e.clientY > innerHeight - edge ? (e.clientY - (innerHeight - edge)) / 5 : 0;
+      if (speed) scrollBy(0, speed);
+      return;
+    }
+    if (!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (!sw.on) {
+      if (Math.hypot(dx, dy) > SLOP) end();
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      sw.on = true;
+      row.classList.add('swiping');
+    }
+    row.slide(Math.max(-110, Math.min(0, sw.base + dx)));
+  };
+  const up = e => {
+    end();
+    if (lifted) {
+      const { ghost } = lifted;
+      swallow(400);
+      if (target) {
+        const to = target.el.getBoundingClientRect();
+        ghost.animate([{ transform: 'scale(1.04)', opacity: 1 }, { transform: `translate(${to.left - ghost.offsetLeft}px, ${to.top + to.height / 2 - ghost.offsetTop - ghost.offsetHeight / 2}px) scale(.6)`, opacity: 0 }], { duration: 260, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'forwards' })
+          .finished.then(() => ghost.remove());
+        target.el.classList.remove('drop-target');
+        target.el.animate([{ transform: 'scale(1.02)' }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.2,.9,.25,1)' });
+        vibrate(10);
+        const t = target;
+        lifted = null; target = null; row.classList.remove('carried');
+        drag.onDrop(t);
+      } else {
+        const home = row.getBoundingClientRect();
+        ghost.animate([{ left: ghost.style.left, top: ghost.style.top }, { left: `${home.left}px`, top: `${home.top}px` }], { duration: 300, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'forwards' })
+          .finished.then(() => { ghost.remove(); row.classList.remove('carried'); });
+        lifted = null;
+      }
+      sw = null;
+      return;
+    }
+    if (!sw) return;
+    const wasSwipe = sw.on, x = sw.base + (e.clientX - sw.x);
+    sw = null;
+    row.classList.remove('swiping');
+    if (!wasSwipe) return;
+    if (x < -42) row.slide(-84); else row.slide(0);
+    swallow(350);
+  };
+  inner.addEventListener('pointermove', move);
+  inner.addEventListener('pointerup', up);
+  inner.addEventListener('pointercancel', e => { if (lifted) up(e); else { end(); sw = null; row.classList.remove('swiping'); } });
+  inner.addEventListener('touchmove', e => { if (lifted) e.preventDefault(); }, { passive: false });
+  inner.addEventListener('contextmenu', e => e.preventDefault());
+  // Tapping away closes Delete again (and the listener goes once the row has)
+  const away = e => { if (!row.isConnected) return document.removeEventListener('pointerdown', away, true); if (row.classList.contains('open') && !row.contains(e.target)) row.slide(0); };
+  document.addEventListener('pointerdown', away, true);
 }
 
 const SCRUB_STEP = 14; // px of finger travel per step
@@ -1024,7 +1361,13 @@ export function RoutineRunView(ctx) {
     const stage = h('div', { class: `flow-body move-stage${dir ? ` enter-${dir > 0 ? 'next' : 'prev'}` : ''}` },
       h('div', { class: 'stage-room' }, figure ? video : null),
       art, h('h1', { tabindex: -1 }, it.name), how ? h('p', { class: 'run-how' }, how) : null,
-      extra ? h('div', { class: 'did-pair' }, amount, extra) : amount, isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null,
+      (() => {
+        // A mic in the reps box: say the number and it goes in
+        const mic = voiceSupported ? micButton({ label: `Say reps for ${it.name}`, once: true, onSaid: text => { const v = spokenAmount(text); if (v) { amount.value = it.did = v; vibrate(8); } } }) : null;
+        if (mic) ctx.onCleanup(() => mic.stop());
+        const box = mic ? h('div', { class: 'did-mic' }, amount, mic) : amount;
+        return extra ? h('div', { class: 'did-pair' }, box, extra) : box;
+      })(), isTimed(it.name, it.dose, it.did) ? timer(it, amount) : null,
       h('div', { class: 'stage-room', 'aria-hidden': 'true' }));
     root.replaceChildren(
       h('header', { class: 'flow-head' }, iconButton('✕', 'Back to the routine', back), h('span', { class: 'eyebrow' }, R.routineLabel(r)), h('span', { class: 'timer' }, `${i + 1}/${moves.length}`)),

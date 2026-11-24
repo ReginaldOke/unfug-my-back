@@ -103,18 +103,13 @@ function fitBox(move) {
 }
 
 /**
- * Animated figure for a move name, or null when there isn't one. `small` draws a thumbnail (no glow,
- * framed tight on the figure so it reads at a glance); `at` draws a still at that point of the move.
+ * The mascot: a sporty little figure in a red top, sleeves and shoes, with a red headband whose tails
+ * flap behind as it moves, and a calm, content face. Returns the svg and draw(joints, strength, blink,
+ * t, settle); `layer` is the group the body is drawn in, and eye and mouth can be redrawn for a mood.
  */
-export function MoveFigure(name, { small = false, at = null } = {}) {
-  // Movements and calm activities are matched together, so the closer name wins
-  const move = findByName([...ALL_MOVES, ...CALM], name);
-  if (!move) return null;
-  if (move.kind) return CalmGuide(move, { small });
-
-  // The mascot: a sporty little figure in a red top, sleeves and shoes, with a red headband whose tails
-  // flap behind as it moves, and a calm, content face (an eye that blinks, a blush, a small smile that
-  // tightens a touch at the hardest point)
+export function mascot(move, { small = false, viewBox = '0 0 200 140' } = {}) {
+  // An eye that blinks, a blush, a small smile that tightens a touch at the hardest point
+  let layer;
   const seed = ++figId;
   const seg = cls => s('path', { class: `fig-seg ${cls}` });
   const side = cls => ({
@@ -136,7 +131,7 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
   // Seen from behind there's no face, just the headband round the back of the head
   if (move.view === 'back') for (const el of [eye, mouth, face.querySelector('.fig-blush')]) el.style.display = 'none';
   const glow = s('circle', { class: 'fig-glow', r: 15 });
-  const svg = s('svg', { viewBox: small ? fitBox(move) : '0 0 200 140', class: `move-figure${small ? ' small' : ''}${move.view === 'back' ? ' from-back' : ''}`, 'aria-hidden': 'true' },
+  const svg = s('svg', { viewBox, class: `move-figure${small ? ' small' : ''}${move.view === 'back' ? ' from-back' : ''}`, 'aria-hidden': 'true' },
     s('defs', {},
       s('radialGradient', { id: 'fig-glow' },
         s('stop', { offset: '0%', 'stop-color': '#ff5a4f', 'stop-opacity': 0.7 }),
@@ -145,7 +140,7 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
     move.floor === false ? null : s('line', { class: 'fig-floor', x1: 14, x2: 186, y1: FLOOR_LINE, y2: FLOOR_LINE }),
     (move.props ?? []).map(([x1, y1, x2, y2]) => s('line', { class: 'fig-floor fig-prop', x1, y1, x2, y2 })),
     small ? null : glow,
-    s('g', {}, far.thigh, far.shin, far.foot, far.shoe, far.upper, far.fore, far.sleeve, torso, neck, tails, face,
+    layer = s('g', {}, far.thigh, far.shin, far.foot, far.shoe, far.upper, far.fore, far.sleeve, torso, neck, tails, face,
       near.thigh, near.shin, near.foot, near.shoe, near.upper, near.fore, near.sleeve));
 
   // Feet point forward from the ankle (the other way for a body lying face up), along the shin when
@@ -197,6 +192,20 @@ export function MoveFigure(name, { small = false, at = null } = {}) {
     glow.style.opacity = (0.35 + 0.65 * strength).toFixed(2);
   };
 
+  return { svg, draw, layer, eye, mouth, glow };
+}
+
+/**
+ * Animated figure for a move name, or null when there isn't one. `small` draws a thumbnail (no glow,
+ * framed tight on the figure so it reads at a glance); `at` draws a still at that point of the move.
+ */
+export function MoveFigure(name, { small = false, at = null } = {}) {
+  // Movements and calm activities are matched together, so the closer name wins
+  const move = findByName([...ALL_MOVES, ...CALM], name);
+  if (!move) return null;
+  if (move.kind) return CalmGuide(move, { small });
+  const { svg, draw } = mascot(move, { small, viewBox: small ? fitBox(move) : '0 0 200 140' });
+  const seed = figId;
   // A still at one point of the move (`at`, 0 to 1), or the stretched pose for reduced motion
   if (at != null || matchMedia('(prefers-reduced-motion: reduce)').matches) {
     draw(poseAt(move, at ?? 1), at ?? 1);

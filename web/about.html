@@ -239,10 +239,13 @@
       footer { scroll-snap-align: end; }
     }
     /* Wide screens: the page scrolls freely, but a quick flick still comes to rest on each of the chart's
-       chapters when it's near one, so the chart can't be skimmed past in one go */
+       chapters when it's near one, so the chart can't be skimmed past in one go. A scroll that stops part way
+       into an opening section settles on it, with its words in the middle of the screen. */
     @media (min-width: 821px) and (prefers-reduced-motion: no-preference) {
       html { scroll-snap-type: y proximity; }
+      .hero, .scene { scroll-snap-align: start; }
       .snap { scroll-snap-align: start; scroll-snap-stop: always; }
+      .private { scroll-snap-align: center; }
     }
     /* The opening: held back until the fonts are in, then the header and the name arrive in turn,
        the name sharpening out of a soft blur, while the phone drops in behind */

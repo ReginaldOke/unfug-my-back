@@ -65,7 +65,9 @@ export function segmented(options, value, onChange, label) {
 
 // Text glyphs like ‹ sit off-centre in most fonts, so common icons are drawn as SVG
 const SVG_ICONS = {
-  '‹': '<path d="M15.25 5.5 8.75 12l6.5 6.5" />',
+  // Nudged a touch toward its point: a chevron reads as the triangle it outlines, whose weight sits
+  // toward the open side, so centred exactly it looks pushed right
+  '‹': '<path d="M14.65 5.5 8.15 12l6.5 6.5" />',
   '✕': '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />',
 };
 

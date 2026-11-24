@@ -421,6 +421,13 @@ export const routines = {
       .sort((a, b) => (b.date ?? b.timestamp).localeCompare(a.date ?? a.timestamp))[0];
     return new Map((past?.log ?? []).filter(x => x.extra).map(x => [x.name, x.extra]));
   },
+  /** Each move's whole entry last time it was logged (before `date`), by move name: { did, extra, sets? }. */
+  lastEntries(id, date = localDate()) {
+    const past = S.table('routineCompletions')
+      .filter(c => c.routineId === id && c.log?.length && (c.date ?? localDate(new Date(c.timestamp))) < date)
+      .sort((a, b) => (b.date ?? b.timestamp).localeCompare(a.date ?? a.timestamp))[0];
+    return new Map((past?.log ?? []).map(x => [x.name, x]));
+  },
   /** What you did for each move last time (before `date`), by move name. */
   lastDid(id, date = localDate()) {
     const past = S.table('routineCompletions')

@@ -11,6 +11,8 @@ import { quickAddFactor } from './factor.js';
 import { voiceSupported, startDictation } from '../lib/voice.js';
 import { askPermissions } from '../lib/native.js';
 import { BUILT_IN, checkinSteps, autoAdvances, isSliderStep } from '../lib/checkin-steps.js';
+import { streakMilestone } from '../lib/milestones.js';
+import { Cheer, CHEER_TEXT, cheerPreview } from './cheer.js';
 
 // Drafts survive leaving the survey (e.g. to add a factor or log a routine) within this session
 const drafts = new Map();
@@ -390,13 +392,29 @@ export function CheckinView(ctx) {
     root.replaceChildren(doneScreen());
   }
 
-  function doneScreen() {
+  /** The milestone today's check-in reached (the first ever, or a streak), the first time it's shown (or again later that day). */
+  function milestone() {
+    const all = R.checkins.all();
+    // The very first check-in gets its own little moment, whichever day it's for
+    const m = all.length === 1 ? { id: 'first', key: 'first' } : date === today ? streakMilestone(all.map(e => e.date), today) : null;
+    const seen = R.settings().milestonesSeen ?? {};
+    if (!m || (seen[m.key] && seen[m.key] !== today)) return null;
+    R.setSettings({ milestonesSeen: { ...seen, [m.key]: today } });
+    return m.id;
+  }
+
+  function doneScreen(cheer = milestone()) {
     const streak = R.checkins.streak();
     const week = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
-    return h('div', { class: 'done-screen' },
+    const [title, line] = CHEER_TEXT[cheer] ?? [];
+    return h('div', { class: `done-screen${cheer ? ' cheering' : ''}` },
       h('div', { class: 'burst', 'aria-hidden': 'true' }, Array.from({ length: 14 }, (_, i) => h('i', { style: `--a:${i * (360 / 14)}deg` }))),
-      h('div', { class: 'done-ring' }, h('span', { class: 'big-num' }, String(streak)), h('span', { class: 'unit' }, streak === 1 ? 'day' : 'days')),
-      h('h1', {}, streak > 1 ? `${streak}-day streak` : 'Day one'),
+      cheer
+        ? h('div', { class: 'done-cheer' }, Cheer(cheer))
+        : h('div', { class: 'done-ring' }, h('span', { class: 'big-num' }, String(streak)), h('span', { class: 'unit' }, streak === 1 ? 'day' : 'days')),
+      h('div', { class: 'done-words' },
+        h('h1', {}, title ?? (streak > 1 ? `${streak}-day streak` : 'Day one')),
+        line ? h('p', { class: 'cheer-line' }, line) : null),
       h('div', { class: 'week-dots', 'aria-label': 'This week' }, week.map(d => h('span', { class: R.checkins.entryFor(d) ? 'on' : '' }, h('i'), h('small', {}, weekdayLetter(d))))),
       h('div', { class: 'stats-row' },
         stat(draft.pain ?? '–', '/10', 'Pain'),
@@ -407,6 +425,8 @@ export function CheckinView(ctx) {
 
   const stat = (v, unit, label) => h('div', { class: 'stat glass' }, h('div', {}, h('span', { class: 'num' }, String(v)), h('span', { class: 'unit' }, unit)), h('span', { class: 'hint' }, label));
 
-  render();
+  // A milestone's screen, to look at without checking in (only while developing)
+  const preview = cheerPreview(ctx.params.get('cheer'));
+  if (preview) root.replaceChildren(doneScreen(preview)); else render();
   return root;
 }

@@ -8,7 +8,16 @@ const n = v => Number(v.replace(',', '.'));
  * The one number worth charting for a logged move, or null: weight if there is one ("75 kg"), else a
  * time ("0:45", "30 s", "2 min" as seconds), else reps ("3 × 8" is 24, "× 6 each side" is 6).
  */
-export function moveValue({ did = '', extra = '' } = {}) {
+export function moveValue(entry = {}) {
+  // In sets: the heaviest weight, else every set's reps or time added up
+  if (entry.sets?.length > 1) {
+    const vals = entry.sets.map(x => moveValue(x)).filter(Boolean);
+    if (!vals.length) return null;
+    const heavy = vals.filter(v => v.unit === 'kg' || v.unit === 'lb');
+    if (heavy.length) return heavy.reduce((a, b) => (b.value > a.value ? b : a));
+    return { value: vals.filter(v => v.unit === vals[0].unit).reduce((t, v) => t + v.value, 0), unit: vals[0].unit };
+  }
+  const { did = '', extra = '' } = entry;
   const both = `${did} ${extra}`;
   const weight = new RegExp(`${NUM}\\s*(kg|lbs?)\\b`, 'i').exec(both);
   if (weight) return { value: n(weight[1]), unit: weight[2].toLowerCase().startsWith('lb') ? 'lb' : 'kg' };
@@ -24,8 +33,9 @@ export function moveValue({ did = '', extra = '' } = {}) {
   return plain ? { value: n(plain[1]), unit: 'reps' } : null;
 }
 
-/** How a logged move reads for one day: "3 × 8 · 75 kg", or "Done" for a plain tick. */
-export const moveText = x => [x.did === '✓' ? 'Done' : x.did, x.extra].filter(Boolean).join(' · ');
+/** How a logged move reads for one day: "3 × 8 · 75 kg", "Done" for a plain tick, or each set in turn ("10 · 20 kg, 8 · 22 kg"). */
+export const moveText = x => (x.sets?.length > 1 ? x.sets.map(moveText).join(', ')
+  : [x.label, x.did === '✓' ? 'Done' : x.did, x.extra].filter(Boolean).join(' · '));
 
 /**
  * One row per move, in the routine's order, then anything else logged (like a timed hang), leaving out

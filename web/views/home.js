@@ -1,12 +1,12 @@
 // Dashboard: today's pain, trend, patterns, movement, routine, and sharing the diary with an AI chat.
-import { h, segmented, sheet, toast, iconButton } from '../lib/ui.js';
+import { h, s as svgEl, segmented, sheet, toast, iconButton } from '../lib/ui.js';
 import * as R from '../lib/repos.js';
 import * as reminders from '../lib/reminders.js';
 import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { HEALTH_LINES } from '../lib/health-days.js';
 import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
-import { quickSummary, trendFindings, factorStory, scoreSplits, painLink } from '../lib/analysis.js';
+import { quickSummary, trendFindings, factorStory, scoreSplits, painLink, patternWeight, painRisks } from '../lib/analysis.js';
 import { findInsights } from '../lib/insights.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
@@ -17,6 +17,9 @@ import { Ruler, SelectCard, PENCIL, healthSwitch } from './controls.js';
 import { openReminderSheet, hoursSummary } from './reminder-sheet.js';
 import { justFinished } from './routines.js';
 import { dragHandles } from './sortable.js';
+import { patternsFor } from './insight.js';
+import { calmBanner } from '../lib/milestones.js';
+import { Cheer, CHEER_TEXT, cheerPreview } from './cheer.js';
 
 // View state that should survive the periodic re-render
 const ui = { range: 7, hidden: null, view: 'chart', month: localDate().slice(0, 7), day: null, drawn: null };
@@ -141,15 +144,16 @@ function NoticeSlot(ctx) {
   const el = h('div', { class: 'notices', 'aria-live': 'polite' });
   const shown = new Map(); // key -> wrapper element
   let banners = [];
+  let preview = cheerPreview(ctx.params.get('cheer'));
   // Opening Home counts as a visit for each notice
   countVisit();
   const first = topFinding();
   if (first) markFinding(first.key, (R.settings().findingSeen?.[first.key] ?? 0) + 1);
 
-  const notice = (key, { title, body, href, actions = [], onClose, full }) => {
+  const notice = (key, { title, body, href, actions = [], onClose, full, art }) => {
     const text = h(href ? 'a' : 'div', { class: 'notice-text', href }, h('strong', {}, title), body ? h('span', {}, body) : null);
-    const card = h('div', { class: `notice glass${full ? ' full' : ''}`, role: 'status' },
-      h('div', { class: 'notice-main' }, text,
+    const card = h('div', { class: `notice glass${full ? ' full' : ''}${art ? ' with-art' : ''}`, role: 'status' },
+      h('div', { class: 'notice-main' }, art ? h('div', { class: 'notice-art', 'aria-hidden': 'true' }, art) : null, text,
         h('button', { type: 'button', class: 'notice-x', 'aria-label': 'Dismiss', onclick: onClose }, '✕')),
       actions.length ? h('div', { class: 'notice-actions' }, actions.map(a => h('button', {
         type: 'button', class: `btn small ${a.primary ? 'primary' : 'glass'}`, onclick: () => { onClose(); a.run?.(); },
@@ -160,6 +164,15 @@ function NoticeSlot(ctx) {
   function update() {
     const want = new Map();
     for (const b of banners) want.set(`b${b.id}`, () => notice(`b${b.id}`, { ...b, onClose: () => dismiss(b.id) }));
+    // A week or a month without a flare: a little celebration, until dismissed or a few days have passed
+    const calm = preview ? { id: preview, key: 'preview' } : calmBanner(R.checkins.all(), R.flares.all(), localDate(), R.settings().cheersDismissed ?? {});
+    if (calm) {
+      const [title, body] = CHEER_TEXT[calm.id];
+      want.set(`m${calm.key}`, () => notice(`m${calm.key}`, {
+        title, body, full: true, art: Cheer(calm.id, { small: true }),
+        onClose: () => { if (calm.key !== 'preview') R.setSettings({ cheersDismissed: { ...(R.settings().cheersDismissed ?? {}), [calm.key]: true } }); preview = null; update(); },
+      }));
+    }
     // Pain that stays high, or a warning sign in the notes: stays until dismissed
     const dismissed = R.settings().careDismissed ?? {};
     const care = careNotice(R.checkins.all(), localDate(), dismissed);
@@ -557,13 +570,16 @@ function patternsCard(today) {
       const st = factorStory(f, data, today);
       const n = midName(f.name);
       // Time and counts read "with more long sitting"; yes or no reads "with a heat pack"
-      return st.best && { name: f.name, href: `#/factor/${f.id}`, delta: st.best.delta, early: st.early, phrase: st.amount ? `on days with more ${n}` : `on days with ${n}` };
+      return st.best && { name: f.name, href: `#/factor/${f.id}`, delta: st.best.delta, early: st.early, phrase: st.amount ? `on days with more ${n}` : `on days with ${n}`,
+        weight: patternWeight(st.best.delta, Math.min(st.best.nWith, st.best.nWithout), st.nCheckins) };
     }),
-    ...scoreSplits(data, today).map(x => ({ name: x.name, href: `#/score/${x.key}`, delta: x.split.delta, early: x.split.early, phrase: SCORE_PHRASE[x.key] })),
-  ].filter(a => a && Math.abs(a.delta) >= 0.05);
+    ...scoreSplits(data, today).map(x => ({ name: x.name, href: `#/score/${x.key}`, delta: x.split.delta, early: x.split.early, phrase: SCORE_PHRASE[x.key],
+      weight: patternWeight(x.split.delta, Math.min(x.split.nMore, x.split.nLess), x.split.nMore + x.split.nLess) })),
+  ].filter(a => a && a.weight != null && Math.abs(a.delta) >= 0.05);
+  // Ranked by how much each counts, so what's logged on most days comes before what's logged once or twice
   const rows = [
-    ...all.filter(a => a.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3),
-    ...all.filter(a => a.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3),
+    ...all.filter(a => a.delta > 0).sort((a, b) => b.weight - a.weight).slice(0, 3),
+    ...all.filter(a => a.delta < 0).sort((a, b) => a.weight - b.weight).slice(0, 3),
   ];
   if (!rows.length) {
     return h('section', { class: 'card glass patterns' }, head,
@@ -574,18 +590,43 @@ function patternsCard(today) {
   const shown = rows;
   const allEarly = rows.every(a => a.early);
   const scale = Math.max(2, ...shown.map(a => Math.abs(a.delta)));
-  // Up top: delays and combinations that cleared the bar (each opens its own page). Without any, the
-  // longest bar below, in words, once it's a real difference
-  const insights = findInsights(data, factors, today).map(x => ({ title: x.title, href: `#/insight/${x.id}`, bad: x.delta > 0 }));
+  // Up top: patterns that cleared the bar, each with a tiny sketch of its chart and its own page: what
+  // comes before flares, delays, combinations, and pain since a routine started. Without any, the longest
+  // bar below, in words, once it's a real difference
+  const insights = patternsFor(data, factors, findInsights(data, factors, today), today).map(x => ({ title: x.title, href: `#/insight/${x.id}`, bad: x.bad, kind: x.kind }));
   const top = [...shown].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
   const leads = insights.length ? insights
     : Math.abs(top.delta) >= 0.5 ? [{ title: `${top.delta > 0 ? 'More' : 'Less'} pain ${top.phrase}`, href: top.href, bad: top.delta > 0 }] : [];
+  const warn = headsUp(factors, data, today);
+  const above = leads.length || warn;
   return h('section', { class: 'card glass patterns' },
-    leads.length ? h('div', { class: 'findings' }, head, leads.map(findingRow)) : null,
-    h('div', { class: 'pat-head' }, leads.length ? h('span', {}) : head,
+    above ? h('div', { class: 'findings' }, head, warn, leads.map(findingRow)) : null,
+    h('div', { class: 'pat-head' }, above ? h('span', {}) : head,
       h('span', { class: 'pat-axis', 'aria-hidden': 'true' }, h('small', {}, '← Less pain'), h('small', {}, 'More pain →'))),
     h('div', { class: 'pat-list' }, shown.map(a => patRow(a, (a.delta ?? 0) / scale))),
     allEarly ? h('p', { class: 'hint pat-note' }, 'Only a few days so far, so these could change.') : null);
+}
+
+// Things you'd sit through, where a nudge to get up helps
+const SITTING = /sit|desk|driv|screen|couch|sofa|computer|commut|gaming|tv\b/i;
+
+/** A heads-up when something that's gone with more pain is up the last two check-ins, with a way to act where there is one. */
+function headsUp(factors, data, today) {
+  // While developing, ?headsup shows one for the item most tied to more pain, ignoring the last two
+  // days, so it can be looked at (it never picks something whose own page says it makes no difference)
+  const preview = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.hash.split('?')[1]).has('headsup');
+  const risk = preview
+    ? factors.map(f => ({ factor: f, st: factorStory(f, data, today) })).filter(x => x.st.state === 'up').sort((a, b) => b.st.best.delta - a.st.best.delta).map(x => ({ factor: x.factor, amount: x.st.amount }))[0]
+    : painRisks(factors, data, today)[0];
+  if (!risk) return null;
+  const f = risk.factor;
+  const nudge = SITTING.test(f.name) && !R.settings().reminder.enabled;
+  return h('div', { class: 'heads-up' },
+    h('a', { class: 'finding', href: `#/factor/${f.id}` },
+      h('i', { class: 'finding-dot bad', 'aria-hidden': 'true' }),
+      h('span', { class: 'grow' }, h('span', { class: 'finding-title' }, risk.amount === false ? `${f.name} two days running` : `More ${midName(f.name)} than usual`), h('small', {}, 'It’s gone with more pain before.')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
+    nudge ? h('button', { type: 'button', class: 'btn small glass', onclick: openReminderSheet }, 'Turn on move nudges') : null);
 }
 
 // How each of the check-in's scores reads in a sentence
@@ -595,11 +636,22 @@ const midName = n => (/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : 
 
 /** "Pain is worse two days after more long sitting": a dot for which way it points, the pattern, a chevron. */
 function findingRow(x) {
-  return h('a', { class: 'finding', href: x.href },
+  const sketch = x.kind ? svgEl('svg', { class: 'finding-sketch', viewBox: '0 0 34 20', 'aria-hidden': 'true' }) : null;
+  if (sketch) sketch.innerHTML = SKETCH[x.kind];
+  return h('a', { class: `finding${sketch ? ' with-sketch' : ''}`, href: x.href },
     h('i', { class: `finding-dot ${x.bad ? 'bad' : 'good'}`, 'aria-hidden': 'true' }),
     h('span', { class: 'grow finding-title' }, x.title),
+    sketch,
     h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
 }
+
+// Each kind of pattern as a tiny version of its chart
+const SKETCH = {
+  flare: '<path d="M0 5 C7 5 10 13 15 14 C21 15 27 9 34 9" class="s-line s-teal"/><path d="M0 16 C8 16 12 15.5 16 15 C21 14 22 4 26 4 C30 4 31 12 34 13" class="s-line"/><circle cx="15" cy="14" r="2.2" class="s-teal-dot"/>',
+  lag: '<path d="M0 15 C6 15 9 14.5 13 14 C18 13.5 19 4 23 4 C27 4 28 13 34 14 L34 20 L0 20 Z" class="s-area"/><path d="M0 15 C6 15 9 14.5 13 14 C18 13.5 19 4 23 4 C27 4 28 13 34 14" class="s-line"/><circle cx="13" cy="14" r="2.2" class="s-cause"/>',
+  combo: '<line x1="10" x2="10" y1="0" y2="20" class="s-axis"/><rect x="10" y="2" width="6" height="3.6" rx="1.8" class="s-soft"/><rect x="10" y="8.2" width="7.5" height="3.6" rx="1.8" class="s-soft"/><rect x="10" y="14.4" width="22" height="3.6" rx="1.8" class="s-hot"/>',
+  trend: '<path d="M0 6 C5 4 7 8 11 6 C15 4 16 9 19 12 C23 15 27 12 34 14 L34 20 L0 20 Z" class="s-area"/><path d="M0 6 C5 4 7 8 11 6 C15 4 16 9 19 12 C23 15 27 12 34 14" class="s-line"/><line x1="16" x2="16" y1="1" y2="19" class="s-axis"/>',
+};
 
 /** One factor: its name, then a bar growing out from the centre line (w is -1..1 of the half width).
     No difference to show yet (only days with it so far): a dot on the line in its role's colour. */

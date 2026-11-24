@@ -33,7 +33,7 @@ export const INSIGHT_DAYS = 56;
 
 const hash = s => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 2166136261);
 // mulberry32: small, fast and well mixed, so neighbouring draws don't lean on each other
-function seeded(key) {
+export function seeded(key) {
   let a = hash(key);
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -42,13 +42,13 @@ function seeded(key) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-function shuffled(xs, rand) {
+export function shuffled(xs, rand) {
   const a = [...xs];
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
 /** How often shuffling gives a statistic at least as far from zero as the real one (counting the real one). */
-function chance(stat, shuffle, key) {
+export function chance(stat, shuffle, key) {
   const real = Math.abs(stat(null));
   const rand = seeded(key);
   let as = 0;
@@ -69,12 +69,28 @@ function window(data, today) {
   return { dates, pain: painByDate(data.dailyEntries) };
 }
 
+// Stress and sleep from the check-in, tested like any logged item. Each day's amount is how far it leans
+// the bad way (stress as it is, sleep turned round), so "more" always means worse.
+export const SCORES = [
+  { id: 'score-stressScore', key: 'stressScore', name: 'High stress', measureType: 'score', flip: false },
+  { id: 'score-sleepQuality', key: 'sleepQuality', name: 'Poor sleep', measureType: 'score', flip: true },
+];
+/** A factor's amounts by date, or a check-in score's (as SCORES describes). */
+export function amountsOf(subject, data) {
+  if (subject.measureType !== 'score') return amountsByDate(data.factorLogs, subject.id);
+  const m = new Map();
+  for (const e of data.dailyEntries) if (e[subject.key] != null) m.set(e.date, subject.flip ? 10 - e[subject.key] : e[subject.key]);
+  return m;
+}
+/** A logged item or check-in score by its id, or null. */
+export const subjectById = (id, factors) => SCORES.find(x => x.id === id) ?? factors.find(f => f.id === id) ?? null;
+
 /**
  * Which days count as "with" a factor: any of it for yes or no; for time and counts, more than its middle
  * amount over the window (so for something logged daily, its bigger days). { on(date), cut }
  */
-function presence(factor, data, dates) {
-  const amounts = amountsByDate(data.factorLogs, factor.id);
+export function presence(factor, data, dates) {
+  const amounts = amountsOf(factor, data);
   if (factor.measureType === 'yesno') return { on: d => (amounts.get(d) || 0) > 0, cut: 0 };
   const cut = balancedCut(dates.map(d => amounts.get(d) || 0)) ?? Infinity;
   return { on: d => (amounts.get(d) || 0) > cut, cut };
@@ -160,7 +176,8 @@ export function explainCombo(a, b, data, today = localDate()) {
 // ---------- What to offer ----------
 
 const mid = n => (/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n);
-const more = f => (f.measureType === 'yesno' ? mid(f.name) : `more ${mid(f.name)}`);
+const more = f => (f.measureType === 'yesno' || f.measureType === 'score' ? mid(f.name) : `more ${mid(f.name)}`);
+export const subjectPhrase = more;
 export const LATER = { 1: 'the day after', 2: 'two days after' };
 
 export const lagTitle = (f, x) => `Pain is ${x.delta > 0 ? 'worse' : 'better'} ${LATER[x.lag]} ${more(f)}`;
@@ -188,6 +205,7 @@ export function findInsights(data, factors, today = localDate(), max = 3) {
 
   const found = [];
   let asked = 0;
+  factors = [...factors, ...SCORES];
   for (const f of factors) {
     for (const lag of [1, 2]) {
       const x = explainLag(f, data, lag, today);
@@ -196,7 +214,7 @@ export function findInsights(data, factors, today = localDate(), max = 3) {
       if (x.shaped) found.push({ id: `lag.${f.id}.${lag}`, kind: 'lag', title: lagTitle(f, x), delta: x.delta, early: x.early, p: x.p });
     }
   }
-  const logged = factors.map(f => ({ f, n: dates.filter(d => (amountsByDate(data.factorLogs, f.id).get(d) || 0) > 0).length }))
+  const logged = factors.map(f => ({ f, n: dates.filter(d => (amountsOf(f, data).get(d) || 0) > 0).length }))
     .filter(x => x.n >= NEED).sort((a, b) => b.n - a.n).slice(0, MAX_PAIRS_FROM).map(x => x.f);
   for (let i = 0; i < logged.length; i++) {
     for (let j = i + 1; j < logged.length; j++) {

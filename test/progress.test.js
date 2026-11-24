@@ -37,3 +37,10 @@ test('a move dropped from the routine without ever being done gets no row', () =
   // Cable fly was removed and never had a value; Push-ups is new but still in the routine; the hang was done
   assert.deepEqual(names, ['Bench press', 'Push-ups', 'Dead hang']);
 });
+
+test('a move done in sets reads set by set, and charts the heaviest weight or all the reps', () => {
+  const weighted = { did: '8, 6', sets: [{ did: '8', extra: '60 kg' }, { did: '6', extra: '65 kg' }] };
+  assert.equal(moveText(weighted), '8 · 60 kg, 6 · 65 kg');
+  assert.deepEqual(moveValue(weighted), { value: 65, unit: 'kg' });
+  assert.deepEqual(moveValue({ did: '10, 10, 8', sets: [{ did: '10' }, { did: '10' }, { did: '8' }] }), { value: 28, unit: 'reps' });
+});
