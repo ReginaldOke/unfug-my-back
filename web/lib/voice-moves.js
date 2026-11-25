@@ -8,11 +8,29 @@ const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy:
 
 /** "twenty five push ups" → "25 push ups"; "a dozen" → 12; "a minute" → 1 minute. */
 export function digits(text) {
-  return text.toLowerCase()
+  return scales(text.toLowerCase()
     .replace(/\ba dozen\b/g, '12').replace(/\bhalf a minute\b/g, '30 seconds').replace(/\ba minute\b/g, '1 minute')
+    // "1,000" is a thousand, not one point nought
+    .replace(/(\d),(?=\d{3}\b)/g, '$1')
+    .replace(/\ba (hundred|thousand|million)\b/g, '1 $1')
     .replace(new RegExp(`\\b(${Object.keys(TENS).join('|')})(?:[\\s-](${UNITS.slice(1, 10).join('|')}))?\\b`, 'g'), (_, t, u) => String(TENS[t] + (u ? UNITS.indexOf(u) : 0)))
-    .replace(new RegExp(`\\b(${UNITS.join('|')})\\b`, 'g'), w => String(UNITS.indexOf(w)))
-    .replace(/(\d+)\s+hundred\b/g, (_, n) => String(Number(n) * 100));
+    .replace(new RegExp(`\\b(${UNITS.join('|')})\\b`, 'g'), w => String(UNITS.indexOf(w))));
+}
+
+const SCALE = { hundred: 100, thousand: 1000, million: 1000000 };
+/** Joins numbers said with scales into one: "2 thousand 5 hundred and 20" → "2520", "1 million" → "1000000". */
+function scales(text) {
+  return text.replace(/\d+(?:\s+(?:and\s+)?(?:\d+|hundred|thousand|million))*(?:\s+(?:hundred|thousand|million))?/g, run => {
+    if (!/hundred|thousand|million/.test(run)) return run;
+    let total = 0, part = 0;
+    for (const w of run.split(/\s+/)) {
+      if (w === 'and') continue;
+      if (w === 'hundred') part = (part || 1) * 100;
+      else if (w === 'thousand' || w === 'million') { total += (part || 1) * SCALE[w]; part = 0; }
+      else part += Number(w);
+    }
+    return String(total + part);
+  });
 }
 
 /** One thing said, as moves: [{ name, did }]. Several can be said at once ("10 push ups and 20 squats"). */

@@ -242,3 +242,13 @@ test('a heads-up when something that goes with more pain is up two check-ins run
   // Nothing when the last check-in is days old
   assert.deepEqual(painRisks([sitting], diary(true), addDays(today, 3)), []);
 });
+
+test('patterns need regular, recent logging', () => {
+  // 27 check-ins: each side needs at least 5 days (15%), so two or four days is too few
+  assert.equal(patternWeight(1.2, 2, 27), null);
+  assert.equal(patternWeight(1.2, 4, 27), null);
+  assert.ok(patternWeight(1.2, 5, 27) > 0);
+  // Not logged for over two weeks: left out; logged ten days ago: counts for less than this week
+  assert.equal(patternWeight(1.2, 8, 27, 15), null);
+  assert.ok(patternWeight(1.2, 8, 27, 10) < patternWeight(1.2, 8, 27, 3));
+});

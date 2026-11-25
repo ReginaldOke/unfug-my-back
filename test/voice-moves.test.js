@@ -42,3 +42,11 @@ test('the player box takes just the number said', () => {
   assert.equal(spokenNumber('I did fifteen'), '15');
   assert.equal(spokenNumber('um'), '');
 });
+
+test('hundreds, thousands and millions are one number', () => {
+  assert.equal(spokenNumber('one hundred'), '100');
+  assert.equal(spokenNumber('a hundred and twenty'), '120');
+  assert.equal(spokenNumber('1 million'), '1000000');
+  assert.equal(spokenNumber('two thousand five hundred'), '2500');
+  assert.equal(spokenNumber('1,000'), '1000');
+});

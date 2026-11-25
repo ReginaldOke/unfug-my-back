@@ -436,18 +436,31 @@ export function factorStory(factor, data, today = localDate()) {
   return { ...base, state, best, next: next.enough && best !== next ? next : null, early: Math.min(best.nWith, best.nWithout) < MIN_DAYS };
 }
 
-// Once the window has this many check-ins, an item on fewer days than PATTERN_MIN_SIDE (or missing on
-// fewer) is too thin to put beside the rest
-const PATTERN_FULL_WINDOW = 10, PATTERN_MIN_SIDE = 3;
+// What makes a pattern worth showing, beyond the size of the gap:
+//   how often: once the window has PATTERN_FULL_WINDOW check-ins, each side needs at least PATTERN_MIN_SIDE
+//     days, and at least PATTERN_MIN_SHARE of the check-ins, so something logged twice in a month stays out
+//   how recently: something not logged for PATTERN_STALE days is left out, and from PATTERN_FRESH days it
+//     counts for less, so what's in your life now comes first
+const PATTERN_FULL_WINDOW = 10, PATTERN_MIN_SIDE = 3, PATTERN_MIN_SHARE = 0.15;
+export const PATTERN_FRESH = 7, PATTERN_STALE = 14;
 
 /**
  * How much a gap in pain counts when ranking what goes with it: the gap, scaled down when either side
- * rests on only a few days, so something logged twice doesn't outrank what's logged most days. Null
- * when it's too thin to show at all. nSmall: days on the smaller side; nCheckins: check-ins in the window.
+ * rests on only a few days and when it hasn't been logged lately. Null when it's too thin or too old to
+ * show. nSmall: days on the smaller side; nCheckins: check-ins in the window; daysSince: since last logged.
  */
-export function patternWeight(delta, nSmall, nCheckins) {
-  if (nCheckins >= PATTERN_FULL_WINDOW && nSmall < PATTERN_MIN_SIDE) return null;
-  return delta * (nSmall / (nSmall + 6));
+export function patternWeight(delta, nSmall, nCheckins, daysSince = 0) {
+  if (nCheckins >= PATTERN_FULL_WINDOW && nSmall < Math.max(PATTERN_MIN_SIDE, Math.ceil(nCheckins * PATTERN_MIN_SHARE))) return null;
+  if (daysSince > PATTERN_STALE) return null;
+  const recency = daysSince <= PATTERN_FRESH ? 1 : 1 - 0.5 * ((daysSince - PATTERN_FRESH) / (PATTERN_STALE - PATTERN_FRESH));
+  return delta * (nSmall / (nSmall + 6)) * recency;
+}
+
+/** Days since a logged item was last logged (any amount), or Infinity if never. */
+export function daysSinceLogged(factorId, data, today = localDate()) {
+  let last = null;
+  for (const l of data.factorLogs) if (l.factorId === factorId && Number(l.value) > 0 && l.date <= today && (!last || l.date > last)) last = l.date;
+  return last ? daysBetween(last, today) : Infinity;
 }
 
 /**
@@ -463,7 +476,7 @@ export function painRisks(factors, data, today = localDate()) {
   for (const factor of factors) {
     const st = factorStory(factor, data, today), b = st.best;
     if (!b || st.early || b.delta < SAME_BAND) continue;
-    if (patternWeight(b.delta, Math.min(b.nWith, b.nWithout), st.nCheckins) == null) continue;
+    if (patternWeight(b.delta, Math.min(b.nWith, b.nWithout), st.nCheckins, daysSinceLogged(factor.id, data, today)) == null) continue;
     if (!st.amount && st.nWith >= st.nCheckins * 0.6) continue;
     const amounts = amountsByDate(data.factorLogs, factor.id);
     if (last.every(d => (amounts.get(d) || 0) > (st.amount ? b.cut : 0))) out.push({ factor, delta: b.delta, amount: st.amount });

@@ -7,11 +7,12 @@
 //   Routines: enough days before and since, done on most days since, a gap of nearly a point or more, and
 //     a shuffle test that chance alone rarely matches. Pain moving after a start isn't proof the routine did it.
 import { addDays, daysBetween, localDate } from './dates.js';
-import { flareEpisodes, painByDate } from './analysis.js';
+import { flareEpisodes, painByDate, daysSinceLogged } from './analysis.js';
 import { SCORES, presence, seeded, shuffled } from './insights.js';
 
 const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
 const FLARE_DAYS = 120; // how far back flares are looked at
+const STILL_LOGGED = 21; // days since an item was last logged, at most, for it to be looked at
 const MIN_FLARES = 3, RUNUP_SHARE = 0.75, BASE_MAX = 0.4, FLARE_ALPHA = 0.05;
 const TREND_BEFORE = 28, TREND_MAX_SINCE = 56, NEED_BEFORE = 10, NEED_SINCE = 14, DONE_SHARE = 0.4, TREND_GAP = 0.8, TREND_ALPHA = 0.01, SHUFFLES = 1999;
 
@@ -39,7 +40,8 @@ export function flareRunUp(data, factors, today = localDate()) {
   const dates = entries.filter(e => e.painScore != null).map(e => e.date).sort();
   const logged = new Set(dates);
   const flareDays = new Set(flares.flatMap(f => Array.from({ length: f.days }, (_, i) => addDays(f.start, i))));
-  const subjects = [...factors, ...SCORES];
+  // Only what's still being logged, as for delays and combinations
+  const subjects = [...factors.filter(f => daysSinceLogged(f.id, data, today) <= STILL_LOGGED), ...SCORES];
   let best = null;
   for (const subject of subjects) {
     const p = presence(subject, data, dates);

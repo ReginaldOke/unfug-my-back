@@ -579,8 +579,8 @@ export function RoutineView(ctx) {
     });
     name.addEventListener('click', () => { if (document.activeElement !== name) name.focus(); });
     // Boxes: reps, then up to four more (weight, a hold, a note…), in the same columns on every set. A
-    // move done in sets has a line for each set after the first, under its name. Too many boxes to fit
-    // scroll sideways, all of a move's lines together.
+    // move done in sets has a line for each set after the first, under its name. When the boxes need more
+    // room than beside the name, every line of the move puts them on a line of their own, under its name.
     const cells = x => (x.extra ? x.extra.split(SEP) : []);
     const store = (x, arr) => { const a = [...arr]; while (a.length && !a.at(-1)?.trim()) a.pop(); x.extra = a.join(SEP); };
     const lines = () => [it, ...(it.rows ??= [])];
@@ -591,7 +591,13 @@ export function RoutineView(ctx) {
       const byCol = new Map();
       for (const sc of scrollers) [...sc.children].forEach((el, k) => { fitWidth(el); byCol.set(k, [...(byCol.get(k) ?? []), el]); });
       // Each column as wide as its widest box, so sets line up
-      for (const els of byCol.values()) { const w = Math.max(...els.map(el => parseFloat(el.style.width) || 0)); for (const el of els) el.style.width = `${w}px`; }
+      let need = 0;
+      for (const els of byCol.values()) { const w = Math.max(...els.map(el => parseFloat(el.style.width) || 0)); for (const el of els) el.style.width = `${w}px`; need += w + 8; }
+      // Beside the name the boxes get at most 60% of the row; past that, all of the move's lines stack
+      const width = main.clientWidth;
+      // While typing in one of its boxes a move stays as it is, so the line doesn't jump under the finger
+      const typing = row.contains(document.activeElement) && document.activeElement.classList.contains('did-input');
+      if (width && !(typing && row.classList.contains('stacked'))) row.classList.toggle('stacked', need - 8 > width * 0.6);
       scrollers.forEach(edges);
     });
     const edges = sc => {
@@ -623,7 +629,9 @@ export function RoutineView(ctx) {
         'aria-label': `Box ${k + 2} for ${it.name}${i ? `, set ${i + 1}` : ''}, like weight or a note`,
         oninput: e => { const a = cells(x); while (a.length <= k) a.push(''); a[k] = e.target.value; store(x, a); s.touched = true; fitAll(); },
         onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
-        onblur: () => setTimeout(() => dropEmpty(k), 0),
+        // A note is kept short in its box, and opens out to its full width while it's being typed in
+        onfocus: fitAll,
+        onblur: () => { fitAll(); setTimeout(() => dropEmpty(k), 0); },
       }));
       const sc = h('div', { class: 'log-fields', onscroll: onScroll }, did, ...extras);
       scrollers.push(sc);
@@ -706,7 +714,13 @@ export function RoutineView(ctx) {
     const row = h('div', { class: 'log-row drag-row' }, del, inner);
     rowItem.set(row, it);
 
-    function remove() {
+    async function remove() {
+      // A move with sets or several boxes filled in asks first; a bare one just goes
+      const filled = lines().reduce((n, x) => n + (x.did?.trim() ? 1 : 0) + cells(x).filter(c => c.trim()).length, 0);
+      if (it.rows?.length || filled >= 3) {
+        const body = it.rows?.length ? `Its ${it.rows.length + 1} sets will go too.` : 'What you entered for it will go too.';
+        if (!(await confirmSheet(`Delete ${it.name.trim() || 'this move'}?`, body, 'Delete', { danger: true }))) { closeOpen(); return; }
+      }
       row.style.height = `${row.offsetHeight}px`;
       row.classList.add('removing');
       requestAnimationFrame(() => { row.style.height = '0px'; });
@@ -1261,11 +1275,13 @@ function fitWidth(input) {
   measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
   const text = input.value || input.placeholder || '';
   const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2;
-  const w = Math.min(190, Math.max(48, Math.ceil(measure.measureText(text).width + pad)));
+  // An extra box (a weight, a note) is kept to a short width unless it's being typed in
+  const most = input.classList.contains('extra-input') && document.activeElement !== input ? 112 : 190;
+  const w = Math.min(most, Math.max(48, Math.ceil(measure.measureText(text).width + pad)));
   input.style.width = `${w}px`;
   // The boxes use even-width digits, which the measuring doesn't: widen by whatever still doesn't fit
   const over = input.scrollWidth - input.clientWidth;
-  if (over > 0) input.style.width = `${Math.min(190, w + over + 2)}px`;
+  if (over > 0) input.style.width = `${Math.min(most, w + over + 2)}px`;
 }
 
 function scrubNumber(input, seed, onChange = () => {}) {

@@ -13,7 +13,7 @@
 // Shuffles use a fixed seed per question, so the same diary always gives the same answer.
 
 import { addDays, localDate } from './dates.js';
-import { painByDate, amountsByDate, balancedCut, MIN_DAYS } from './analysis.js';
+import { painByDate, amountsByDate, balancedCut, daysSinceLogged, MIN_DAYS } from './analysis.js';
 
 const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
 export const NEED = 3; // days on each side (and with both together) before anything is said
@@ -28,6 +28,7 @@ const FALSE_FINDS = 0.05;
 const MAX_PAIRS_FROM = 6; // the most often logged things, paired with each other
 // Insights look further back than a single comparison: more days is the honest way to be surer
 export const INSIGHT_DAYS = 56;
+const STILL_LOGGED = 21; // days since an item was last logged, at most, for it to be looked at
 
 // ---------- Small tools ----------
 
@@ -205,7 +206,8 @@ export function findInsights(data, factors, today = localDate(), max = 3) {
 
   const found = [];
   let asked = 0;
-  factors = [...factors, ...SCORES];
+  // Only what's still being logged: something last logged weeks ago can't say much about now
+  factors = [...factors.filter(f => daysSinceLogged(f.id, data, today) <= STILL_LOGGED), ...SCORES];
   for (const f of factors) {
     for (const lag of [1, 2]) {
       const x = explainLag(f, data, lag, today);

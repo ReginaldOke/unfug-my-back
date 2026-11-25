@@ -6,7 +6,7 @@ import { shareDiary, copyDiary } from '../lib/ai.js';
 import { HEALTH_IMPORT } from '../lib/health.js';
 import { HEALTH_LINES } from '../lib/health-days.js';
 import { notificationStatus, onBanners, dismiss, countVisit } from '../lib/notify.js';
-import { quickSummary, trendFindings, factorStory, scoreSplits, painLink, patternWeight, painRisks } from '../lib/analysis.js';
+import { quickSummary, trendFindings, factorStory, scoreSplits, painLink, patternWeight, painRisks, daysSinceLogged } from '../lib/analysis.js';
 import { findInsights } from '../lib/insights.js';
 import { careNotice } from '../lib/care.js';
 import { localDate, addDays, daysBetween, fmtTime, minutesSince, parseDate } from '../lib/dates.js';
@@ -571,7 +571,7 @@ function patternsCard(today) {
       const n = midName(f.name);
       // Time and counts read "with more long sitting"; yes or no reads "with a heat pack"
       return st.best && { name: f.name, href: `#/factor/${f.id}`, delta: st.best.delta, early: st.early, phrase: st.amount ? `on days with more ${n}` : `on days with ${n}`,
-        weight: patternWeight(st.best.delta, Math.min(st.best.nWith, st.best.nWithout), st.nCheckins) };
+        weight: patternWeight(st.best.delta, Math.min(st.best.nWith, st.best.nWithout), st.nCheckins, daysSinceLogged(f.id, data, today)) };
     }),
     ...scoreSplits(data, today).map(x => ({ name: x.name, href: `#/score/${x.key}`, delta: x.split.delta, early: x.split.early, phrase: SCORE_PHRASE[x.key],
       weight: patternWeight(x.split.delta, Math.min(x.split.nMore, x.split.nLess), x.split.nMore + x.split.nLess) })),
@@ -594,7 +594,8 @@ function patternsCard(today) {
   // comes before flares, delays, combinations, and pain since a routine started. Without any, the longest
   // bar below, in words, once it's a real difference
   const insights = patternsFor(data, factors, findInsights(data, factors, today), today).map(x => ({ title: x.title, href: `#/insight/${x.id}`, bad: x.bad, kind: x.kind }));
-  const top = [...shown].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+  // The one most worth saying: the strongest by the same weighing as the bars, not just the biggest gap
+  const top = [...shown].sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))[0];
   const leads = insights.length ? insights
     : Math.abs(top.delta) >= 0.5 ? [{ title: `${top.delta > 0 ? 'More' : 'Less'} pain ${top.phrase}`, href: top.href, bad: top.delta > 0 }] : [];
   const warn = headsUp(factors, data, today);
