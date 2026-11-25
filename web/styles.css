@@ -2439,3 +2439,14 @@ input.set-label:focus { outline: none; color: var(--ink); }
 .spot-veil { fill: var(--bg); opacity: .62; }
 .spot-tag { font: 500 9px var(--font); letter-spacing: .06em; fill: #e2687f; text-transform: uppercase; }
 .insight-page .cmp strong { white-space: nowrap; }
+
+/* See form: pressed at once, then a small spinner in place of its icon while the video opens */
+.form-video.opening, .move-orb.orb-form.opening { color: var(--ink); }
+.move-stage .form-video.opening { scale: .96; }
+.opening .fv-icon { position: relative; }
+.opening .fv-icon svg { opacity: 0; }
+.opening .fv-icon::after { content: ''; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: fv-spin .7s linear infinite; }
+.move-orb.orb-form.opening .fv-icon::after { width: 24px; height: 24px; border-width: 2.5px; }
+@keyframes fv-spin { to { transform: rotate(360deg); } }
+/* A set still on its usual name ("Push-ups (2)") is lighter, so it reads as a repeat */
+input.set-label.auto { color: var(--ink-3); }

@@ -3,6 +3,8 @@ import Capacitor
 import CoreMotion
 import UserNotifications
 import BackgroundTasks
+import Speech
+import AVFoundation
 
 /// The app's web view, with the plugins below registered on it.
 class AppViewController: CAPBridgeViewController {
@@ -11,6 +13,7 @@ class AppViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(MotionHistoryPlugin())
         bridge?.registerPluginInstance(AppLaunchPlugin())
+        bridge?.registerPluginInstance(SpeechPlugin())
     }
 
     override open func viewDidLoad() {
@@ -215,7 +218,26 @@ public class AppLaunchPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "setTheme", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "keepAwake", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openVideo", returnType: CAPPluginReturnPromise),
     ]
+
+    /// A YouTube search: straight into the YouTube app when it's installed (no stop in Safari first),
+    /// otherwise the web page. Resolves once iOS has handed it over.
+    @objc func openVideo(_ call: CAPPluginCall) {
+        guard let web = call.getString("url"), let url = URL(string: web) else { call.reject("No link"); return }
+        var app = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        app?.scheme = "youtube"
+        DispatchQueue.main.async {
+            if let direct = app?.url {
+                UIApplication.shared.open(direct, options: [:]) { opened in
+                    if opened { call.resolve(["app": true]); return }
+                    UIApplication.shared.open(url, options: [:]) { _ in call.resolve(["app": false]) }
+                }
+            } else {
+                UIApplication.shared.open(url, options: [:]) { _ in call.resolve(["app": false]) }
+            }
+        }
+    }
     private static let key = "themeSetting"
 
     /// The same rule as theme.js: the setting if there is one, otherwise light from 6am and dark from 5pm.
@@ -411,4 +433,76 @@ extension ISO8601DateFormatter {
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
+}
+
+
+/// Speech to text with Apple's recogniser, for saying reps and moves out loud (the web view has no speech
+/// recognition of its own). Sends "result" with the words so far as they arrive, and "end" when it stops.
+public class SpeechPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "SpeechPlugin"
+    public let jsName = "Speech"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+    ]
+    private let engine = AVAudioEngine()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var task: SFSpeechRecognitionTask?
+
+    @objc func start(_ call: CAPPluginCall) {
+        let lang = call.getString("lang")
+        SFSpeechRecognizer.requestAuthorization { status in
+            guard status == .authorized else { call.reject("not-allowed"); return }
+            AVAudioSession.sharedInstance().requestRecordPermission { ok in
+                DispatchQueue.main.async {
+                    guard ok else { call.reject("not-allowed"); return }
+                    do { try self.begin(lang: lang); call.resolve() } catch { self.finish(); call.reject(error.localizedDescription) }
+                }
+            }
+        }
+    }
+
+    @objc func stop(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            // Stop listening; the recogniser then gives its last words and "end" follows
+            if self.engine.isRunning { self.engine.stop(); self.engine.inputNode.removeTap(onBus: 0) }
+            self.request?.endAudio()
+            call.resolve()
+        }
+    }
+
+    private func begin(lang: String?) throws {
+        finish()
+        let recogniser = lang.flatMap { SFSpeechRecognizer(locale: Locale(identifier: $0)) } ?? SFSpeechRecognizer()
+        guard let recogniser, recogniser.isAvailable else { throw NSError(domain: "Speech", code: 1, userInfo: [NSLocalizedDescriptionKey: "unavailable"]) }
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
+        let input = engine.inputNode
+        input.removeTap(onBus: 0)
+        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in req.append(buffer) }
+        engine.prepare()
+        try engine.start()
+        request = req
+        task = recogniser.recognitionTask(with: req) { [weak self] result, error in
+            guard let self else { return }
+            if let result {
+                self.notifyListeners("result", data: ["text": result.bestTranscription.formattedString, "final": result.isFinal])
+            }
+            if error != nil || result?.isFinal == true {
+                DispatchQueue.main.async { self.finish(); self.notifyListeners("end", data: [:]) }
+            }
+        }
+    }
+
+    private func finish() {
+        if engine.isRunning { engine.stop(); engine.inputNode.removeTap(onBus: 0) }
+        request?.endAudio()
+        task?.cancel()
+        task = nil
+        request = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
 }

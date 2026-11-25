@@ -45,3 +45,15 @@ export function spokenAmount(text) {
   const { dose } = readNumbers(t);
   return dose.replace(/ reps$/, '') || t.match(/\d+(?:[.,]\d+)?/)?.[0] || '';
 }
+
+/** Just the number said, for a box that takes a count: "twelve" → "12", "I did fifteen" → "15". */
+export function spokenNumber(text) {
+  return digits(text).match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.') ?? '';
+}
+
+/** A move typed or dictated with its amount in the name ("10 push ups"), as { name, did }, or null. */
+export function splitTyped(text) {
+  if (!/\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|a minute|a dozen)\b/i.test(text)) return null;
+  const [m] = spokenMoves(text);
+  return m?.did ? { name: m.name, did: m.did, ...(m.extra ? { extra: m.extra } : {}) } : null;
+}

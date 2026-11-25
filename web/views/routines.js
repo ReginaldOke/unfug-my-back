@@ -10,14 +10,14 @@ import { checkinDraft } from './checkin.js';
 import { MoveFigure, figureTop } from './figure.js';
 import { isTimed, formVideoUrl, startIndex } from '../lib/play.js';
 import { calmFor } from '../lib/calm.js';
-import { keepAwake } from '../lib/native.js';
+import { keepAwake, openVideo } from '../lib/native.js';
 import { dragHandles } from './sortable.js';
 import { libraryRoutine } from '../lib/routine-library.js';
 import { emojiFor } from '../lib/labels.js';
 import { readRoutine } from '../lib/routine-import.js';
 import { readRoutineFile } from '../lib/routine-files.js';
 import { nameForMoves, nameForSplit, nameDays, freshName } from '../lib/routine-name.js';
-import { spokenMoves, matchMove, spokenAmount } from '../lib/voice-moves.js';
+import { spokenMoves, matchMove, spokenNumber, splitTyped } from '../lib/voice-moves.js';
 import { normName } from '../lib/move-names.js';
 import { voiceSupported, startDictation } from '../lib/voice.js';
 
@@ -662,18 +662,34 @@ export function RoutineView(ctx) {
       onclick: () => { cols++; it.extraDose = undefined; paintMove(); main.querySelectorAll('.extra-input')[cols - 1]?.focus(); },
     }, '+');
     const main = h('div', { class: 'log-line' });
+    function setLabel(x, j) {
+      const auto = () => `${it.name.trim() || 'Set'} (${j + 2})`;
+      const input = h('input', {
+        type: 'text', class: `log-gap set-label${x.label?.trim() ? '' : ' auto'}`, value: x.label?.trim() || auto(), 'data-n': j + 2, 'aria-label': `Name of set ${j + 2}`, maxlength: 40,
+        oninput: e => {
+          const v = e.target.value.trim();
+          // Back to the usual name, or cleared: it follows the move again
+          x.label = v && v !== auto() ? e.target.value : undefined;
+          input.classList.toggle('auto', !x.label);
+          s.touched = true;
+        },
+        onblur: e => { if (!e.target.value.trim()) e.target.value = auto(); },
+        onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
+      });
+      return input;
+    }
     const setLines = h('div', { class: 'log-sets' });
+    // Renaming the move renames the sets still on their usual names
+    name.addEventListener('input', () => setLines.querySelectorAll('.set-label.auto').forEach(el => { el.value = `${it.name.trim() || 'Set'} (${el.dataset.n})`; }));
     function paintMove() {
       scrollers.length = 0;
       plus.hidden = cols >= MAX_BOXES - 1;
       repeatBtn.hidden = it.rows.length >= MAX_SETS - 1;
       main.replaceChildren(name, h('span', { class: 'log-tools' }, repeatBtn, plus), fields(it, 0));
       setLines.replaceChildren(...it.rows.map((x, j) => h('div', { class: 'log-line log-set' },
-        // A set dropped in from the timer keeps its name, as a subheading ("Side plank" under "Plank + side plank")
-        x.label != null ? h('input', {
-          type: 'text', class: 'log-gap set-label', value: x.label, placeholder: '', 'aria-label': `Name of set ${j + 2}`, maxlength: 40,
-          oninput: e => { x.label = e.target.value; s.touched = true; }, onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
-        }) : h('span', { class: 'log-gap', 'aria-hidden': 'true' }),
+        // Each set is named, lighter than the move: "Push-ups (2)", "(3)" and so on until it's renamed (a
+        // different variation that time, or a recording dropped in from the timer)
+        setLabel(x, j),
         h('span', { class: 'log-tools' },
           h('button', {
             type: 'button', class: 'extra-add set-remove', 'aria-label': `Remove set ${j + 2} of ${it.name}`, title: 'Remove this set',
@@ -763,7 +779,7 @@ export function RoutineView(ctx) {
   // Adding a move: its name, then how many; Enter goes from one to the other, then adds it
   const addName = h('input', {
     type: 'text', class: 'log-add-input', placeholder: '+ Add a move', 'aria-label': 'New move', enterkeyhint: 'next',
-    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addReps.focus(); } },
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); splitName(); addReps.focus(); } },
   });
   const addReps = h('input', {
     type: 'text', class: 'did-input log-add-reps', placeholder: '', 'aria-label': 'Reps, weight or time for the new move', enterkeyhint: 'done',
@@ -808,7 +824,14 @@ export function RoutineView(ctx) {
   ctx.onCleanup(() => voice?.stop());
   // Leaving the pair (not moving between its two boxes) adds what's there
   add.addEventListener('focusout', e => { if (!add.contains(e.relatedTarget)) commitAdd(); });
+  // "10 push ups" typed or dictated into the name: the number goes in the box and the name keeps the move
+  const splitName = () => {
+    const x = !addReps.value.trim() && splitTyped(addName.value);
+    if (x) { addName.value = x.name; addReps.value = x.did; }
+  };
+  addName.addEventListener('change', splitName);
   function commitAdd() {
+    splitName();
     const name = addName.value.trim();
     if (!name) return;
     const dose = addReps.value.trim();
@@ -1081,6 +1104,23 @@ function centreForm(name, figure, video, bar, tries = 20) {
  * A small round mic. Tap to listen, tap again to stop. onSaid gets each finished phrase as it's heard
  * (with once, it stops after the first). onListen(on) tells when it starts and stops.
  */
+/**
+ * See form: shows it's been pressed straight away and spins until the video app takes over (or for a few
+ * seconds, if it doesn't), then opens the search, in the YouTube app itself where there is one.
+ */
+function openForm(e) {
+  e.preventDefault();
+  const el = e.currentTarget;
+  if (el.classList.contains('opening')) return;
+  el.classList.add('opening');
+  vibrate(6);
+  const done = () => { el.classList.remove('opening'); document.removeEventListener('visibilitychange', back); };
+  const back = () => { if (document.visibilityState === 'visible') done(); };
+  document.addEventListener('visibilitychange', back);
+  setTimeout(done, 4000);
+  openVideo(el.href);
+}
+
 function micButton({ label, onSaid, onListen = () => {}, once = false }) {
   let stop = null;
   const b = h('button', {
@@ -1340,6 +1380,7 @@ export function RoutineRunView(ctx) {
     const video = h('a', { class: 'glass form-video', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': calm ? `Guided ${it.name} videos` : `See form videos for ${it.name}` },
       h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', {}, calm ? 'Guided' : 'See form'));
     video.firstChild.innerHTML = WATCH;
+    video.addEventListener('click', openForm);
     // With no figure for the move, the circle itself is the way to see how it's done
     const figure = MoveFigure(it.name);
     let art;
@@ -1347,6 +1388,7 @@ export function RoutineRunView(ctx) {
     else {
       const orb = h('a', { class: 'move-orb orb-form', href: formVideoUrl(it.name), target: '_blank', rel: 'noopener', 'aria-label': `See form videos for ${it.name}` },
         h('span', { class: 'fv-icon', 'aria-hidden': 'true' }), h('span', { class: 'orb-label' }, 'See form'));
+      orb.addEventListener('click', openForm);
       orb.firstChild.innerHTML = WATCH;
       art = h('div', { class: 'move-art' }, orb);
     }
@@ -1363,7 +1405,7 @@ export function RoutineRunView(ctx) {
       art, h('h1', { tabindex: -1 }, it.name), how ? h('p', { class: 'run-how' }, how) : null,
       (() => {
         // A mic in the reps box: say the number and it goes in
-        const mic = voiceSupported ? micButton({ label: `Say reps for ${it.name}`, once: true, onSaid: text => { const v = spokenAmount(text); if (v) { amount.value = it.did = v; vibrate(8); } } }) : null;
+        const mic = voiceSupported ? micButton({ label: `Say reps for ${it.name}`, once: true, onSaid: text => { const v = spokenNumber(text); if (v) { amount.value = it.did = v; amount.dispatchEvent(new Event('input', { bubbles: true })); vibrate(8); } } }) : null;
         if (mic) ctx.onCleanup(() => mic.stop());
         const box = mic ? h('div', { class: 'did-mic' }, amount, mic) : amount;
         return extra ? h('div', { class: 'did-pair' }, box, extra) : box;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spokenMoves, matchMove, spokenAmount, digits } from '../web/lib/voice-moves.js';
+import { spokenMoves, matchMove, spokenAmount, digits, spokenNumber, splitTyped } from '../web/lib/voice-moves.js';
 
 test('numbers said as words become digits', () => {
   assert.equal(digits('twenty five push ups'), '25 push ups');
@@ -28,4 +28,17 @@ test('reps for the player box', () => {
   assert.equal(spokenAmount('twelve'), '12');
   assert.equal(spokenAmount('three sets of ten'), '3 × 10');
   assert.equal(spokenAmount('forty five seconds'), '45 s');
+});
+
+test('a move typed with its amount splits into name and reps', () => {
+  assert.deepEqual(splitTyped('10 push ups'), { name: 'Push-up', did: '10' });
+  assert.equal(splitTyped('ten push ups')?.did, '10');
+  assert.equal(splitTyped('Bulgarian split squat'), null);
+  assert.equal(splitTyped('Plank one minute')?.name, 'Plank');
+});
+
+test('the player box takes just the number said', () => {
+  assert.equal(spokenNumber('twelve'), '12');
+  assert.equal(spokenNumber('I did fifteen'), '15');
+  assert.equal(spokenNumber('um'), '');
 });

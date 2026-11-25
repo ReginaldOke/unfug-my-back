@@ -314,3 +314,9 @@ export function keepAwake() {
   document.addEventListener('visibilitychange', ask);
   return () => { done = true; document.removeEventListener('visibilitychange', ask); lock?.release().catch(() => {}); };
 }
+
+/** Opens a form video search: in the app, straight into the YouTube app when it's there; in a browser, a new tab. */
+export async function openVideo(url) {
+  if (!isNative) { window.open(url, '_blank', 'noopener'); return; }
+  try { await App.openVideo({ url }); } catch { window.open(url, '_blank'); }
+}
