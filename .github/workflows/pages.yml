@@ -36,9 +36,9 @@ jobs:
           cp node_modules/three/examples/jsm/controls/OrbitControls.js web/vendor/three/examples/jsm/controls/
           cp node_modules/three/examples/jsm/loaders/{OBJLoader,GLTFLoader}.js web/vendor/three/examples/jsm/loaders/
           cp node_modules/three/examples/jsm/utils/{BufferGeometryUtils,SkeletonUtils}.js web/vendor/three/examples/jsm/utils/
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: web
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
